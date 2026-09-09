@@ -4,3 +4,9 @@
 [submodule "services/game-service"]
 	path = services/game-service
 	url = https://github.com/TimurCravtov/KahootWithUndeadGameService.git
+[submodule "services/base-service"]
+	path = services/base-service
+	url = git@github.com:M1XaM/kahoots-base-service.git
+[submodule "services/crafting-service"]
+	path = services/crafting-service
+	url = git@github.com:M1XaM/kahoots-crafting-service.git
