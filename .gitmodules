@@ -1,0 +1,6 @@
+[submodule "services/player-service"]
+	path = services/player-service
+	url = https://github.com/TimurCravtov/KahootWithUndeadPlayerService.git
+[submodule "services/game-service"]
+	path = services/game-service
+	url = https://github.com/TimurCravtov/KahootWithUndeadGameService.git
