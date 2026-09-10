@@ -33,9 +33,3 @@
 - **Kafka (async)** — producer shouldn't block on the reaction (e.g. `exam.completed`, resource
   completions); consumers dedupe on `eventId`.
 - **WebSockets** — client-facing live push only (Game Service sessions), never service-to-service.
-
-<details>
-  <summary>Click to expand</summary>
-  <i>hello</i>
-  Here is the hidden content that appears when you click the summary.
-</details>
