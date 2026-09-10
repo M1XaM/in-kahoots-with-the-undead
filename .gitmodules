@@ -1,0 +1,24 @@
+[submodule "services/player-service"]
+	path = services/player-service
+	url = https://github.com/TimurCravtov/KahootWithUndeadPlayerService.git
+[submodule "services/game-service"]
+	path = services/game-service
+	url = https://github.com/TimurCravtov/KahootWithUndeadGameService.git
+[submodule "services/base-service"]
+	path = services/base-service
+	url = git@github.com:M1XaM/kahoots-base-service.git
+[submodule "services/crafting-service"]
+	path = services/crafting-service
+	url = git@github.com:M1XaM/kahoots-crafting-service.git
+[submodule "services/resource-service"]
+	path = services/resource-service
+	url = git@github.com:NeValetik/kahoot-resource-service.git
+[submodule "services/zombie-service"]
+	path = services/zombie-service
+	url = git@github.com:NeValetik/kahoot-zombie-service.git
+[submodule "services/world-service"]
+	path = services/world-service
+	url = https://github.com/inercaso/world-service.git
+[submodule "services/exam-service"]
+	path = services/exam-service
+	url = https://github.com/inercaso/exam-service.git
