@@ -1,0 +1,15 @@
+name: Create Item
+$kind: http-request
+method: POST
+url: http://localhost:8081/items
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |
+    {
+      "itemId": "coffee",
+      "name": "Coffee",
+      "type": "consumable"
+    }

@@ -5,6 +5,25 @@ during a zombie apocalypse and must scavenge resources, build up their base, and
 including Professor Zombies, who force a pop quiz before letting you past. Passing exams unlocks new
 wings of the university to explore, tying academic progress directly to survival progress.
 
+[![player-service](https://img.shields.io/docker/v/timurcravtov/player-service?sort=semver&label=player-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/player-service)
+[![game-service](https://img.shields.io/badge/game--service-v--.--.---red?logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/game-service)
+[![exam-service](https://img.shields.io/badge/exam--service-v--.--.---red?logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/exam-service)
+[![world-service](https://img.shields.io/badge/world--service-v--.--.---red?logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/world-service)
+[![zombie-service](https://img.shields.io/badge/zombie--service-v--.--.---red?logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/zombie-service)
+[![resource-service](https://img.shields.io/badge/resource--service-v--.--.---red?logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/resource-service)
+[![base-service](https://img.shields.io/badge/base--service-v--.--.---red?logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/base-service)
+[![crafting-service](https://img.shields.io/badge/crafting--service-v--.--.---red?logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/crafting-service)
+
+[![player-service postman](https://img.shields.io/badge/player--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/player-service)
+[![game-service postman](https://img.shields.io/badge/game--service-no--docs-red?logo=postman&logoColor=white)](docs/postman/game-service)
+[![exam-service postman](https://img.shields.io/badge/exam--service-no--docs-red?logo=postman&logoColor=white)](docs/postman/exam-service)
+[![world-service postman](https://img.shields.io/badge/world--service-no--docs-red?logo=postman&logoColor=white)](docs/postman/world-service)
+[![zombie-service postman](https://img.shields.io/badge/zombie--service-no--docs-red?logo=postman&logoColor=white)](docs/postman/zombie-service)
+[![resource-service postman](https://img.shields.io/badge/resource--service-no--docs-red?logo=postman&logoColor=white)](docs/postman/resource-service)
+[![base-service postman](https://img.shields.io/badge/base--service-no--docs-red?logo=postman&logoColor=white)](docs/postman/base-service)
+[![crafting-service postman](https://img.shields.io/badge/crafting--service-no--docs-red?logo=postman&logoColor=white)](docs/postman/crafting-service)
+
+
 ## Architecture
 
 ![Architecture diagram](docs/architecture.png)

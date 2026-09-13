@@ -1,0 +1,4 @@
+name: Get All Items
+$kind: http-request
+method: GET
+url: http://localhost:8081/items
