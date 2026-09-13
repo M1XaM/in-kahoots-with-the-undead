@@ -1,0 +1,14 @@
+name: Create Player
+$kind: http-request
+method: POST
+url: http://localhost:8081/players
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |
+    {
+      "username": "razvan",
+      "password": "hunter2hunter2"
+    }

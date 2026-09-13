@@ -1,0 +1,16 @@
+name: Update Player
+$kind: http-request
+method: PUT
+url: http://localhost:8081/players/1
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |
+    {
+      "username": "razvan2",
+      "level": 2,
+      "xp": 100,
+      "online": true
+    }
