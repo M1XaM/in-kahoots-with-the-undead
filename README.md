@@ -45,12 +45,25 @@ Contract](docs/communication.md) for the full endpoint and event contract.
 ## GitHub Workflow
 
 - **Branches**: `main` is protected: no direct pushes, merges only through a reviewed PR, CI must
-  pass. `develop` is the integration branch everyone works off; feature work branches off `develop`
-  and merges back into it, and `develop` is merged into `main` for releases.
+  pass. `dev` is the integration branch everyone works off; feature work branches off `dev`
+  and merges back into it, and `dev` is merged into `main` for releases.
 - **Naming**: `feature/<short-description>`, `fix/<short-description>`, `chore/<short-description>`
   (e.g. `feature/resource-reservations`).
-- **Merging**: squash merge, PR title becomes the commit message. Requires 1 approval and a
-  passing CI run before the merge button unlocks.
+- **Commits**: follow [Conventional Commits](https://www.conventionalcommits.org):
+  `type(scope)!: description`, where `(scope)` and `!` are optional. Use the imperative mood,
+  lowercase, no trailing period (e.g. `feat(auth): add login endpoint`,
+  `fix(db): correct migration order`, `feat(auth)!: change token format`).
+  - Types: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `ci`, `build`, `perf`.
+  - Scope: the module or area touched, such as `auth`, `inventory` or `session`.
+  - `!` marks a breaking API/event change and describes it in the commit body.
+  - The release workflow reads these subjects to pick the version: `!` bumps `MAJOR`, `feat` bumps
+    `MINOR`, anything else bumps `PATCH`. Because `dev` uses rebase merges, every commit in a PR
+    reaches history as written, so each one must follow the format, not just the PR title.
+  - The `Commit message check` action validates every commit in PRs into `dev` and `main`. Merge
+    commits (e.g. `Merge branch 'main' into dev`) are skipped.
+- **Merging**: into `dev`, use rebase and merge (linear history, each commit is kept). Into
+  `main`, use a merge commit so each release is a single visible merge point. Squash merge is not
+  used. Requires 1 approval and a passing CI run before the merge button unlocks.
 - **PR content**: what changed and why, which service(s) it touches, how it was tested, and any
   follow-up work left out of scope. Linked to the relevant task/issue.
 - **Test coverage**: new logic needs tests before merge; CI fails the build below the coverage
