@@ -58,33 +58,100 @@ sends the same cookie.
 
 Internal endpoints require `X-Internal-Key: <shared secret>` (from environment, never committed).
 A service acting for a player also sends `X-Player-Id: <int>` so the callee can attribute the write.
+The same `X-Internal-Key` header authenticates the handshake of a service event connection (see
+[Service events](#service-events)).
 
 ---
 
 ## Data ownership
 
 Each service owns its own database instance. No shared tables, no cross-service joins, no reading
-another service's DB. Data owned elsewhere is fetched over REST or received via events.
+another service's DB. Data owned elsewhere is fetched over REST or received via [service
+events](#service-events).
 
 | Service | Store |
 |---|---|
 | Player, Exam, World, Zombie, Base, Crafting, Resource | PostgreSQL, one database per service |
 | Game | Redis (live session and timer state), PostgreSQL (session history) |
 
-Sync REST when the caller needs the answer to continue. Kafka when something happened that other
-services react to. Every event is wrapped in the same envelope and consumers deduplicate on `eventId`:
+---
+
+## Service events
+
+Sync REST when the caller needs the answer to continue. WebSocket events when something happened
+that other services react to. There is no message broker: every producing service serves its own
+events over a WebSocket and consumers connect to it.
+
+### Connection
+
+A producer exposes `GET /events`, upgraded to a WebSocket, on its normal port (e.g.
+`ws://exam:8083/events`). The consumer is the client: it opens the connection, authenticates the
+handshake with `X-Internal-Key`, and keeps it open. A producer never connects to a consumer.
+
+Game serves `/events` as a plain WebSocket next to the client-facing `/game` Socket.IO namespace;
+the two are unrelated.
+
+| Consumer | Connects to |
+|---|---|
+| Player | Game |
+| Game | Exam, World, Resource |
+| Exam | — |
+| World | Exam |
+| Resource | Player, Game |
+| Base | Player |
+| Crafting | Player, Exam, World |
+| Zombie | — |
+
+### Envelope
+
+Every event carries the same envelope. `type` is the event name, `<service>.<event>`, e.g.
+`exam.completed`:
 
 ```json
 {
   "eventId": "6f1c0c3e-…",
-  "type": "ExamCompleted",
+  "type": "exam.completed",
   "version": 1,
   "occurredAt": "2026-09-09T18:04:11Z",
   "payload": { }
 }
 ```
 
-Topics are named `<service>.<event>`, e.g. `exam.completed`.
+### Frames
+
+Messages on the socket are JSON text frames. The consumer sends:
+
+```json
+{ "op": "subscribe", "types": ["exam.completed"], "since": 1041 }
+```
+
+```json
+{ "op": "ack", "seq": 1042 }
+```
+
+`types` lists the event names wanted. `since` is the `seq` of the last event the consumer has
+processed (`0` on first connect); the producer replays everything after it, then streams live. The
+producer sends:
+
+```json
+{ "op": "event", "seq": 1042, "event": { "eventId": "6f1c0c3e-…", "type": "exam.completed", "version": 1, "occurredAt": "2026-09-09T18:04:11Z", "payload": { } } }
+```
+
+`seq` is a per-producer counter that only increases. A consumer acks after it has handled the event
+and persisted its own effect; it reconnects from its last acked `seq`.
+
+### Delivery
+
+- **At least once.** A producer writes the event to an outbox table in the same database
+  transaction as the state change that caused it, so a crash never loses one. Events are pushed
+  from the outbox and kept for 7 days. A consumer that has been down longer than that must
+  resynchronise over REST.
+- **Consumers deduplicate on `eventId`.** Replay after a reconnect can redeliver events that were
+  handled but not yet acked; handling one twice must be a no-op.
+- **Ordering** holds per producer (`seq`) and not across producers. Where it matters the consumer
+  compares `occurredAt`.
+- **Liveness.** Both sides send WebSocket pings every 30 s and drop the connection after two
+  missed pongs. A consumer reconnects with exponential backoff, 1 s doubling to 30 s.
 
 ---
 
@@ -452,8 +519,8 @@ per level gained.
 <details>
 <summary><b>consumes</b> <code>game.presence_changed</code> — Sets the <code>online</code> flag</summary>
 
-Game emits this on WebSocket connect/disconnect. Player stores the latest value; out-of-order
-delivery is resolved by `occurredAt`.
+Game emits this when a player's client connects to or disconnects from the `/game` socket. Player
+stores the latest value; out-of-order delivery is resolved by `occurredAt`.
 
 </details>
 
@@ -1605,7 +1672,7 @@ Recipe { recipeId: int, name: string, inputs: map<string,int>,
 
 ## Event summary
 
-| Topic | Payload | Producer | Consumers |
+| Event | Payload | Producer | Consumers |
 |---|---|---|---|
 | `player.registered` | `{ playerId, username }` | Player | Base, Resource |
 | `player.leveled_up` | `{ playerId, level }` | Player | Crafting |
