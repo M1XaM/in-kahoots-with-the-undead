@@ -26,7 +26,7 @@ jobs:
           set -euo pipefail
 
           # <type>(<optional scope>)<optional !>: <message>
-          pattern='^(feat|fix|chore|docs|refactor|test|ci|build|perf)(\([^)]+\))?!?: .+'
+          pattern='^(feat|fix|chore|docs|refactor|test|ci|cicd|build|perf)(\([^)]+\))?!?: .+'
 
           total=0
           bad=0
