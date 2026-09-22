@@ -42,6 +42,22 @@ Crafting react to what Game reports via async events, and publish their own even
 exam results, wing unlocks) for services that depend on them. See the [Communication
 Contract](docs/communication.md) for the full endpoint and event contract.
 
+## Running
+
+`docker-compose.yml` brings up every published service together, each with its own Postgres
+instance (one DB per service, no shared tables), pulling images from Docker Hub — it never builds
+from a service's Dockerfile.
+
+```
+cp .env.example .env   # adjust credentials/tags if needed
+docker compose up
+```
+
+| Service | URL |
+|---|---|
+| Player | http://localhost:8081 |
+| Game | http://localhost:8082 |
+
 ## GitHub Workflow
 
 - **Branches**: `main` is protected: no direct pushes, merges only through a reviewed PR, CI must

@@ -1,0 +1,64 @@
+services:
+  player-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${PLAYER_POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${PLAYER_POSTGRES_PASSWORD:-qwerty}
+      POSTGRES_DB: ${PLAYER_POSTGRES_DB:-player}
+    volumes:
+      - player-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PLAYER_POSTGRES_USER:-postgres} -d ${PLAYER_POSTGRES_DB:-player}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  player:
+    image: ${DOCKERHUB_USERNAME:-timurcravtov}/player-service:${PLAYER_SERVICE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      PORT: ${PLAYER_PORT:-8081}
+      DATABASE_URL: postgres://${PLAYER_POSTGRES_USER:-postgres}:${PLAYER_POSTGRES_PASSWORD:-qwerty}@player-db:5432/${PLAYER_POSTGRES_DB:-player}?sslmode=disable
+      INTERNAL_KEY: ${INTERNAL_KEY:-changeme}
+      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:-supersecret}
+      KAFKA_BROKERS: ${KAFKA_BROKERS:-localhost:9092}
+    ports:
+      - "${PLAYER_PORT:-8081}:${PLAYER_PORT:-8081}"
+    depends_on:
+      player-db:
+        condition: service_healthy
+
+  game-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${GAME_POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${GAME_POSTGRES_PASSWORD:-qwerty}
+      POSTGRES_DB: ${GAME_POSTGRES_DB:-game}
+    volumes:
+      - game-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${GAME_POSTGRES_USER:-postgres} -d ${GAME_POSTGRES_DB:-game}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  game:
+    image: ${DOCKERHUB_USERNAME:-timurcravtov}/game-service:${GAME_SERVICE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      PORT: ${GAME_PORT:-8082}
+      DATABASE_URL: postgres://${GAME_POSTGRES_USER:-postgres}:${GAME_POSTGRES_PASSWORD:-qwerty}@game-db:5432/${GAME_POSTGRES_DB:-game}?sslmode=disable
+      INTERNAL_KEY: ${INTERNAL_KEY:-changeme}
+      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:-supersecret}
+      KAFKA_BROKERS: ${KAFKA_BROKERS:-localhost:9092}
+    ports:
+      - "${GAME_PORT:-8082}:${GAME_PORT:-8082}"
+    depends_on:
+      game-db:
+        condition: service_healthy
+
+volumes:
+  player-db-data:
+  game-db-data:
