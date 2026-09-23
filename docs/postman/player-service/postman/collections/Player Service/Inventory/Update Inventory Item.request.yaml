@@ -1,0 +1,13 @@
+name: Update Inventory Item
+$kind: http-request
+method: PUT
+url: http://localhost:8081/players/1/inventory/coffee
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |
+    {
+      "quantity": 5
+    }

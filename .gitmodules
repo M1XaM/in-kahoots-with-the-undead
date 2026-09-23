@@ -16,3 +16,9 @@
 [submodule "services/zombie-service"]
 	path = services/zombie-service
 	url = git@github.com:NeValetik/kahoot-zombie-service.git
+[submodule "services/world-service"]
+	path = services/world-service
+	url = https://github.com/inercaso/world-service.git
+[submodule "services/exam-service"]
+	path = services/exam-service
+	url = https://github.com/inercaso/exam-service.git
