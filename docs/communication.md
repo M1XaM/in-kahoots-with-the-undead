@@ -1672,6 +1672,14 @@ Base     { baseId: int, playerId: int, level: int, storageCapacity: int,
 
 Recipes and crafting. Output items are delivered into the Player Service inventory.
 
+A player's level for `available` is the higher of Player's `GET /players/{id}` and the last
+`player.leveled_up` seen. Unlocked wings are global: once World reports a wing, every player has it.
+
+**Current implementation:** until JWT verification is added, Crafting reads the acting player from
+the `X-Player-Id` header instead of the cookie (internal callers must send it too), and receives
+events over HTTP at `POST /crafting/internal/events` instead of WebSocket connections to Player,
+Exam and World.
+
 ### Endpoints
 
 <details>
@@ -1730,6 +1738,130 @@ is written and `409 DELIVERY_FAILED` is returned; the client can retry with the 
 
 </details>
 
+<details>
+<summary><b>GET</b> <code>/crafting/recipes/{id}</code> — One recipe</summary>
+
+**Caller:** client, internal · **Auth:** cookie or `X-Internal-Key` · **Idempotent:** —
+
+`available` is included when a player is known, computed as in the list.
+
+**Responses**
+
+| Code | When |
+|---|---|
+| `200` | Found; body is the `Recipe` |
+| `404 RECIPE_NOT_FOUND` | No such recipe |
+
+</details>
+
+<details>
+<summary><b>POST</b> <code>/crafting/recipes</code> — Create a recipe</summary>
+
+**Caller:** internal · **Auth:** `X-Internal-Key` · **Idempotent:** —
+
+**Request body**
+
+```json
+{ "name": "Barricade Kit", "inputs": { "wood": 4, "metal": 2 },
+  "output": { "itemId": "barricade_kit", "name": "Barricade Kit", "quantity": 1 },
+  "requires": { "level": 2 } }
+```
+
+| Field | Type | Rules |
+|---|---|---|
+| `name` | string | Required |
+| `inputs` | map<string,int> | Non-empty, every amount ≥ 1 |
+| `output` | `{ itemId, name, quantity }` | All required, `quantity` ≥ 1; `itemId` must exist in Player's catalogue |
+| `requires` | `{ level?, subject?, wingId? }` | Optional; `level` ≥ 1 |
+
+**Responses**
+
+| Code | When |
+|---|---|
+| `201` | Created; body is the `Recipe` without `available` |
+
+</details>
+
+<details>
+<summary><b>PUT</b> <code>/crafting/recipes/{id}</code> — Replace a recipe</summary>
+
+**Caller:** internal · **Auth:** `X-Internal-Key` · **Idempotent:** yes (naturally)
+
+Same body and rules as create.
+
+**Responses**
+
+| Code | When |
+|---|---|
+| `200` | Updated; body is the `Recipe` |
+| `404 RECIPE_NOT_FOUND` | No such recipe |
+
+</details>
+
+<details>
+<summary><b>DELETE</b> <code>/crafting/recipes/{id}</code> — Delete a recipe</summary>
+
+**Caller:** internal · **Auth:** `X-Internal-Key` · **Idempotent:** —
+
+Past craft records keep their `recipeId`.
+
+**Responses**
+
+| Code | When |
+|---|---|
+| `204` | Deleted |
+| `404 RECIPE_NOT_FOUND` | No such recipe |
+
+</details>
+
+<details>
+<summary><b>GET</b> <code>/crafting/crafts</code> — The player's craft history</summary>
+
+**Caller:** client · **Auth:** cookie · **Idempotent:** —
+
+Newest first.
+
+**Responses**
+
+```json
+// 200
+[ { "craftId": "f4e2…", "playerId": 42, "recipeId": 1, "itemId": "barricade_kit", "quantity": 1,
+    "status": "completed", "createdAt": "2026-09-09T18:04:11Z" } ]
+```
+
+</details>
+
+<details>
+<summary><b>GET</b> <code>/crafting/crafts/{id}</code> — One of the player's crafts</summary>
+
+**Caller:** client · **Auth:** cookie · **Idempotent:** —
+
+**Responses**
+
+| Code | When |
+|---|---|
+| `200` | Found; body is the `Craft` |
+| `404 CRAFT_NOT_FOUND` | No such craft, or it belongs to another player |
+
+</details>
+
+<details>
+<summary><b>POST</b> <code>/crafting/internal/events</code> — Receive a service event</summary>
+
+**Caller:** internal · **Auth:** `X-Internal-Key` · **Idempotent:** yes (deduplicated on `eventId`)
+
+Takes one event in the standard [envelope](#envelope). Stands in for the WebSocket consumers until
+they are built; both apply events the same way.
+
+**Responses**
+
+```json
+// 200 — status is processed, duplicate (eventId seen before) or ignored (type Crafting does not consume)
+{ "eventId": "6f1c0c3e-…", "status": "processed" }
+```
+
+</details>
+
 ### Events
 
 <details>
@@ -1743,12 +1875,14 @@ Each updates the per-player unlock state used to compute `available`:
 ### Schemas
 
 <details>
-<summary>Recipe</summary>
+<summary>Recipe, Craft</summary>
 
 ```
 Recipe { recipeId: int, name: string, inputs: map<string,int>,
          output: { itemId: string, name: string, quantity: int },
          requires: { level: int?, subject: string?, wingId: int? }, available: bool }
+Craft  { craftId: uuid, playerId: int, recipeId: int, itemId: string, quantity: int,
+         status: enum(completed), createdAt: datetime }
 ```
 
 </details>
