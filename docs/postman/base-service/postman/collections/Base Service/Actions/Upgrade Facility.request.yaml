@@ -1,0 +1,17 @@
+name: Upgrade Facility
+$kind: http-request
+method: POST
+url: http://localhost:8087/base/players/1/upgrades
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: X-Player-Id
+    value: "1"
+  - key: Idempotency-Key
+    value: "{{$guid}}"
+body:
+  type: json
+  content: |
+    {
+      "facility": "storage"
+    }
