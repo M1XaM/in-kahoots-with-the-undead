@@ -1,0 +1,7 @@
+name: Get Recipe
+$kind: http-request
+method: GET
+url: http://localhost:8088/crafting/recipes/1
+headers:
+  - key: X-Player-Id
+    value: "1"

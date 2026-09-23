@@ -12,7 +12,7 @@ wings of the university to explore, tying academic progress directly to survival
 [![zombie-service](https://img.shields.io/badge/zombie--service-v--.--.---red?logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/zombie-service)
 [![resource-service](https://img.shields.io/badge/resource--service-v--.--.---red?logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/resource-service)
 [![base-service](https://img.shields.io/docker/v/mixam052/kahoots-base-service?sort=semver&label=base-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/mixam052/kahoots-base-service)
-[![crafting-service](https://img.shields.io/badge/crafting--service-v--.--.---red?logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/crafting-service)
+[![crafting-service](https://img.shields.io/docker/v/mixam052/kahoots-crafting-service?sort=semver&label=crafting-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/mixam052/kahoots-crafting-service)
 
 [![player-service postman](https://img.shields.io/badge/player--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/player-service)
 [![game-service postman](https://img.shields.io/badge/game--service-no--docs-red?logo=postman&logoColor=white)](docs/postman/game-service)
@@ -21,7 +21,7 @@ wings of the university to explore, tying academic progress directly to survival
 [![zombie-service postman](https://img.shields.io/badge/zombie--service-no--docs-red?logo=postman&logoColor=white)](docs/postman/zombie-service)
 [![resource-service postman](https://img.shields.io/badge/resource--service-no--docs-red?logo=postman&logoColor=white)](docs/postman/resource-service)
 [![base-service postman](https://img.shields.io/badge/base--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/base-service)
-[![crafting-service postman](https://img.shields.io/badge/crafting--service-no--docs-red?logo=postman&logoColor=white)](docs/postman/crafting-service)
+[![crafting-service postman](https://img.shields.io/badge/crafting--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/crafting-service)
 
 
 ## Architecture
@@ -60,6 +60,7 @@ docker compose up
 | Player | http://localhost:8081 |
 | Game | http://localhost:8082 |
 | Base | http://localhost:8087 |
+| Crafting | http://localhost:8088 |
 
 ### Base Service
 
@@ -69,6 +70,16 @@ docker compose up
 - **Talks to:** Resource, World and Player. Until they run, spending endpoints (upgrades,
   barricades, Kiki) return `503 SERVICE_UNAVAILABLE`; reading and creating bases work on their own.
 - **Try it:** Postman collection in [`docs/postman/base-service`](docs/postman/base-service).
+
+### Crafting Service
+
+- **Image:** [`mixam052/kahoots-crafting-service`](https://hub.docker.com/r/mixam052/kahoots-crafting-service),
+  version set by `CRAFTING_SERVICE_TAG` (currently `0.1.0`).
+- **Needs:** its own Postgres (`crafting-db`, started by compose) and `CRAFTING_POSTGRES_PASSWORD`
+  in `.env`. Recipes start empty; add them with `POST /crafting/recipes`.
+- **Talks to:** Resource and Player. Until they run, crafting returns `503 SERVICE_UNAVAILABLE`;
+  recipes, availability and events work on their own.
+- **Try it:** Postman collection in [`docs/postman/crafting-service`](docs/postman/crafting-service).
 
 ## GitHub Workflow
 
