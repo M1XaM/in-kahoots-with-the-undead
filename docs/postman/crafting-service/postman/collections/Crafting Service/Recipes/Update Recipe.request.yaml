@@ -1,0 +1,18 @@
+name: Update Recipe
+$kind: http-request
+method: PUT
+url: http://localhost:8088/crafting/recipes/1
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: X-Internal-Key
+    value: changeme
+body:
+  type: json
+  content: |
+    {
+      "name": "Barricade Kit",
+      "inputs": { "wood": 5, "metal": 2 },
+      "output": { "itemId": "barricade_kit", "name": "Barricade Kit", "quantity": 1 },
+      "requires": { "level": 2 }
+    }

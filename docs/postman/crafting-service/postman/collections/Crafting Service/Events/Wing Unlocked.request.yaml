@@ -1,0 +1,19 @@
+name: Wing Unlocked
+$kind: http-request
+method: POST
+url: http://localhost:8088/crafting/internal/events
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: X-Internal-Key
+    value: changeme
+body:
+  type: json
+  content: |
+    {
+      "eventId": "{{$guid}}",
+      "type": "world.wing_unlocked",
+      "version": 1,
+      "occurredAt": "2026-09-23T12:00:00Z",
+      "payload": { "wingId": 4, "name": "Math Wing", "roomIds": [14, 15, 16] }
+    }
