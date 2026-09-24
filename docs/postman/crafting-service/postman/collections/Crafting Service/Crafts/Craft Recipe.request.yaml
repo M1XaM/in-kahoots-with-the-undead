@@ -1,0 +1,17 @@
+name: Craft Recipe
+$kind: http-request
+method: POST
+url: http://localhost:8088/crafting/crafts
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: X-Player-Id
+    value: "1"
+  - key: Idempotency-Key
+    value: "{{$guid}}"
+body:
+  type: json
+  content: |
+    {
+      "recipeId": 1
+    }

@@ -1,0 +1,7 @@
+name: Get Craft
+$kind: http-request
+method: GET
+url: http://localhost:8088/crafting/crafts/00000000-0000-0000-0000-000000000000
+headers:
+  - key: X-Player-Id
+    value: "1"

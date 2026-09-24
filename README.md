@@ -11,8 +11,8 @@ wings of the university to explore, tying academic progress directly to survival
 [![world-service](https://img.shields.io/badge/world--service-v--.--.---red?logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/world-service)
 [![zombie-service](https://img.shields.io/badge/zombie--service-v--.--.---red?logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/zombie-service)
 [![resource-service](https://img.shields.io/badge/resource--service-v--.--.---red?logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/resource-service)
-[![base-service](https://img.shields.io/badge/base--service-v--.--.---red?logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/base-service)
-[![crafting-service](https://img.shields.io/badge/crafting--service-v--.--.---red?logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/crafting-service)
+[![base-service](https://img.shields.io/docker/v/mixam052/kahoots-base-service?sort=semver&label=base-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/mixam052/kahoots-base-service)
+[![crafting-service](https://img.shields.io/docker/v/mixam052/kahoots-crafting-service?sort=semver&label=crafting-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/mixam052/kahoots-crafting-service)
 
 [![player-service postman](https://img.shields.io/badge/player--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/player-service)
 [![game-service postman](https://img.shields.io/badge/game--service-no--docs-red?logo=postman&logoColor=white)](docs/postman/game-service)
@@ -20,8 +20,8 @@ wings of the university to explore, tying academic progress directly to survival
 [![world-service postman](https://img.shields.io/badge/world--service-no--docs-red?logo=postman&logoColor=white)](docs/postman/world-service)
 [![zombie-service postman](https://img.shields.io/badge/zombie--service-no--docs-red?logo=postman&logoColor=white)](docs/postman/zombie-service)
 [![resource-service postman](https://img.shields.io/badge/resource--service-no--docs-red?logo=postman&logoColor=white)](docs/postman/resource-service)
-[![base-service postman](https://img.shields.io/badge/base--service-no--docs-red?logo=postman&logoColor=white)](docs/postman/base-service)
-[![crafting-service postman](https://img.shields.io/badge/crafting--service-no--docs-red?logo=postman&logoColor=white)](docs/postman/crafting-service)
+[![base-service postman](https://img.shields.io/badge/base--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/base-service)
+[![crafting-service postman](https://img.shields.io/badge/crafting--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/crafting-service)
 
 
 ## Architecture
@@ -48,6 +48,8 @@ Contract](docs/communication.md) for the full endpoint and event contract.
 instance (one DB per service, no shared tables), pulling images from Docker Hub — it never builds
 from a service's Dockerfile.
 
+Requirements: Docker with Compose v2, and the service ports below free on your machine.
+
 ```
 cp .env.example .env   # adjust credentials/tags if needed
 docker compose up
@@ -57,6 +59,27 @@ docker compose up
 |---|---|
 | Player | http://localhost:8081 |
 | Game | http://localhost:8082 |
+| Base | http://localhost:8087 |
+| Crafting | http://localhost:8088 |
+
+### Base Service
+
+- **Image:** [`mixam052/kahoots-base-service`](https://hub.docker.com/r/mixam052/kahoots-base-service),
+  version set by `BASE_SERVICE_TAG` (currently `0.1.0`).
+- **Needs:** its own Postgres (`base-db`, started by compose) and `BASE_POSTGRES_PASSWORD` in `.env`.
+- **Talks to:** Resource, World and Player. Until they run, spending endpoints (upgrades,
+  barricades, Kiki) return `503 SERVICE_UNAVAILABLE`; reading and creating bases work on their own.
+- **Try it:** Postman collection in [`docs/postman/base-service`](docs/postman/base-service).
+
+### Crafting Service
+
+- **Image:** [`mixam052/kahoots-crafting-service`](https://hub.docker.com/r/mixam052/kahoots-crafting-service),
+  version set by `CRAFTING_SERVICE_TAG` (currently `0.1.0`).
+- **Needs:** its own Postgres (`crafting-db`, started by compose) and `CRAFTING_POSTGRES_PASSWORD`
+  in `.env`. Recipes start empty; add them with `POST /crafting/recipes`.
+- **Talks to:** Resource and Player. Until they run, crafting returns `503 SERVICE_UNAVAILABLE`;
+  recipes, availability and events work on their own.
+- **Try it:** Postman collection in [`docs/postman/crafting-service`](docs/postman/crafting-service).
 
 ## GitHub Workflow
 
@@ -82,6 +105,14 @@ docker compose up
   used. Requires 1 approval and a passing CI run before the merge button unlocks.
 - **PR content**: what changed and why, which service(s) it touches, how it was tested, and any
   follow-up work left out of scope. Linked to the relevant task/issue.
+- **Auto draft PR**: the `Auto draft PR` workflow (`.github/workflows/auto-draft-pr.yml`) opens a
+  draft PR into `dev` on the first push of any new branch, titled `Draft: <latest commit subject>`.
+  It assigns the pusher, requests review from the rest of the team and Copilot, and fills the body
+  with an AI summary of the commits and diff (via GitHub Models, with a static fallback).
+- **Draft title guard**: the `PR title check` workflow (`.github/workflows/pr-title-check.yml`)
+  fails while the PR title starts with `Draft`, so the author must rename the PR before it can
+  merge. It only blocks merging once `no-draft-title` is a required status check in branch
+  protection, and "Allow GitHub Actions to create pull requests" must be enabled in repo settings.
 - **Test coverage**: new logic needs tests before merge; CI fails the build below the coverage
   threshold. Reviewers can ask for more coverage on a case-by-case basis.
 - **Versioning**: semantic versioning per service (`MAJOR.MINOR.PATCH`), tagged on `main` at each

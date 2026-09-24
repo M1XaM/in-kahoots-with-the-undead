@@ -1,0 +1,7 @@
+name: Delete Recipe
+$kind: http-request
+method: DELETE
+url: http://localhost:8088/crafting/recipes/1
+headers:
+  - key: X-Internal-Key
+    value: changeme

@@ -1,0 +1,15 @@
+name: Create Base
+$kind: http-request
+method: POST
+url: http://localhost:8087/base/players
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: X-Internal-Key
+    value: changeme
+body:
+  type: json
+  content: |
+    {
+      "playerId": 1
+    }

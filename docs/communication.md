@@ -1442,6 +1442,21 @@ What players have built: base level, facilities, barricades, storage, Kiki.
 Every spend follows **reserve (Resource) → apply locally → commit (Resource)**; a failed local
 write releases the reservation.
 
+**Costs** (Base's own table):
+
+| Spend | Cost |
+|---|---|
+| Facility upgrade | per current level (a new facility costs one level): storage `10 wood + 4 metal`, kitchen `8 wood + 2 metal`, workshop `6 wood + 6 metal`, homeroom `12 wood + 4 paper` |
+| Barricade | per level being built: `3 wood + 1 metal` |
+| Kiki | the `food` sent in the request |
+
+Base `level` is its highest facility level; `storageCapacity` is 100 per storage level. A new base
+has only `storage` at level 1.
+
+**Current implementation:** until JWT verification is added, Base reads the acting player from the
+`X-Player-Id` header instead of the cookie, and receives events over HTTP at
+`POST /base/internal/events` instead of a WebSocket connection to Player.
+
 ### Endpoints
 
 <details>
@@ -1558,6 +1573,76 @@ and `409 REWARD_DELIVERY_FAILED` is returned so the client can retry with the sa
 
 </details>
 
+<details>
+<summary><b>GET</b> <code>/base/players</code> — List all bases</summary>
+
+**Caller:** internal · **Auth:** `X-Internal-Key` · **Idempotent:** —
+
+**Responses**
+
+```json
+// 200
+[ { "baseId": 8, "playerId": 42, "level": 2, "storageCapacity": 200, "facilities": [ … ], "barricades": [ … ] } ]
+```
+
+</details>
+
+<details>
+<summary><b>POST</b> <code>/base/players</code> — Create a starting base</summary>
+
+**Caller:** internal · **Auth:** `X-Internal-Key` · **Idempotent:** yes (naturally)
+
+Does the same as consuming `player.registered`. Creating a base that already exists returns it
+unchanged.
+
+**Request body**
+
+```json
+{ "playerId": 42 }
+```
+
+**Responses**
+
+| Code | When |
+|---|---|
+| `201` | Created |
+| `200` | Already existed |
+
+Body: the `Base`.
+
+</details>
+
+<details>
+<summary><b>DELETE</b> <code>/base/players/{id}</code> — Delete a player's base</summary>
+
+**Caller:** internal · **Auth:** `X-Internal-Key` · **Idempotent:** —
+
+**Responses**
+
+| Code | When |
+|---|---|
+| `204` | Deleted, with its facilities and barricades |
+| `404 BASE_NOT_FOUND` | No base for this player |
+
+</details>
+
+<details>
+<summary><b>POST</b> <code>/base/internal/events</code> — Receive a service event</summary>
+
+**Caller:** internal · **Auth:** `X-Internal-Key` · **Idempotent:** yes (deduplicated on `eventId`)
+
+Takes one event in the standard [envelope](#envelope). Stands in for the WebSocket consumer until
+it is built; both apply events the same way.
+
+**Responses**
+
+```json
+// 200 — status is processed, duplicate (eventId seen before) or ignored (type Base does not consume)
+{ "eventId": "6f1c0c3e-…", "status": "processed" }
+```
+
+</details>
+
 ### Events
 
 <details>
@@ -1586,6 +1671,14 @@ Base     { baseId: int, playerId: int, level: int, storageCapacity: int,
 ## Crafting Service
 
 Recipes and crafting. Output items are delivered into the Player Service inventory.
+
+A player's level for `available` is the higher of Player's `GET /players/{id}` and the last
+`player.leveled_up` seen. Unlocked wings are global: once World reports a wing, every player has it.
+
+**Current implementation:** until JWT verification is added, Crafting reads the acting player from
+the `X-Player-Id` header instead of the cookie (internal callers must send it too), and receives
+events over HTTP at `POST /crafting/internal/events` instead of WebSocket connections to Player,
+Exam and World.
 
 ### Endpoints
 
@@ -1645,6 +1738,130 @@ is written and `409 DELIVERY_FAILED` is returned; the client can retry with the 
 
 </details>
 
+<details>
+<summary><b>GET</b> <code>/crafting/recipes/{id}</code> — One recipe</summary>
+
+**Caller:** client, internal · **Auth:** cookie or `X-Internal-Key` · **Idempotent:** —
+
+`available` is included when a player is known, computed as in the list.
+
+**Responses**
+
+| Code | When |
+|---|---|
+| `200` | Found; body is the `Recipe` |
+| `404 RECIPE_NOT_FOUND` | No such recipe |
+
+</details>
+
+<details>
+<summary><b>POST</b> <code>/crafting/recipes</code> — Create a recipe</summary>
+
+**Caller:** internal · **Auth:** `X-Internal-Key` · **Idempotent:** —
+
+**Request body**
+
+```json
+{ "name": "Barricade Kit", "inputs": { "wood": 4, "metal": 2 },
+  "output": { "itemId": "barricade_kit", "name": "Barricade Kit", "quantity": 1 },
+  "requires": { "level": 2 } }
+```
+
+| Field | Type | Rules |
+|---|---|---|
+| `name` | string | Required |
+| `inputs` | map<string,int> | Non-empty, every amount ≥ 1 |
+| `output` | `{ itemId, name, quantity }` | All required, `quantity` ≥ 1; `itemId` must exist in Player's catalogue |
+| `requires` | `{ level?, subject?, wingId? }` | Optional; `level` ≥ 1 |
+
+**Responses**
+
+| Code | When |
+|---|---|
+| `201` | Created; body is the `Recipe` without `available` |
+
+</details>
+
+<details>
+<summary><b>PUT</b> <code>/crafting/recipes/{id}</code> — Replace a recipe</summary>
+
+**Caller:** internal · **Auth:** `X-Internal-Key` · **Idempotent:** yes (naturally)
+
+Same body and rules as create.
+
+**Responses**
+
+| Code | When |
+|---|---|
+| `200` | Updated; body is the `Recipe` |
+| `404 RECIPE_NOT_FOUND` | No such recipe |
+
+</details>
+
+<details>
+<summary><b>DELETE</b> <code>/crafting/recipes/{id}</code> — Delete a recipe</summary>
+
+**Caller:** internal · **Auth:** `X-Internal-Key` · **Idempotent:** —
+
+Past craft records keep their `recipeId`.
+
+**Responses**
+
+| Code | When |
+|---|---|
+| `204` | Deleted |
+| `404 RECIPE_NOT_FOUND` | No such recipe |
+
+</details>
+
+<details>
+<summary><b>GET</b> <code>/crafting/crafts</code> — The player's craft history</summary>
+
+**Caller:** client · **Auth:** cookie · **Idempotent:** —
+
+Newest first.
+
+**Responses**
+
+```json
+// 200
+[ { "craftId": "f4e2…", "playerId": 42, "recipeId": 1, "itemId": "barricade_kit", "quantity": 1,
+    "status": "completed", "createdAt": "2026-09-09T18:04:11Z" } ]
+```
+
+</details>
+
+<details>
+<summary><b>GET</b> <code>/crafting/crafts/{id}</code> — One of the player's crafts</summary>
+
+**Caller:** client · **Auth:** cookie · **Idempotent:** —
+
+**Responses**
+
+| Code | When |
+|---|---|
+| `200` | Found; body is the `Craft` |
+| `404 CRAFT_NOT_FOUND` | No such craft, or it belongs to another player |
+
+</details>
+
+<details>
+<summary><b>POST</b> <code>/crafting/internal/events</code> — Receive a service event</summary>
+
+**Caller:** internal · **Auth:** `X-Internal-Key` · **Idempotent:** yes (deduplicated on `eventId`)
+
+Takes one event in the standard [envelope](#envelope). Stands in for the WebSocket consumers until
+they are built; both apply events the same way.
+
+**Responses**
+
+```json
+// 200 — status is processed, duplicate (eventId seen before) or ignored (type Crafting does not consume)
+{ "eventId": "6f1c0c3e-…", "status": "processed" }
+```
+
+</details>
+
 ### Events
 
 <details>
@@ -1658,12 +1875,14 @@ Each updates the per-player unlock state used to compute `available`:
 ### Schemas
 
 <details>
-<summary>Recipe</summary>
+<summary>Recipe, Craft</summary>
 
 ```
 Recipe { recipeId: int, name: string, inputs: map<string,int>,
          output: { itemId: string, name: string, quantity: int },
          requires: { level: int?, subject: string?, wingId: int? }, available: bool }
+Craft  { craftId: uuid, playerId: int, recipeId: int, itemId: string, quantity: int,
+         status: enum(completed), createdAt: datetime }
 ```
 
 </details>
