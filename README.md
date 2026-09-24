@@ -66,7 +66,7 @@ docker compose up
 
 - **Image:** [`mixam052/kahoots-base-service`](https://hub.docker.com/r/mixam052/kahoots-base-service),
   version set by `BASE_SERVICE_TAG` (currently `0.1.0`).
-- **Needs:** its own Postgres (`base-db`, started by compose) and `BASE_POSTGRES_PASSWORD` in `.env`.
+- **Needs:** its own Postgres (`base-db`, started by compose); password defaults to `qwerty`, override with `BASE_POSTGRES_PASSWORD`.
 - **Talks to:** Resource, World and Player. Until they run, spending endpoints (upgrades,
   barricades, Kiki) return `503 SERVICE_UNAVAILABLE`; reading and creating bases work on their own.
 - **Try it:** Postman collection in [`docs/postman/base-service`](docs/postman/base-service).
@@ -75,8 +75,8 @@ docker compose up
 
 - **Image:** [`mixam052/kahoots-crafting-service`](https://hub.docker.com/r/mixam052/kahoots-crafting-service),
   version set by `CRAFTING_SERVICE_TAG` (currently `0.1.0`).
-- **Needs:** its own Postgres (`crafting-db`, started by compose) and `CRAFTING_POSTGRES_PASSWORD`
-  in `.env`. Recipes start empty; add them with `POST /crafting/recipes`.
+- **Needs:** its own Postgres (`crafting-db`, started by compose); password defaults to `qwerty`, override with `CRAFTING_POSTGRES_PASSWORD`.
+  Recipes start empty; add them with `POST /crafting/recipes`.
 - **Talks to:** Resource and Player. Until they run, crafting returns `503 SERVICE_UNAVAILABLE`;
   recipes, availability and events work on their own.
 - **Try it:** Postman collection in [`docs/postman/crafting-service`](docs/postman/crafting-service).
