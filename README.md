@@ -6,7 +6,7 @@ including Professor Zombies, who force a pop quiz before letting you past. Passi
 wings of the university to explore, tying academic progress directly to survival progress.
 
 [![player-service](https://img.shields.io/docker/v/timurcravtov/player-service?sort=semver&label=player-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/player-service)
-[![game-service](https://img.shields.io/badge/game--service-v--.--.---red?logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/game-service)
+[![game-service](https://img.shields.io/docker/v/timurcravtov/game-service?sort=semver&label=game-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/game-service)
 [![exam-service](https://img.shields.io/badge/exam--service-v--.--.---red?logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/exam-service)
 [![world-service](https://img.shields.io/badge/world--service-v--.--.---red?logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/world-service)
 [![zombie-service](https://img.shields.io/badge/zombie--service-v--.--.---red?logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/zombie-service)
@@ -61,6 +61,25 @@ docker compose up
 | Game | http://localhost:8082 |
 | Base | http://localhost:8087 |
 | Crafting | http://localhost:8088 |
+
+### Player Service
+
+- **Image:** [`timurcravtov/player-service`](https://hub.docker.com/r/timurcravtov/player-service),
+  version set by `PLAYER_SERVICE_TAG` (default `latest`).
+- **Needs:** its own Postgres (`player-db`, started by compose); password defaults to `qwerty`, override with `PLAYER_POSTGRES_PASSWORD`.
+- **Talks to:** nobody synchronously. It issues the login cookie and publishes the JWKS the other
+  services use to verify it.
+- **Try it:** Postman collection in [`docs/postman/player-service`](docs/postman/player-service).
+
+### Game Service
+
+- **Image:** [`timurcravtov/game-service`](https://hub.docker.com/r/timurcravtov/game-service),
+  version set by `GAME_SERVICE_TAG` (default `latest`).
+- **Needs:** its own Postgres (`game-db`, started by compose); password defaults to `qwerty`, override with `GAME_POSTGRES_PASSWORD`.
+- **Talks to:** Player, World, Zombie, Exam, Resource and Base. Until they run, starting a
+  session or a timed action that depends on them will fail; creating lobbies works on its own.
+- **Try it:** Postman collection in [`docs/postman/game-service`](docs/postman/game-service).
+  Log in through the Player collection first, since Game authenticates with the login cookie.
 
 ### Base Service
 
