@@ -1,0 +1,17 @@
+name: Update Wing
+$kind: http-request
+method: PUT
+url: http://localhost:8084/world/wings/5
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: X-Internal-Key
+    value: changeme
+body:
+  type: json
+  content: |
+    {
+      "name": "Chemistry Wing",
+      "unlocked": true,
+      "unlockedBySubject": "chemistry"
+    }

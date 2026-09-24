@@ -1,0 +1,7 @@
+name: Delete Room
+$kind: http-request
+method: DELETE
+url: http://localhost:8084/world/rooms/15
+headers:
+  - key: X-Internal-Key
+    value: changeme

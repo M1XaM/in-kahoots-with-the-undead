@@ -1,0 +1,7 @@
+name: Delete Question
+$kind: http-request
+method: DELETE
+url: http://localhost:8083/exams/questions/22
+headers:
+  - key: X-Internal-Key
+    value: changeme

@@ -1,0 +1,23 @@
+name: Update Question
+$kind: http-request
+method: PUT
+url: http://localhost:8083/exams/questions/22
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: X-Internal-Key
+    value: changeme
+body:
+  type: json
+  content: |
+    {
+      "subject": "math",
+      "text": "12 / 3 = ?",
+      "options": [
+        "2",
+        "3",
+        "4",
+        "6"
+      ],
+      "correctOption": 2
+    }
