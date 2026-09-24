@@ -15,7 +15,7 @@ wings of the university to explore, tying academic progress directly to survival
 [![crafting-service](https://img.shields.io/docker/v/mixam052/kahoots-crafting-service?sort=semver&label=crafting-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/mixam052/kahoots-crafting-service)
 
 [![player-service postman](https://img.shields.io/badge/player--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/player-service)
-[![game-service postman](https://img.shields.io/badge/game--service-no--docs-red?logo=postman&logoColor=white)](docs/postman/game-service)
+[![game-service postman](https://img.shields.io/badge/game--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/game-service)
 [![exam-service postman](https://img.shields.io/badge/exam--service-no--docs-red?logo=postman&logoColor=white)](docs/postman/exam-service)
 [![world-service postman](https://img.shields.io/badge/world--service-no--docs-red?logo=postman&logoColor=white)](docs/postman/world-service)
 [![zombie-service postman](https://img.shields.io/badge/zombie--service-no--docs-red?logo=postman&logoColor=white)](docs/postman/zombie-service)

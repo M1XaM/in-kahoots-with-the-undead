@@ -1,0 +1,14 @@
+name: Start Action
+$kind: http-request
+method: POST
+url: http://localhost:8082/game/sessions/7a90e5f6-0000-4000-8000-000000000001/actions
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |
+    {
+      "type": "scavenge",
+      "roomId": 3
+    }

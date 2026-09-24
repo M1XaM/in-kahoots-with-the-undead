@@ -1,0 +1,4 @@
+name: Get Session
+$kind: http-request
+method: GET
+url: http://localhost:8082/game/sessions/7a90e5f6-0000-4000-8000-000000000001
