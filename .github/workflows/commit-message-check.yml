@@ -1,0 +1,59 @@
+name: Commit message check
+
+on:
+  pull_request:
+    branches: [dev, main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  validate-commits:
+    name: Validate commit messages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check every commit in the PR
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          # <type>(<optional scope>)<optional !>: <message>
+          pattern='^(feat|fix|chore|docs|refactor|test|ci|cicd|build|perf)(\([^)]+\))?!?: .+'
+
+          total=0
+          bad=0
+
+          # merge commits (e.g. "Merge branch 'main' into dev") are skipped
+          while IFS= read -r line; do
+            [[ -z "$line" ]] && continue
+            total=$((total + 1))
+            sha="${line%% *}"
+            subject="${line#* }"
+
+            if [[ "$subject" =~ $pattern ]]; then
+              echo "OK    $sha  $subject"
+            else
+              echo "FAIL  $sha  $subject"
+              echo "::error::Commit $sha has an invalid message: \"$subject\""
+              bad=$((bad + 1))
+            fi
+          done < <(git log --no-merges --format='%h %s' "$BASE_SHA..$HEAD_SHA")
+
+          echo
+          if (( bad > 0 )); then
+            echo "$bad of $total commit(s) do not match the required format:"
+            echo "  <type>(<scope>)!: <message>   (scope and ! are optional)"
+            echo "  type must be one of: feat, fix, chore, docs, refactor, test, ci, build, perf"
+            echo "  examples: 'feat: add login page'  |  'fix(api): handle null response'  |  'feat(auth)!: change token format'"
+            exit 1
+          fi
+
+          echo "All $total commit(s) are correctly formatted."
