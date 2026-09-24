@@ -105,6 +105,14 @@ docker compose up
   used. Requires 1 approval and a passing CI run before the merge button unlocks.
 - **PR content**: what changed and why, which service(s) it touches, how it was tested, and any
   follow-up work left out of scope. Linked to the relevant task/issue.
+- **Auto draft PR**: the `Auto draft PR` workflow (`.github/workflows/auto-draft-pr.yml`) opens a
+  draft PR into `dev` on the first push of any new branch, titled `Draft: <latest commit subject>`.
+  It assigns the pusher, requests review from the rest of the team and Copilot, and fills the body
+  with an AI summary of the commits and diff (via GitHub Models, with a static fallback).
+- **Draft title guard**: the `PR title check` workflow (`.github/workflows/pr-title-check.yml`)
+  fails while the PR title starts with `Draft`, so the author must rename the PR before it can
+  merge. It only blocks merging once `no-draft-title` is a required status check in branch
+  protection, and "Allow GitHub Actions to create pull requests" must be enabled in repo settings.
 - **Test coverage**: new logic needs tests before merge; CI fails the build below the coverage
   threshold. Reviewers can ask for more coverage on a case-by-case basis.
 - **Versioning**: semantic versioning per service (`MAJOR.MINOR.PATCH`), tagged on `main` at each
