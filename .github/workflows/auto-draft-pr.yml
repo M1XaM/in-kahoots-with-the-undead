@@ -1,0 +1,81 @@
+name: Auto draft PR
+
+# Opens a draft PR into dev the first time a branch is pushed.
+on:
+  push:
+    branches-ignore:
+      - dev
+      - main
+
+permissions:
+  contents: read
+  pull-requests: write
+  models: read
+
+jobs:
+  open-pr:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      BRANCH: ${{ github.ref_name }}
+      ACTOR: ${{ github.actor }}
+      COMMIT_MSG: ${{ github.event.head_commit.message }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create draft PR
+        run: |
+          set -euo pipefail
+
+          existing=$(gh pr list --head "$BRANCH" --state all --json number --jq 'length')
+          if [ "$existing" != "0" ]; then
+            echo "PR already exists for $BRANCH, skipping."
+            exit 0
+          fi
+
+          subject=$(printf '%s' "$COMMIT_MSG" | head -n1)
+          title="Draft: ${subject:-$BRANCH}"
+
+          # AI-generated body via GitHub Models; falls back to a static note
+          body="Auto-created draft PR for \`$BRANCH\`."
+          git fetch origin dev --quiet || true
+          log=$(git log --format='- %s' "origin/dev..HEAD" | head -n 50)
+          diff=$(git diff "origin/dev...HEAD" | head -c 30000 || true)
+          payload=$(jq -n --arg log "$log" --arg diff "$diff" '{
+            model: "openai/gpt-4o-mini",
+            messages: [
+              {role: "system", content: "You write concise GitHub pull request descriptions in Markdown. Output a short summary paragraph, then a bulleted list of key changes. No preamble."},
+              {role: "user", content: ("Commits:\n" + $log + "\n\nDiff (may be truncated):\n" + $diff)}
+            ]
+          }')
+          if ai=$(curl -sf https://models.github.ai/inference/chat/completions \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "$payload" | jq -er '.choices[0].message.content'); then
+            body="$ai"
+          else
+            echo "::warning::AI description failed, using default body"
+          fi
+          body="$body"$'\n\n---\n'"_Rename the PR (remove the \`Draft:\` prefix) and mark it ready for review before merging._"
+
+          url=$(gh pr create \
+            --base dev \
+            --head "$BRANCH" \
+            --draft \
+            --title "$title" \
+            --body "$body" \
+            --assignee "$ACTOR")
+          echo "Created $url"
+
+          # Reviewers: everyone except the pusher
+          reviewers=""
+          for r in TimurCravtov inercaso M1XaM NeValetik; do
+            if [ "${r,,}" != "${ACTOR,,}" ]; then
+              reviewers="${reviewers:+$reviewers,}$r"
+            fi
+          done
+          gh pr edit "$url" --add-reviewer "$reviewers" || echo "::warning::Could not add some reviewers"
+          gh pr edit "$url" --add-reviewer "@copilot" || echo "::warning::Could not add Copilot as reviewer"

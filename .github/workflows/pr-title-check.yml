@@ -1,0 +1,23 @@
+name: PR title check
+
+# Add "PR title check / no-draft-title" as a required status check in branch protection
+# so PRs whose title still starts with "Draft" cannot be merged.
+on:
+  pull_request:
+    types: [opened, reopened, edited, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  no-draft-title:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Title must not start with "Draft"
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          if printf '%s' "$TITLE" | grep -qiE '^[[:space:]]*draft'; then
+            echo "::error::PR title starts with \"Draft\". Edit the title before merging."
+            exit 1
+          fi
