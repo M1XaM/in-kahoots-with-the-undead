@@ -1,0 +1,4 @@
+name: Create Lobby
+$kind: http-request
+method: POST
+url: http://localhost:8082/game/lobbies
