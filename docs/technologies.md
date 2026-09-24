@@ -13,8 +13,8 @@
 |---|---|---|---|---|
 | 1 | **Player** | Go / Gin | REST + Kafka (`player.leveled_up`) | Identity/inventory needs strong consistency; GORM transactions cover atomic trades. |
 | 2 | **Game** | TS / NestJS | WebSockets (Socket.IO) + REST/events | Live progress updates and many concurrent timers — Node's event loop and NestJS gateways fit natively. |
-| 3 | **Exam** | Go / Gin | REST (sync) + Kafka (`exam.completed`) | Simple CRUD/validation, fast and light. Event published async so World isn't blocked. |
-| 4 | **World** | Go / Gin | REST (sync) + consumes `exam.completed` | Relational map data, queried every cycle by Game — low per-request overhead matters. |
+| 3 | **Exam** | TS / NestJS | REST (sync) + publishes `exam.completed` (service events, WebSocket) | Simple CRUD/validation; the result is written to an outbox in the grading transaction and streamed async, so World isn't blocked. |
+| 4 | **World** | TS / NestJS | REST (sync) + consumes `exam.completed`, publishes `world.wing_unlocked` (service events, WebSocket) | Relational map data queried every cycle by Game, plus an event consumer and producer next to the REST controllers. |
 | 5 | **Zombie** | Go / Gin | REST (sync) | Low-write config/definition store — plain cacheable REST is enough. |
 | 6 | **Resource** | TS / NestJS | Kafka (gather/consume completion) + REST (balance) | Async, reconnect-prone completions need idempotent event handling — NestJS's queue/event tooling covers this natively. |
 | 7 | **Base** | Go / Gin | REST + calls Resource (reserve/commit) | Spend-then-build; reservation on Resource makes the spend reversible if the local write fails. |
@@ -25,7 +25,9 @@
 - **Go:** explicit transactions and error handling keep atomic operations (trades, crafting, spends)
   easy to reason about, at the cost of more manual wiring than a batteries-included framework.
 - **NestJS:** built-in WebSocket/event scaffolding matches the traffic shape of Game and Resource
-  (many timers, many async completions) better than hand-rolling the same in Go.
+  (many timers, many async completions) better than hand-rolling the same in Go. Exam and World use
+  it too: DTO validation and dependency injection keep their REST surface small, and their event
+  producer/consumer live as providers next to the controllers.
 
 ## Communication conventions
 
