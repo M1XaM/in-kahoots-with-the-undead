@@ -1,0 +1,7 @@
+name: Get Exam
+$kind: http-request
+method: GET
+url: http://localhost:8083/exams/1
+headers:
+  - key: X-Player-Id
+    value: '1'

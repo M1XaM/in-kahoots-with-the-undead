@@ -1,0 +1,7 @@
+name: Delete Spawn Point
+$kind: http-request
+method: DELETE
+url: http://localhost:8084/world/spawn-points/9
+headers:
+  - key: X-Internal-Key
+    value: changeme

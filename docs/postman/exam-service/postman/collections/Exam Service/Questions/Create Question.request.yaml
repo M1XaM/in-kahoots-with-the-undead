@@ -1,0 +1,23 @@
+name: Create Question
+$kind: http-request
+method: POST
+url: http://localhost:8083/exams/questions
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: X-Internal-Key
+    value: changeme
+body:
+  type: json
+  content: |
+    {
+      "subject": "math",
+      "text": "12 / 4 = ?",
+      "options": [
+        "2",
+        "3",
+        "4",
+        "6"
+      ],
+      "correctOption": 1
+    }

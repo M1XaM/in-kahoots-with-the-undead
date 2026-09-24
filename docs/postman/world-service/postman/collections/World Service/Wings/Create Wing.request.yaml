@@ -1,0 +1,17 @@
+name: Create Wing
+$kind: http-request
+method: POST
+url: http://localhost:8084/world/wings
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: X-Internal-Key
+    value: changeme
+body:
+  type: json
+  content: |
+    {
+      "name": "Chemistry Wing",
+      "unlocked": false,
+      "unlockedBySubject": "chemistry"
+    }
