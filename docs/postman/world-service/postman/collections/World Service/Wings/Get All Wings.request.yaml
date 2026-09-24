@@ -1,0 +1,7 @@
+name: Get All Wings
+$kind: http-request
+method: GET
+url: http://localhost:8084/world/wings
+headers:
+  - key: X-Internal-Key
+    value: changeme

@@ -1,0 +1,4 @@
+name: Leave Lobby
+$kind: http-request
+method: DELETE
+url: http://localhost:8082/game/lobbies/c1d4e5f6-0000-4000-8000-000000000001/players/me

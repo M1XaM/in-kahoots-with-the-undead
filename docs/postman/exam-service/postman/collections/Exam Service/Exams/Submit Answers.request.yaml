@@ -1,0 +1,13 @@
+name: Submit Answers
+$kind: http-request
+method: POST
+url: http://localhost:8083/exams/1/answers
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: X-Player-Id
+    value: '1'
+body:
+  type: json
+  content: |
+    { "answers": [ { "questionId": 1, "option": 1 }, { "questionId": 2, "option": 1 } ] }

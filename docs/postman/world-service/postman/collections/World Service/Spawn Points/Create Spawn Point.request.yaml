@@ -1,0 +1,18 @@
+name: Create Spawn Point
+$kind: http-request
+method: POST
+url: http://localhost:8084/world/spawn-points
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: X-Internal-Key
+    value: changeme
+body:
+  type: json
+  content: |
+    {
+      "roomId": 3,
+      "zombieTypes": [
+        "dean"
+      ]
+    }

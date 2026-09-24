@@ -1,0 +1,19 @@
+name: Update Spawn Point
+$kind: http-request
+method: PUT
+url: http://localhost:8084/world/spawn-points/9
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: X-Internal-Key
+    value: changeme
+body:
+  type: json
+  content: |
+    {
+      "roomId": 3,
+      "zombieTypes": [
+        "dean",
+        "janitor"
+      ]
+    }

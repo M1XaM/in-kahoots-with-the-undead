@@ -1,0 +1,7 @@
+name: Get Question
+$kind: http-request
+method: GET
+url: http://localhost:8083/exams/questions/1
+headers:
+  - key: X-Internal-Key
+    value: changeme

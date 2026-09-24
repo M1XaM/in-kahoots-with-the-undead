@@ -1,0 +1,20 @@
+name: Create Room
+$kind: http-request
+method: POST
+url: http://localhost:8084/world/rooms
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: X-Internal-Key
+    value: changeme
+body:
+  type: json
+  content: |
+    {
+      "name": "Chem Lab",
+      "type": "laboratory",
+      "wingId": 2,
+      "resourceNode": {
+        "resourceType": "metal"
+      }
+    }

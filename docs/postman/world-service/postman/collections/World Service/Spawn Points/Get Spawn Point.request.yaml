@@ -1,0 +1,7 @@
+name: Get Spawn Point
+$kind: http-request
+method: GET
+url: http://localhost:8084/world/spawn-points/2
+headers:
+  - key: X-Internal-Key
+    value: changeme

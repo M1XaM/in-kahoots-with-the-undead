@@ -1,0 +1,15 @@
+name: Create Exam
+$kind: http-request
+method: POST
+url: http://localhost:8083/exams
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: X-Internal-Key
+    value: changeme
+  - key: Idempotency-Key
+    value: '{{$guid}}'
+body:
+  type: json
+  content: |
+    { "playerId": 1, "zombieId": 5, "encounterId": "enc-{{$timestamp}}" }

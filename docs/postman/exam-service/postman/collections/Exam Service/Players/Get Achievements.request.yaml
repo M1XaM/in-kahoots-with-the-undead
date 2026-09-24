@@ -1,0 +1,7 @@
+name: Get Achievements
+$kind: http-request
+method: GET
+url: http://localhost:8083/exams/players/1/achievements
+headers:
+  - key: X-Player-Id
+    value: '1'
