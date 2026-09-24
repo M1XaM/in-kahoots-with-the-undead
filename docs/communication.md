@@ -891,6 +891,11 @@ Action     { actionId: uuid, playerId: int, type: ActionType, roomId: int,
 
 Exams, grading, per-player academic history and achievements.
 
+**Current implementation:** until Player and Zombie are running, Exam can use stand-ins, all on by
+default in compose: `AUTH_MODE=mock` reads the acting player from the `X-Player-Id` header instead
+of the cookie, `PLAYER_CLIENT=mock` accepts every player id, and `ZOMBIE_CLIENT=mock` serves
+built-in professor zombies. `jwks` / `http` switch each one to the real service.
+
 ### Endpoints
 
 <details>
@@ -1015,6 +1020,95 @@ checks achievement rules (e.g. all `math` exams passed → `survived_the_pumpkin
 
 </details>
 
+<details>
+<summary><b>GET</b> <code>/exams/questions</code> — List the question bank</summary>
+
+**Caller:** internal · **Auth:** `X-Internal-Key` · **Idempotent:** —
+
+| Query param | Type | Effect |
+|---|---|---|
+| `subject` | string? | Only questions for this subject |
+
+**Responses**
+
+```json
+// 200 — includes the correct answer, so it is never exposed to clients
+[ { "questionId": 1, "subject": "math", "text": "d/dx of x^2 ?", "options": ["x", "2x", "x^2", "2"], "correctOption": 1 } ]
+```
+
+</details>
+
+<details>
+<summary><b>GET</b> <code>/exams/questions/{id}</code> — One question</summary>
+
+**Caller:** internal · **Auth:** `X-Internal-Key` · **Idempotent:** —
+
+**Responses**
+
+| Code | When |
+|---|---|
+| `200` | Found; body is the `Question` |
+| `404 QUESTION_NOT_FOUND` | No such question |
+
+</details>
+
+<details>
+<summary><b>POST</b> <code>/exams/questions</code> — Add a question to the bank</summary>
+
+**Caller:** internal · **Auth:** `X-Internal-Key` · **Idempotent:** —
+
+**Request body**
+
+```json
+{ "subject": "math", "text": "12 / 4 = ?", "options": ["2", "3", "4", "6"], "correctOption": 1 }
+```
+
+| Field | Type | Rules |
+|---|---|---|
+| `subject` | string | Required |
+| `text` | string | Required, ≤ 500 chars |
+| `options` | [string] | 2–6 non-empty options |
+| `correctOption` | int | Index into `options` |
+
+**Responses**
+
+| Code | When |
+|---|---|
+| `201` | Created; body is the `Question` |
+
+</details>
+
+<details>
+<summary><b>PUT</b> <code>/exams/questions/{id}</code> — Replace a question</summary>
+
+**Caller:** internal · **Auth:** `X-Internal-Key` · **Idempotent:** yes (naturally)
+
+Same body and rules as create. Exams already drawn keep a snapshot of their questions, so editing
+the bank never changes an exam in progress or its grade.
+
+**Responses**
+
+| Code | When |
+|---|---|
+| `200` | Updated; body is the `Question` |
+| `404 QUESTION_NOT_FOUND` | No such question |
+
+</details>
+
+<details>
+<summary><b>DELETE</b> <code>/exams/questions/{id}</code> — Remove a question</summary>
+
+**Caller:** internal · **Auth:** `X-Internal-Key` · **Idempotent:** —
+
+**Responses**
+
+| Code | When |
+|---|---|
+| `204` | Deleted |
+| `404 QUESTION_NOT_FOUND` | No such question |
+
+</details>
+
 ### Events
 
 <details>
@@ -1039,6 +1133,7 @@ Emitted for every graded exam, pass or fail. World reacts only when `passed` is 
 Exam       { examId: int, playerId: int, subject: string, expiresAt: datetime,
              questions: [{ questionId: int, text: string, options: [string] }] }
 ExamResult { examId: int, subject: string, passed: bool, grade: int, correct: int, total: int, takenAt: datetime }
+Question   { questionId: int, subject: string, text: string, options: [string], correctOption: int }   // internal only
 ```
 
 </details>
@@ -1049,6 +1144,10 @@ ExamResult { examId: int, subject: string, passed: bool, grade: int, correct: in
 
 The campus: wings, rooms, resource nodes, zombie spawn points. Geography only — what players build
 on it belongs to Base.
+
+**Current implementation:** until JWT verification is wired in (`AUTH_MODE=jwks`), World reads the
+acting player from the `X-Player-Id` header instead of the cookie. It consumes Exam's WebSocket
+stream, and also accepts events over HTTP at `POST /world/internal/events`.
 
 ### Endpoints
 
@@ -1131,6 +1230,226 @@ on it belongs to Base.
 
 </details>
 
+<details>
+<summary><b>GET</b> <code>/world/wings/{id}</code> — One wing</summary>
+
+**Caller:** client, internal · **Auth:** cookie or `X-Internal-Key` · **Idempotent:** —
+
+**Responses**
+
+| Code | When |
+|---|---|
+| `200` | Found; body is the `Wing` |
+| `404 WING_NOT_FOUND` | No such wing |
+
+</details>
+
+<details>
+<summary><b>POST</b> <code>/world/wings</code> — Create a wing</summary>
+
+**Caller:** internal · **Auth:** `X-Internal-Key` · **Idempotent:** —
+
+**Request body**
+
+```json
+{ "name": "Chemistry Wing", "unlocked": false, "unlockedBySubject": "chemistry" }
+```
+
+| Field | Type | Rules |
+|---|---|---|
+| `name` | string | Required, unique |
+| `unlocked` | bool? | Default `false` |
+| `unlockedBySubject` | string? | Subject whose passed exam unlocks the wing; `null` for none |
+
+**Responses**
+
+| Code | When |
+|---|---|
+| `201` | Created; body is the `Wing` |
+| `409 WING_NAME_TAKEN` | A wing with that name exists |
+
+</details>
+
+<details>
+<summary><b>PUT</b> <code>/world/wings/{id}</code> — Replace a wing</summary>
+
+**Caller:** internal · **Auth:** `X-Internal-Key` · **Idempotent:** yes (naturally)
+
+Same body and rules as create. Changing `unlocked` from `false` to `true` publishes
+`world.wing_unlocked`, as an exam pass would.
+
+**Responses**
+
+| Code | When |
+|---|---|
+| `200` | Updated; body is the `Wing` |
+| `404 WING_NOT_FOUND` | No such wing |
+| `409 WING_NAME_TAKEN` | Another wing has that name |
+
+</details>
+
+<details>
+<summary><b>DELETE</b> <code>/world/wings/{id}</code> — Delete a wing</summary>
+
+**Caller:** internal · **Auth:** `X-Internal-Key` · **Idempotent:** —
+
+**Responses**
+
+| Code | When |
+|---|---|
+| `204` | Deleted |
+| `404 WING_NOT_FOUND` | No such wing |
+| `409 WING_NOT_EMPTY` | The wing still has rooms |
+
+</details>
+
+<details>
+<summary><b>POST</b> <code>/world/rooms</code> — Create a room</summary>
+
+**Caller:** internal · **Auth:** `X-Internal-Key` · **Idempotent:** —
+
+**Request body**
+
+```json
+{ "name": "Chem Lab", "type": "laboratory", "wingId": 2, "resourceNode": { "resourceType": "metal" } }
+```
+
+| Field | Type | Rules |
+|---|---|---|
+| `name` | string | Required |
+| `type` | RoomType | Required |
+| `wingId` | int | Must be an existing wing |
+| `resourceNode` | `{ resourceType }`? | Omit or `null` for a room without a gatherable node |
+
+**Responses**
+
+| Code | When |
+|---|---|
+| `201` | Created; body is the `Room` |
+| `404 WING_NOT_FOUND` | No such wing |
+
+</details>
+
+<details>
+<summary><b>PUT</b> <code>/world/rooms/{id}</code> — Replace a room</summary>
+
+**Caller:** internal · **Auth:** `X-Internal-Key` · **Idempotent:** yes (naturally)
+
+Same body and rules as create; omitting `resourceNode` removes the room's node.
+
+**Responses**
+
+| Code | When |
+|---|---|
+| `200` | Updated; body is the `Room` |
+| `404 ROOM_NOT_FOUND` | No such room |
+| `404 WING_NOT_FOUND` | No such wing |
+
+</details>
+
+<details>
+<summary><b>DELETE</b> <code>/world/rooms/{id}</code> — Delete a room</summary>
+
+**Caller:** internal · **Auth:** `X-Internal-Key` · **Idempotent:** —
+
+Also deletes the room's resource node and spawn points.
+
+**Responses**
+
+| Code | When |
+|---|---|
+| `204` | Deleted |
+| `404 ROOM_NOT_FOUND` | No such room |
+
+</details>
+
+<details>
+<summary><b>GET</b> <code>/world/spawn-points/{id}</code> — One spawn point</summary>
+
+**Caller:** internal (Game) · **Auth:** `X-Internal-Key` · **Idempotent:** —
+
+**Responses**
+
+| Code | When |
+|---|---|
+| `200` | Found; body is the `SpawnPoint` |
+| `404 SPAWN_POINT_NOT_FOUND` | No such spawn point |
+
+</details>
+
+<details>
+<summary><b>POST</b> <code>/world/spawn-points</code> — Create a spawn point</summary>
+
+**Caller:** internal · **Auth:** `X-Internal-Key` · **Idempotent:** —
+
+**Request body**
+
+```json
+{ "roomId": 3, "zombieTypes": ["professor", "tourist"] }
+```
+
+| Field | Type | Rules |
+|---|---|---|
+| `roomId` | int | Must be an existing room |
+| `zombieTypes` | [ZombieType] | Non-empty, no duplicates |
+
+**Responses**
+
+| Code | When |
+|---|---|
+| `201` | Created; body is the `SpawnPoint` |
+| `404 ROOM_NOT_FOUND` | No such room |
+
+</details>
+
+<details>
+<summary><b>PUT</b> <code>/world/spawn-points/{id}</code> — Replace a spawn point</summary>
+
+**Caller:** internal · **Auth:** `X-Internal-Key` · **Idempotent:** yes (naturally)
+
+Same body and rules as create.
+
+**Responses**
+
+| Code | When |
+|---|---|
+| `200` | Updated; body is the `SpawnPoint` |
+| `404 SPAWN_POINT_NOT_FOUND` | No such spawn point |
+| `404 ROOM_NOT_FOUND` | No such room |
+
+</details>
+
+<details>
+<summary><b>DELETE</b> <code>/world/spawn-points/{id}</code> — Delete a spawn point</summary>
+
+**Caller:** internal · **Auth:** `X-Internal-Key` · **Idempotent:** —
+
+**Responses**
+
+| Code | When |
+|---|---|
+| `204` | Deleted |
+| `404 SPAWN_POINT_NOT_FOUND` | No such spawn point |
+
+</details>
+
+<details>
+<summary><b>POST</b> <code>/world/internal/events</code> — Receive a service event</summary>
+
+**Caller:** internal · **Auth:** `X-Internal-Key` · **Idempotent:** yes (deduplicated on `eventId`)
+
+Takes one `exam.completed` event in the standard [envelope](#envelope) and applies it exactly as
+the WebSocket consumer does. Other event types are rejected with `400 VALIDATION_ERROR`.
+
+**Responses**
+
+```json
+// 200 — duplicate is true when the eventId was seen before
+{ "eventId": "6f1c0c3e-…", "duplicate": false }
+```
+
+</details>
+
 ### Events
 
 <details>
@@ -1162,6 +1481,7 @@ RoomType { laboratory | library | canteen | classroom | corridor | fafcab }
 Room     { roomId: int, name: string, type: RoomType, wingId: int, unlocked: bool,
            resourceNode: { nodeId: int, resourceType: string }? }
 Wing     { wingId: int, name: string, unlocked: bool, unlockedBySubject: string? }
+SpawnPoint { pointId: int, roomId: int, zombieTypes: [ZombieType] }
 ```
 
 </details>
