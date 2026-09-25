@@ -1,0 +1,20 @@
+name: Update Zombie
+$kind: http-request
+method: PATCH
+url: "http://localhost:8085/zombies/{{zombieId}}"
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+body:
+  type: json
+  content: |
+    {
+      "stats": {
+        "health": 150,
+        "speed": 1,
+        "attack": 9,
+        "perception": 3
+      }
+    }

@@ -1,0 +1,7 @@
+name: Get Zombie (player cookie)
+$kind: http-request
+method: GET
+url: "http://localhost:8085/zombies/{{zombieId}}"
+headers:
+  - key: Cookie
+    value: "access_token=x.eyJzdWIiOjQyLCJ1c2VybmFtZSI6InJhenZhbiJ9.y"

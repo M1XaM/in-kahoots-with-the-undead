@@ -1,0 +1,24 @@
+name: Create Ledger Entry
+$kind: http-request
+method: POST
+url: "http://localhost:8086/resources/ledger"
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+body:
+  type: json
+  content: |
+    {
+      "playerId": 43,
+      "kind": "gathered",
+      "resourceType": "food",
+      "amount": 12,
+      "nodeId": 11
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.collectionVariables.set('ledgerEntryId', pm.response.json().id);

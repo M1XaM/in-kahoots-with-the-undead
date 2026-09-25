@@ -1,0 +1,7 @@
+name: Get Player Reservations
+$kind: http-request
+method: GET
+url: "http://localhost:8086/resources/players/42/reservations"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"

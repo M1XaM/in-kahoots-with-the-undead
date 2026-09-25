@@ -1,0 +1,8 @@
+name: Published Events
+$kind: http-request
+method: GET
+url: "http://localhost:8086/resources/_mock/events/published"
+description: "Events this service would have produced to Kafka."
+headers:
+  - key: X-Internal-Key
+    value: "changeme"

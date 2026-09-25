@@ -1,0 +1,29 @@
+name: Create Tourist Zombie
+$kind: http-request
+method: POST
+url: "http://localhost:8085/zombies"
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+body:
+  type: json
+  content: |
+    {
+      "type": "tourist",
+      "name": "Lost Erasmus",
+      "subject": null,
+      "spriteUrl": "/sprites/tourist.png",
+      "stats": {
+        "health": 60,
+        "speed": 3,
+        "attack": 5,
+        "perception": 5
+      },
+      "abilities": [
+        "steal_xp",
+        "steal_resources",
+        "sprint"
+      ]
+    }

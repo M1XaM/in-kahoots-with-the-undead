@@ -1,0 +1,21 @@
+name: Steal Resources
+$kind: http-request
+method: POST
+url: "http://localhost:8086/resources/players/42/steal"
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+  - key: Idempotency-Key
+    value: "{{$guid}}"
+body:
+  type: json
+  content: |
+    {
+      "resources": {
+        "food": 5,
+        "wood": 3
+      },
+      "encounterId": "{{$guid}}"
+    }

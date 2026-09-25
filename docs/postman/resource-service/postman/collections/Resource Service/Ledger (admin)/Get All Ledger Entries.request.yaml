@@ -1,0 +1,7 @@
+name: Get All Ledger Entries
+$kind: http-request
+method: GET
+url: "http://localhost:8086/resources/ledger"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"

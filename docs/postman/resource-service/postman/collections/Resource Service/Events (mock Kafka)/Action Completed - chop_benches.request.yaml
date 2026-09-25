@@ -1,0 +1,28 @@
+name: Action Completed - chop_benches
+$kind: http-request
+method: POST
+url: "http://localhost:8086/resources/_mock/events/game.action_completed"
+description: "Credits 5-15 wood and publishes resource.gathered."
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+body:
+  type: json
+  content: |
+    {
+      "eventId": "{{$guid}}",
+      "type": "ActionCompleted",
+      "version": 1,
+      "occurredAt": "2026-09-25T10:00:00Z",
+      "payload": {
+        "actionId": "{{$guid}}",
+        "sessionId": "7a90",
+        "playerId": 42,
+        "type": "chop_benches",
+        "roomId": 1,
+        "nodeId": null,
+        "completedAt": "2026-09-25T10:00:00Z"
+      }
+    }
