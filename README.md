@@ -115,9 +115,11 @@ docker compose up
 ### Zombie Service
 
 - **Image:** [`nevaletik/kahoot-zombie-service`](https://hub.docker.com/r/nevaletik/kahoot-zombie-service),
-  version set by `ZOMBIE_SERVICE_TAG` (currently `1.0.0`).
-- **Needs:** its own Postgres (`zombie-db`, started by compose); password defaults to `qwerty`,
-  override with `ZOMBIE_POSTGRES_PASSWORD`. Definitions start empty; add them with `POST /zombies`.
+  version set by `ZOMBIE_SERVICE_TAG` (currently `1.1.0`).
+- **Needs:** its own Postgres (`zombie-db`, started by compose and seeded from
+  [`db/zombie-service/init.sql`](db/zombie-service/init.sql) with ten definitions: ids `5`/`6`/`7`
+  are the math/physics/programming professors, `9` and `10` are not, matching Exam's stand-in);
+  password defaults to `qwerty`, override with `ZOMBIE_POSTGRES_PASSWORD`.
   `INTERNAL_KEY` is the `X-Internal-Key` every route except the health check expects.
 - **Talks to:** nobody. It verifies Player's login cookie on `GET /zombies/{id}`; until Player's
   JWKS is wired in, the cookie is decoded without checking its signature.
@@ -127,10 +129,11 @@ docker compose up
 ### Resource Service
 
 - **Image:** [`nevaletik/kahoot-resource-service`](https://hub.docker.com/r/nevaletik/kahoot-resource-service),
-  version set by `RESOURCE_SERVICE_TAG` (currently `1.0.0`).
-- **Needs:** its own Postgres (`resource-db`, started by compose); password defaults to `qwerty`,
-  override with `RESOURCE_POSTGRES_PASSWORD`. A player has no balances until `player.registered`
-  is delivered for them.
+  version set by `RESOURCE_SERVICE_TAG` (currently `1.1.0`).
+- **Needs:** its own Postgres (`resource-db`, started by compose and seeded from
+  [`db/resource-service/init.sql`](db/resource-service/init.sql) with balances and ledger history
+  for players `1`-`3`); password defaults to `qwerty`, override with `RESOURCE_POSTGRES_PASSWORD`.
+  Other players get balances when `player.registered` is delivered for them.
 - **Talks to:** Player and Game over their `/events` streams (set `RESOURCE_PLAYER_EVENTS_URL` /
   `RESOURCE_GAME_EVENTS_URL`), and World for node resource types (`RESOURCE_WORLD_SERVICE_URL`).
   While those are empty it uses a built-in copy of the rooms and accepts events over HTTP at
