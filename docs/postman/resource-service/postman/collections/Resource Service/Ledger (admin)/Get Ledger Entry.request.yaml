@@ -1,0 +1,7 @@
+name: Get Ledger Entry
+$kind: http-request
+method: GET
+url: "http://localhost:8086/resources/ledger/{{ledgerEntryId}}"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"

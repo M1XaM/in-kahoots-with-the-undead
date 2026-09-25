@@ -1,0 +1,7 @@
+name: Get Ledger (player cookie)
+$kind: http-request
+method: GET
+url: "http://localhost:8086/resources/players/42/ledger?limit=50"
+headers:
+  - key: Cookie
+    value: "access_token=x.eyJzdWIiOjQyLCJ1c2VybmFtZSI6InJhenZhbiJ9.y"

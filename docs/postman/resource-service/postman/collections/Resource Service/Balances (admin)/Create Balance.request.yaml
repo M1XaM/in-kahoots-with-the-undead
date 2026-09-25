@@ -1,0 +1,22 @@
+name: Create Balance
+$kind: http-request
+method: POST
+url: "http://localhost:8086/resources/balances"
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+body:
+  type: json
+  content: |
+    {
+      "playerId": 43,
+      "resourceType": "wood",
+      "amount": 10
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.collectionVariables.set('balanceId', pm.response.json().id);

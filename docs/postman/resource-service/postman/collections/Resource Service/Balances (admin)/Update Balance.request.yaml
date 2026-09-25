@@ -1,0 +1,15 @@
+name: Update Balance
+$kind: http-request
+method: PATCH
+url: "http://localhost:8086/resources/balances/{{balanceId}}"
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+body:
+  type: json
+  content: |
+    {
+      "amount": 25
+    }

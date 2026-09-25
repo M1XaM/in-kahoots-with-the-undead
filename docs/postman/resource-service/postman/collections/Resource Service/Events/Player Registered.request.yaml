@@ -1,0 +1,23 @@
+name: Player Registered
+$kind: http-request
+method: POST
+url: "http://localhost:8086/resources/internal/events"
+description: "HTTP delivery of player.registered (same handler as the WebSocket consumer): creates zero balances for player 42."
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+body:
+  type: json
+  content: |
+    {
+      "eventId": "{{$guid}}",
+      "type": "player.registered",
+      "version": 1,
+      "occurredAt": "2026-09-25T10:00:00Z",
+      "payload": {
+        "playerId": 42,
+        "username": "razvan"
+      }
+    }

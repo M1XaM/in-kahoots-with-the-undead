@@ -1,0 +1,7 @@
+name: Get Balances (internal)
+$kind: http-request
+method: GET
+url: "http://localhost:8086/resources/players/42"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"

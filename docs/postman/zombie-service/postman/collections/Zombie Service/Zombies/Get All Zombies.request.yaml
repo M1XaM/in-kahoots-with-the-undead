@@ -1,0 +1,7 @@
+name: Get All Zombies
+$kind: http-request
+method: GET
+url: "http://localhost:8085/zombies"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"

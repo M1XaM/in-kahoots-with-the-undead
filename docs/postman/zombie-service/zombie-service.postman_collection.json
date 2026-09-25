@@ -1,0 +1,186 @@
+{
+  "info": {
+    "name": "Zombie Service",
+    "description": "Zombie Service (port 8085). Internal key defaults to `changeme` (INTERNAL_KEY in the team .env). The player cookie is an unsigned mock JWT for sub=42 (Player JWKS is mocked).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/"
+      }
+    },
+    {
+      "name": "Zombies",
+      "item": [
+        {
+          "name": "Create Professor Zombie",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/zombies",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"professor\",\n  \"name\": \"Prof. Grosu\",\n  \"subject\": \"math\",\n  \"spriteUrl\": \"/sprites/prof_grosu.png\",\n  \"stats\": {\n    \"health\": 120,\n    \"speed\": 1,\n    \"attack\": 8,\n    \"perception\": 3\n  },\n  \"abilities\": [\n    \"administer_exam\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('zombieId', pm.response.json().zombieId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Tourist Zombie",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/zombies",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"tourist\",\n  \"name\": \"Lost Erasmus\",\n  \"subject\": null,\n  \"spriteUrl\": \"/sprites/tourist.png\",\n  \"stats\": {\n    \"health\": 60,\n    \"speed\": 3,\n    \"attack\": 5,\n    \"perception\": 5\n  },\n  \"abilities\": [\n    \"steal_xp\",\n    \"steal_resources\",\n    \"sprint\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Get All Zombies",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/zombies"
+          }
+        },
+        {
+          "name": "Get Zombies by Type",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/zombies?type=professor"
+          }
+        },
+        {
+          "name": "Get Zombie (internal)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/zombies/{{zombieId}}"
+          }
+        },
+        {
+          "name": "Get Zombie (player cookie)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "access_token=x.eyJzdWIiOjQyLCJ1c2VybmFtZSI6InJhenZhbiJ9.y"
+              }
+            ],
+            "url": "{{baseUrl}}/zombies/{{zombieId}}"
+          }
+        },
+        {
+          "name": "Update Zombie",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/zombies/{{zombieId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stats\": {\n    \"health\": 150,\n    \"speed\": 1,\n    \"attack\": 9,\n    \"perception\": 3\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete Zombie",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/zombies/{{zombieId}}"
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8085"
+    },
+    {
+      "key": "zombieId",
+      "value": ""
+    }
+  ]
+}

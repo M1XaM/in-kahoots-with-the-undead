@@ -1,0 +1,7 @@
+name: Get Reservation
+$kind: http-request
+method: GET
+url: "http://localhost:8086/resources/reservations/{{reservationId}}"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
