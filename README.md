@@ -9,8 +9,8 @@ wings of the university to explore, tying academic progress directly to survival
 [![game-service](https://img.shields.io/docker/v/timurcravtov/game-service?sort=semver&label=game-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/game-service)
 [![exam-service](https://img.shields.io/docker/v/inercaso/exam-service?sort=semver&label=exam-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/inercaso/exam-service)
 [![world-service](https://img.shields.io/docker/v/inercaso/world-service?sort=semver&label=world-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/inercaso/world-service)
-[![zombie-service](https://img.shields.io/badge/zombie--service-v--.--.---red?logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/zombie-service)
-[![resource-service](https://img.shields.io/badge/resource--service-v--.--.---red?logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/resource-service)
+[![zombie-service](https://img.shields.io/docker/v/nevaletik/kahoot-zombie-service?sort=semver&label=zombie-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/nevaletik/kahoot-zombie-service)
+[![resource-service](https://img.shields.io/docker/v/nevaletik/kahoot-resource-service?sort=semver&label=resource-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/nevaletik/kahoot-resource-service)
 [![base-service](https://img.shields.io/docker/v/mixam052/kahoots-base-service?sort=semver&label=base-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/mixam052/kahoots-base-service)
 [![crafting-service](https://img.shields.io/docker/v/mixam052/kahoots-crafting-service?sort=semver&label=crafting-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/mixam052/kahoots-crafting-service)
 
@@ -18,8 +18,8 @@ wings of the university to explore, tying academic progress directly to survival
 [![game-service postman](https://img.shields.io/badge/game--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/game-service)
 [![exam-service postman](https://img.shields.io/badge/exam--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/exam-service)
 [![world-service postman](https://img.shields.io/badge/world--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/world-service)
-[![zombie-service postman](https://img.shields.io/badge/zombie--service-no--docs-red?logo=postman&logoColor=white)](docs/postman/zombie-service)
-[![resource-service postman](https://img.shields.io/badge/resource--service-no--docs-red?logo=postman&logoColor=white)](docs/postman/resource-service)
+[![zombie-service postman](https://img.shields.io/badge/zombie--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/zombie-service)
+[![resource-service postman](https://img.shields.io/badge/resource--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/resource-service)
 [![base-service postman](https://img.shields.io/badge/base--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/base-service)
 [![crafting-service postman](https://img.shields.io/badge/crafting--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/crafting-service)
 
@@ -61,6 +61,8 @@ docker compose up
 | Game | http://localhost:8082 |
 | Exam | http://localhost:8083 |
 | World | http://localhost:8084 |
+| Zombie | http://localhost:8085 |
+| Resource | http://localhost:8086 |
 | Base | http://localhost:8087 |
 | Crafting | http://localhost:8088 |
 
@@ -109,6 +111,34 @@ docker compose up
   `WORLD_AUTH_MODE=mock` (`X-Player-Id` header) until Player's login cookie is wired in (`jwks`).
 - **Try it:** Postman collection in [`docs/postman/world-service`](docs/postman/world-service).
   Pass an exam through the Exam collection and the matching wing shows `unlocked: true`.
+
+### Zombie Service
+
+- **Image:** [`nevaletik/kahoot-zombie-service`](https://hub.docker.com/r/nevaletik/kahoot-zombie-service),
+  version set by `ZOMBIE_SERVICE_TAG` (currently `1.0.0`).
+- **Needs:** its own Postgres (`zombie-db`, started by compose); password defaults to `qwerty`,
+  override with `ZOMBIE_POSTGRES_PASSWORD`. Definitions start empty; add them with `POST /zombies`.
+  `INTERNAL_KEY` is the `X-Internal-Key` every route except the health check expects.
+- **Talks to:** nobody. It verifies Player's login cookie on `GET /zombies/{id}`; until Player's
+  JWKS is wired in, the cookie is decoded without checking its signature.
+- **Try it:** Postman collection in [`docs/postman/zombie-service`](docs/postman/zombie-service)
+  (also as a single importable `zombie-service.postman_collection.json`).
+
+### Resource Service
+
+- **Image:** [`nevaletik/kahoot-resource-service`](https://hub.docker.com/r/nevaletik/kahoot-resource-service),
+  version set by `RESOURCE_SERVICE_TAG` (currently `1.0.0`).
+- **Needs:** its own Postgres (`resource-db`, started by compose); password defaults to `qwerty`,
+  override with `RESOURCE_POSTGRES_PASSWORD`. A player has no balances until `player.registered`
+  is delivered for them.
+- **Talks to:** Player and Game over their `/events` streams (set `RESOURCE_PLAYER_EVENTS_URL` /
+  `RESOURCE_GAME_EVENTS_URL`), and World for node resource types (`RESOURCE_WORLD_SERVICE_URL`).
+  While those are empty it uses a built-in copy of the rooms and accepts events over HTTP at
+  `POST /resources/internal/events`. It publishes `resource.gathered` on `ws://resource:8086/events`.
+  Base and Crafting reserve/commit through it with `INTERNAL_KEY`.
+- **Try it:** Postman collection in [`docs/postman/resource-service`](docs/postman/resource-service)
+  (also as a single importable `resource-service.postman_collection.json`). Run the Events folder
+  first to give player 42 balances.
 
 ### Base Service
 
