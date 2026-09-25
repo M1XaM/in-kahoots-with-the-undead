@@ -1,8 +1,8 @@
-name: Action Completed - scavenge
+name: Action Completed - chop_benches
 $kind: http-request
 method: POST
-url: "http://localhost:8086/resources/_mock/events/game.action_completed"
-description: "Room 3 / node 12 is metal in the mocked World Service."
+url: "http://localhost:8086/resources/internal/events"
+description: "Credits 5-15 wood and publishes resource.gathered on ws://localhost:8086/events."
 headers:
   - key: Content-Type
     value: "application/json"
@@ -13,16 +13,16 @@ body:
   content: |
     {
       "eventId": "{{$guid}}",
-      "type": "ActionCompleted",
+      "type": "game.action_completed",
       "version": 1,
       "occurredAt": "2026-09-25T10:00:00Z",
       "payload": {
         "actionId": "{{$guid}}",
         "sessionId": "7a90",
         "playerId": 42,
-        "type": "scavenge",
-        "roomId": 3,
-        "nodeId": 12,
+        "type": "chop_benches",
+        "roomId": 1,
+        "nodeId": null,
         "completedAt": "2026-09-25T10:00:00Z"
       }
     }

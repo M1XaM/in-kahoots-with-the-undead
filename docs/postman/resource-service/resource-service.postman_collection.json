@@ -14,7 +14,7 @@
       }
     },
     {
-      "name": "Events (mock Kafka)",
+      "name": "Events",
       "item": [
         {
           "name": "Player Registered",
@@ -30,11 +30,11 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/resources/_mock/events/player.registered",
-            "description": "Simulates player.registered: creates zero balances for player 42.",
+            "url": "{{baseUrl}}/resources/internal/events",
+            "description": "HTTP delivery of player.registered (same handler as the WebSocket consumer): creates zero balances for player 42.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"eventId\": \"{{$guid}}\",\n  \"type\": \"PlayerRegistered\",\n  \"version\": 1,\n  \"occurredAt\": \"2026-09-25T10:00:00Z\",\n  \"payload\": {\n    \"playerId\": 42,\n    \"username\": \"razvan\"\n  }\n}",
+              "raw": "{\n  \"eventId\": \"{{$guid}}\",\n  \"type\": \"player.registered\",\n  \"version\": 1,\n  \"occurredAt\": \"2026-09-25T10:00:00Z\",\n  \"payload\": {\n    \"playerId\": 42,\n    \"username\": \"razvan\"\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -57,11 +57,11 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/resources/_mock/events/game.action_completed",
-            "description": "Credits 5-15 wood and publishes resource.gathered.",
+            "url": "{{baseUrl}}/resources/internal/events",
+            "description": "Credits 5-15 wood and publishes resource.gathered on ws://localhost:8086/events.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"eventId\": \"{{$guid}}\",\n  \"type\": \"ActionCompleted\",\n  \"version\": 1,\n  \"occurredAt\": \"2026-09-25T10:00:00Z\",\n  \"payload\": {\n    \"actionId\": \"{{$guid}}\",\n    \"sessionId\": \"7a90\",\n    \"playerId\": 42,\n    \"type\": \"chop_benches\",\n    \"roomId\": 1,\n    \"nodeId\": null,\n    \"completedAt\": \"2026-09-25T10:00:00Z\"\n  }\n}",
+              "raw": "{\n  \"eventId\": \"{{$guid}}\",\n  \"type\": \"game.action_completed\",\n  \"version\": 1,\n  \"occurredAt\": \"2026-09-25T10:00:00Z\",\n  \"payload\": {\n    \"actionId\": \"{{$guid}}\",\n    \"sessionId\": \"7a90\",\n    \"playerId\": 42,\n    \"type\": \"chop_benches\",\n    \"roomId\": 1,\n    \"nodeId\": null,\n    \"completedAt\": \"2026-09-25T10:00:00Z\"\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -84,11 +84,11 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/resources/_mock/events/game.action_completed",
+            "url": "{{baseUrl}}/resources/internal/events",
             "description": "Room 3 / node 12 is metal in the mocked World Service.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"eventId\": \"{{$guid}}\",\n  \"type\": \"ActionCompleted\",\n  \"version\": 1,\n  \"occurredAt\": \"2026-09-25T10:00:00Z\",\n  \"payload\": {\n    \"actionId\": \"{{$guid}}\",\n    \"sessionId\": \"7a90\",\n    \"playerId\": 42,\n    \"type\": \"scavenge\",\n    \"roomId\": 3,\n    \"nodeId\": 12,\n    \"completedAt\": \"2026-09-25T10:00:00Z\"\n  }\n}",
+              "raw": "{\n  \"eventId\": \"{{$guid}}\",\n  \"type\": \"game.action_completed\",\n  \"version\": 1,\n  \"occurredAt\": \"2026-09-25T10:00:00Z\",\n  \"payload\": {\n    \"actionId\": \"{{$guid}}\",\n    \"sessionId\": \"7a90\",\n    \"playerId\": 42,\n    \"type\": \"scavenge\",\n    \"roomId\": 3,\n    \"nodeId\": 12,\n    \"completedAt\": \"2026-09-25T10:00:00Z\"\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -107,8 +107,8 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/resources/_mock/events/published",
-            "description": "Events this service would have produced to Kafka."
+            "url": "{{baseUrl}}/resources/internal/events?since=0",
+            "description": "Outbox: the events /events subscribers receive (resource.gathered)."
           }
         }
       ]
