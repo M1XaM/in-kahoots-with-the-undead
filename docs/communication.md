@@ -1492,6 +1492,10 @@ SpawnPoint { pointId: int, roomId: int, zombieTypes: [ZombieType] }
 
 Zombie definitions: types, stats, abilities, sprites. Read-only at runtime.
 
+**Current implementation:** until Player's JWKS is wired in, the `access_token` cookie is decoded
+but its signature is not verified (`sub`/`exp` are still checked). Definitions start empty; add
+them with `POST /zombies`.
+
 ### Endpoints
 
 <details>
@@ -1537,6 +1541,21 @@ Zombie definitions: types, stats, abilities, sprites. Read-only at runtime.
 
 </details>
 
+<details>
+<summary><b>POST</b> <code>/zombies</code> · <b>PATCH</b> <code>/zombies/{id}</code> · <b>DELETE</b> <code>/zombies/{id}</code> — Manage definitions</summary>
+
+**Caller:** internal (admin) · **Auth:** `X-Internal-Key` · **Idempotent:** —
+
+`POST` takes a full `Zombie` without `zombieId` and returns `201` with it; `PATCH` takes any subset
+of its fields and returns `200`; `DELETE` returns `204`. `404 ZOMBIE_NOT_FOUND` for an unknown id.
+
+```json
+{ "type": "tourist", "name": "Lost Erasmus", "subject": null, "spriteUrl": "/sprites/tourist.png",
+  "stats": { "health": 60, "speed": 3, "attack": 5, "perception": 5 }, "abilities": ["steal_xp", "steal_resources", "sprint"] }
+```
+
+</details>
+
 ### Schemas
 
 <details>
@@ -1562,6 +1581,14 @@ The resource economy: per-player balances, gathering, spending, a ledger of ever
 Spending is two-phase so a caller that fails after spending can undo it:
 **reserve → do the work → commit** (or release). Reservations not committed within 60 s are
 released automatically.
+
+**Current implementation:** until Player's JWKS is wired in, the `access_token` cookie is decoded
+but its signature is not verified. Resource serves `resource.gathered` on `ws://resource:8086/events`
+and consumes Player's and Game's streams when `PLAYER_EVENTS_URL` / `GAME_EVENTS_URL` are set;
+until then it also accepts events over HTTP at `POST /resources/internal/events` (same handlers,
+same `eventId` deduplication). Room → node resource types come from World's
+`GET /world/rooms/{id}` when `WORLD_SERVICE_URL` is set, otherwise from a built-in copy of the
+example rooms.
 
 ### Endpoints
 
@@ -1603,8 +1630,8 @@ Newest first. `nodeId` records where a resource was gathered.
 ```json
 // 200
 [
-  { "entryId": "d0a1…", "kind": "gathered", "resourceType": "food", "amount": 12, "nodeId": 12, "actionId": "e3f1…", "reservationId": null, "at": "2026-09-09T18:09:11Z" },
-  { "entryId": "c9f0…", "kind": "spent", "resourceType": "wood", "amount": -10, "nodeId": null, "actionId": null, "reservationId": "5b3e…", "at": "2026-09-09T18:01:40Z" }
+  { "entryId": "d0a1…", "kind": "gathered", "resourceType": "food", "amount": 12, "nodeId": 12, "actionId": "e3f1…", "reservationId": null, "encounterId": null, "at": "2026-09-09T18:09:11Z" },
+  { "entryId": "c9f0…", "kind": "spent", "resourceType": "wood", "amount": -10, "nodeId": null, "actionId": null, "reservationId": "5b3e…", "encounterId": null, "at": "2026-09-09T18:01:40Z" }
 ]
 ```
 
@@ -1657,6 +1684,7 @@ Deducts the reserved amounts permanently and writes `spent` ledger entries.
 |---|---|
 | `200` | Committed (or already committed) |
 | `404 RESERVATION_NOT_FOUND` | No such reservation |
+| `409 RESERVATION_RELEASED` | Already released through `DELETE`; reserve again |
 | `410 RESERVATION_EXPIRED` | Auto-released after 60 s; reserve again |
 
 ```json
@@ -1689,13 +1717,18 @@ Returns held amounts to the free balance. Used by Base/Crafting when the step af
 **Caller:** internal (Game) · **Auth:** `X-Internal-Key` · **Idempotent:** yes
 
 Takes `min(requested, free balance)` per resource; never fails for insufficient balance. Writes
-`stolen` ledger entries. `encounterId` is recorded for the ledger.
+`stolen` ledger entries. `encounterId` is recorded on each ledger entry.
 
 **Request body**
 
 ```json
 { "resources": { "food": 5, "wood": 3 }, "encounterId": "a5c2…" }
 ```
+
+| Field | Type | Rules |
+|---|---|---|
+| `resources` | map<string,int> | Non-empty, every amount ≥ 1 |
+| `encounterId` | string | Required; the Game encounter that caused the theft |
 
 **Responses**
 
@@ -1708,6 +1741,39 @@ Takes `min(requested, free balance)` per resource; never fails for insufficient 
 // 200
 { "taken": { "food": 4, "wood": 3 } }
 ```
+
+</details>
+
+<details>
+<summary><b>POST</b> <code>/resources/internal/events</code> — Deliver an event over HTTP</summary>
+
+**Caller:** internal · **Auth:** `X-Internal-Key` · **Idempotent:** yes (deduplicated on `eventId`)
+
+Accepts a full event envelope (`player.registered` or `game.action_completed`) and runs the same
+handler as the WebSocket consumer. `GET /resources/internal/events?since=<seq>` lists the events
+Resource has produced.
+
+**Responses**
+
+| Code | When |
+|---|---|
+| `202` | `{ "eventId", "status": "handled" \| "duplicate" \| "ignored" }` |
+| `400 VALIDATION_ERROR` | Malformed envelope or payload |
+
+</details>
+
+<details>
+<summary>Admin CRUD — balances, ledger entries, reservations</summary>
+
+**Caller:** internal (admin, testing) · **Auth:** `X-Internal-Key` · **Idempotent:** —
+
+Raw rows, bypassing the economy rules. Not for use by other services.
+
+| Resource | Routes |
+|---|---|
+| Balances | `POST`/`GET /resources/balances`, `GET`/`PATCH`/`DELETE /resources/balances/{id}`, `GET /resources/players/{id}/balances` |
+| Ledger | `POST`/`GET /resources/ledger`, `GET`/`PATCH`/`DELETE /resources/ledger/{id}` |
+| Reservations | `GET /resources/reservations`, `GET`/`PATCH /resources/reservations/{id}`, `GET /resources/players/{id}/reservations` |
 
 </details>
 
@@ -1745,7 +1811,7 @@ event is a no-op. Publishes `resource.gathered` after crediting.
 
 ```
 LedgerEntry { entryId: uuid, kind: enum(gathered|spent|stolen), resourceType: string, amount: int,
-              nodeId: int?, actionId: uuid?, reservationId: uuid?, at: datetime }
+              nodeId: int?, actionId: uuid?, reservationId: uuid?, encounterId: string?, at: datetime }
 ```
 
 Resource types are open strings; the current set is `wood`, `metal`, `paper`, `food`, `textbooks`,
