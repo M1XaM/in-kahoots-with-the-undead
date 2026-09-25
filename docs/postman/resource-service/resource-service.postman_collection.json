@@ -1,0 +1,574 @@
+{
+  "info": {
+    "name": "Resource Service",
+    "description": "Resource Service (port 8086). Run the Events folder first to give player 42 balances. Internal key defaults to `changeme` (INTERNAL_KEY in the team .env). The player cookie is an unsigned mock JWT for sub=42 (Player JWKS is mocked).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/"
+      }
+    },
+    {
+      "name": "Events (mock Kafka)",
+      "item": [
+        {
+          "name": "Player Registered",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/resources/_mock/events/player.registered",
+            "description": "Simulates player.registered: creates zero balances for player 42.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"{{$guid}}\",\n  \"type\": \"PlayerRegistered\",\n  \"version\": 1,\n  \"occurredAt\": \"2026-09-25T10:00:00Z\",\n  \"payload\": {\n    \"playerId\": 42,\n    \"username\": \"razvan\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Action Completed - chop_benches",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/resources/_mock/events/game.action_completed",
+            "description": "Credits 5-15 wood and publishes resource.gathered.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"{{$guid}}\",\n  \"type\": \"ActionCompleted\",\n  \"version\": 1,\n  \"occurredAt\": \"2026-09-25T10:00:00Z\",\n  \"payload\": {\n    \"actionId\": \"{{$guid}}\",\n    \"sessionId\": \"7a90\",\n    \"playerId\": 42,\n    \"type\": \"chop_benches\",\n    \"roomId\": 1,\n    \"nodeId\": null,\n    \"completedAt\": \"2026-09-25T10:00:00Z\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Action Completed - scavenge",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/resources/_mock/events/game.action_completed",
+            "description": "Room 3 / node 12 is metal in the mocked World Service.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"{{$guid}}\",\n  \"type\": \"ActionCompleted\",\n  \"version\": 1,\n  \"occurredAt\": \"2026-09-25T10:00:00Z\",\n  \"payload\": {\n    \"actionId\": \"{{$guid}}\",\n    \"sessionId\": \"7a90\",\n    \"playerId\": 42,\n    \"type\": \"scavenge\",\n    \"roomId\": 3,\n    \"nodeId\": 12,\n    \"completedAt\": \"2026-09-25T10:00:00Z\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Published Events",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/resources/_mock/events/published",
+            "description": "Events this service would have produced to Kafka."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Economy",
+      "item": [
+        {
+          "name": "Get Balances (internal)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/resources/players/42"
+          }
+        },
+        {
+          "name": "Get Balances (player cookie)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "access_token=x.eyJzdWIiOjQyLCJ1c2VybmFtZSI6InJhenZhbiJ9.y"
+              }
+            ],
+            "url": "{{baseUrl}}/resources/players/42"
+          }
+        },
+        {
+          "name": "Get Ledger (player cookie)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "access_token=x.eyJzdWIiOjQyLCJ1c2VybmFtZSI6InJhenZhbiJ9.y"
+              }
+            ],
+            "url": "{{baseUrl}}/resources/players/42/ledger?limit=50"
+          }
+        },
+        {
+          "name": "Reserve Resources",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": "{{baseUrl}}/resources/players/42/reservations",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resources\": {\n    \"wood\": 3\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('reservationId', pm.response.json().reservationId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Commit Reservation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/resources/reservations/{{reservationId}}/commit"
+          }
+        },
+        {
+          "name": "Release Reservation",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/resources/reservations/{{reservationId}}",
+            "description": "409 ALREADY_COMMITTED after a commit; reserve again to see 204."
+          }
+        },
+        {
+          "name": "Steal Resources",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": "{{baseUrl}}/resources/players/42/steal",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resources\": {\n    \"food\": 5,\n    \"wood\": 3\n  },\n  \"encounterId\": \"{{$guid}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Balances (admin)",
+      "item": [
+        {
+          "name": "Create Balance",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/resources/balances",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"playerId\": 43,\n  \"resourceType\": \"wood\",\n  \"amount\": 10\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('balanceId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get All Balances",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/resources/balances"
+          }
+        },
+        {
+          "name": "Get Balance",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/resources/balances/{{balanceId}}"
+          }
+        },
+        {
+          "name": "Get Player Balances",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/resources/players/43/balances"
+          }
+        },
+        {
+          "name": "Update Balance",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/resources/balances/{{balanceId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 25\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete Balance",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/resources/balances/{{balanceId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ledger (admin)",
+      "item": [
+        {
+          "name": "Create Ledger Entry",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/resources/ledger",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"playerId\": 43,\n  \"kind\": \"gathered\",\n  \"resourceType\": \"food\",\n  \"amount\": 12,\n  \"nodeId\": 11\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('ledgerEntryId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get All Ledger Entries",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/resources/ledger"
+          }
+        },
+        {
+          "name": "Get Ledger Entry",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/resources/ledger/{{ledgerEntryId}}"
+          }
+        },
+        {
+          "name": "Update Ledger Entry",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/resources/ledger/{{ledgerEntryId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 8\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete Ledger Entry",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/resources/ledger/{{ledgerEntryId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reservations (admin)",
+      "item": [
+        {
+          "name": "Get All Reservations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/resources/reservations"
+          }
+        },
+        {
+          "name": "Get Player Reservations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/resources/players/42/reservations"
+          }
+        },
+        {
+          "name": "Get Reservation",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/resources/reservations/{{reservationId}}"
+          }
+        },
+        {
+          "name": "Update Reservation",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/resources/reservations/{{reservationId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"released\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8086"
+    },
+    {
+      "key": "reservationId",
+      "value": ""
+    },
+    {
+      "key": "balanceId",
+      "value": ""
+    },
+    {
+      "key": "ledgerEntryId",
+      "value": ""
+    }
+  ]
+}

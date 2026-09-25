@@ -1,0 +1,7 @@
+name: Get Zombies by Type
+$kind: http-request
+method: GET
+url: "http://localhost:8085/zombies?type=professor"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"

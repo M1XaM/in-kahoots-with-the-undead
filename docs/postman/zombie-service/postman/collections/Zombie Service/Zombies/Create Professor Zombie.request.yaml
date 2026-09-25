@@ -1,0 +1,32 @@
+name: Create Professor Zombie
+$kind: http-request
+method: POST
+url: "http://localhost:8085/zombies"
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+body:
+  type: json
+  content: |
+    {
+      "type": "professor",
+      "name": "Prof. Grosu",
+      "subject": "math",
+      "spriteUrl": "/sprites/prof_grosu.png",
+      "stats": {
+        "health": 120,
+        "speed": 1,
+        "attack": 8,
+        "perception": 3
+      },
+      "abilities": [
+        "administer_exam"
+      ]
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.collectionVariables.set('zombieId', pm.response.json().zombieId);

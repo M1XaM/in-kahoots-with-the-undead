@@ -1,0 +1,15 @@
+name: Update Reservation
+$kind: http-request
+method: PATCH
+url: "http://localhost:8086/resources/reservations/{{reservationId}}"
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+body:
+  type: json
+  content: |
+    {
+      "status": "released"
+    }
