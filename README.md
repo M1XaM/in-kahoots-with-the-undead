@@ -115,7 +115,7 @@ docker compose up
 ### Zombie Service
 
 - **Image:** [`nevaletik/kahoot-zombie-service`](https://hub.docker.com/r/nevaletik/kahoot-zombie-service),
-  version set by `ZOMBIE_SERVICE_TAG` (currently `1.1.0`).
+  version set by `ZOMBIE_SERVICE_TAG` (currently `1.2.0`).
 - **Needs:** its own Postgres (`zombie-db`, started by compose and seeded from
   [`db/zombie-service/init.sql`](db/zombie-service/init.sql) with ten definitions: ids `5`/`6`/`7`
   are the math/physics/programming professors, `9` and `10` are not, matching Exam's stand-in);
@@ -123,13 +123,15 @@ docker compose up
   `INTERNAL_KEY` is the `X-Internal-Key` every route except the health check expects.
 - **Talks to:** nobody. It verifies Player's login cookie on `GET /zombies/{id}`; until Player's
   JWKS is wired in, the cookie is decoded without checking its signature.
-- **Try it:** Postman collection in [`docs/postman/zombie-service`](docs/postman/zombie-service)
-  (also as a single importable `zombie-service.postman_collection.json`).
+- **Try it:** Swagger UI at http://localhost:8085/docs (OpenAPI spec:
+  [`docs/openapi/zombie-service.openapi.json`](docs/openapi/zombie-service.openapi.json)), or the
+  Postman collection in [`docs/postman/zombie-service`](docs/postman/zombie-service) (also as a
+  single importable `zombie-service.postman_collection.json`).
 
 ### Resource Service
 
 - **Image:** [`nevaletik/kahoot-resource-service`](https://hub.docker.com/r/nevaletik/kahoot-resource-service),
-  version set by `RESOURCE_SERVICE_TAG` (currently `1.1.0`).
+  version set by `RESOURCE_SERVICE_TAG` (currently `1.2.0`).
 - **Needs:** its own Postgres (`resource-db`, started by compose and seeded from
   [`db/resource-service/init.sql`](db/resource-service/init.sql) with balances and ledger history
   for players `1`-`3`); password defaults to `qwerty`, override with `RESOURCE_POSTGRES_PASSWORD`.
@@ -139,9 +141,11 @@ docker compose up
   While those are empty it uses a built-in copy of the rooms and accepts events over HTTP at
   `POST /resources/internal/events`. It publishes `resource.gathered` on `ws://resource:8086/events`.
   Base and Crafting reserve/commit through it with `INTERNAL_KEY`.
-- **Try it:** Postman collection in [`docs/postman/resource-service`](docs/postman/resource-service)
-  (also as a single importable `resource-service.postman_collection.json`). Run the Events folder
-  first to give player 42 balances.
+- **Try it:** Swagger UI at http://localhost:8086/docs (OpenAPI spec:
+  [`docs/openapi/resource-service.openapi.json`](docs/openapi/resource-service.openapi.json)), or the
+  Postman collection in [`docs/postman/resource-service`](docs/postman/resource-service) (also as a
+  single importable `resource-service.postman_collection.json`). Players `1`-`3` are seeded; run the
+  Events folder to give player 42 balances.
 
 ### Base Service
 
