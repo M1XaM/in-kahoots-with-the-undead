@@ -246,6 +246,10 @@ services:
       DB_NAME: ${RESOURCE_POSTGRES_DB:-resource}
       # empty = built-in World mock; http://world:8084 to use the real World Service
       WORLD_SERVICE_URL: ${RESOURCE_WORLD_SERVICE_URL:-}
+      # empty = not connected (use POST /resources/internal/events);
+      # ws://player:8081/events and ws://game:8082/events once they serve /events
+      PLAYER_EVENTS_URL: ${RESOURCE_PLAYER_EVENTS_URL:-}
+      GAME_EVENTS_URL: ${RESOURCE_GAME_EVENTS_URL:-}
     ports:
       - "${RESOURCE_PORT:-8086}:${RESOURCE_PORT:-8086}"
     depends_on:
