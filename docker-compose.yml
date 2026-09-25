@@ -203,7 +203,7 @@ services:
       retries: 10
 
   zombie:
-    image: ${ZOMBIE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-zombie-service:${ZOMBIE_SERVICE_TAG:-1.1.0}
+    image: ${ZOMBIE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-zombie-service:${ZOMBIE_SERVICE_TAG:-1.2.0}
     restart: unless-stopped
     environment:
       PORT: ${ZOMBIE_PORT:-8085}
@@ -236,7 +236,7 @@ services:
       retries: 10
 
   resource:
-    image: ${RESOURCE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-resource-service:${RESOURCE_SERVICE_TAG:-1.1.0}
+    image: ${RESOURCE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-resource-service:${RESOURCE_SERVICE_TAG:-1.2.0}
     restart: unless-stopped
     environment:
       PORT: ${RESOURCE_PORT:-8086}
