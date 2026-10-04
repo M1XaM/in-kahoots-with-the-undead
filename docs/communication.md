@@ -7,6 +7,7 @@
 
 | Service | Port | Path prefix |
 |---|---|---|
+| **Gateway** | 8080 | all of the below, plus `/ws/{service}` and `/health` |
 | Player | 8081 | `/auth`, `/players`, `/trades` |
 | Game | 8082 | `/game` |
 | Exam | 8083 | `/exams` |
@@ -31,6 +32,28 @@ repeated per endpoint.
 A repeated key returns the original response and performs no second write. Keys are kept for 24h.
 
 ---
+
+## Gateway
+
+Every REST call enters through the API Gateway (`http://gateway:8080` inside compose,
+http://localhost:8080 from the host), which forwards it unchanged to the service owning the path
+prefix above. Services call each other through the gateway too, sending `X-Internal-Key`.
+
+- **Authorization:** the gateway verifies the player JWT (`Authorization: Bearer <jwt>` or the
+  `access_token` cookie) before forwarding; `401 UNAUTHENTICATED` if it is missing or invalid.
+  `POST /auth/register`, `POST /auth/login` and `GET /auth/jwks` are public. The `Authorization`
+  header is never forwarded; the service receives `X-Player-Id: <sub>` set by the gateway (a
+  client-sent `X-Player-Id` is overwritten). Internal callers keep their own `X-Player-Id`.
+- **Internal endpoints** (`/<prefix>/internal/...`) answer `404` at the gateway without a valid
+  `X-Internal-Key`.
+- **Limits:** `504 GATEWAY_TIMEOUT` past the task timeout, `429 TOO_MANY_REQUESTS` (with
+  `Retry-After`) over the concurrent task limit, `503 SERVICE_UNAVAILABLE` if the service is down.
+  Services apply their own limits and answer `408 REQUEST_TIMEOUT` / `429 TOO_MANY_REQUESTS`.
+- **WebSockets** are negotiated, not relayed: `GET /ws/game` returns
+  `{ "url": "ws://localhost:8082/game", "protocol": "socket.io", "path": "/socket.io" }` for the
+  client; with `X-Internal-Key`, `GET /ws/{player|game|exam|world|resource}` returns
+  `{ "url": "ws://<service>/events", "protocol": "websocket" }`. The socket is then opened directly
+  on the service.
 
 ## Authentication
 

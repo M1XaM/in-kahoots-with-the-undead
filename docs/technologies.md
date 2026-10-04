@@ -6,6 +6,7 @@
 |---|---|---|
 | **Go** | Gin, GORM, PostgreSQL | CRUD-heavy, relational, transactional — "system of record" |
 | **TypeScript** | Node.js, NestJS, Socket.IO | Real-time, event-driven, I/O-bound — "live gameplay" |
+| **Python** | FastAPI, httpx, PyJWT | The API Gateway only — the lab's "banned" language, kept out of the services |
 
 ## Per-service breakdown
 
@@ -18,6 +19,7 @@
 | 5 | **Zombie** | Go / Gin | REST (sync) | Low-write config/definition store — plain cacheable REST is enough. |
 | 6 | **Resource** | TS / NestJS | Kafka (gather/consume completion) + REST (balance) | Async, reconnect-prone completions need idempotent event handling — NestJS's queue/event tooling covers this natively. |
 | 7 | **Base** | Go / Gin | REST + calls Resource (reserve/commit) | Spend-then-build; reservation on Resource makes the spend reversible if the local write fails. |
+| 0 | **Gateway** | Python / FastAPI | REST in, REST out (async httpx pool) + WebSocket negotiation | Thin, I/O-bound proxy: an async framework handles many concurrent upstream calls on one event loop, and authorization, task timeout and the concurrent task limit live in one place instead of in every client. |
 | 8 | **Crafting** | Go / Gin | REST + calls Resource (reserve/commit), Player (deliver) | Multi-step workflow across services; reserve → deliver → commit, release on failure. |
 
 ## Trade-offs
@@ -31,7 +33,10 @@
 
 ## Communication conventions
 
-- **REST (sync)** — caller needs an immediate answer (e.g. Game → World for rooms).
+- **REST (sync)** — caller needs an immediate answer (e.g. Game → World for rooms). Every REST
+  call, from clients and between services, goes through the Gateway.
 - **Kafka (async)** — producer shouldn't block on the reaction (e.g. `exam.completed`, resource
   completions); consumers dedupe on `eventId`.
-- **WebSockets** — client-facing live push only (Game Service sessions), never service-to-service.
+- **WebSockets** — client-facing live push (Game Service sessions) and the services' `/events`
+  streams. The Gateway only negotiates the URL (`GET /ws/{service}`); the socket connects
+  directly to the service.
