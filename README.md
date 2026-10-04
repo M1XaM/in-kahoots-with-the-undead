@@ -5,6 +5,7 @@ during a zombie apocalypse and must scavenge resources, build up their base, and
 including Professor Zombies, who force a pop quiz before letting you past. Passing exams unlocks new
 wings of the university to explore, tying academic progress directly to survival progress.
 
+[![gateway](https://img.shields.io/docker/v/timurcravtov/gateway?sort=semver&label=gateway&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/gateway)
 [![player-service](https://img.shields.io/docker/v/timurcravtov/player-service?sort=semver&label=player-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/player-service)
 [![game-service](https://img.shields.io/docker/v/timurcravtov/game-service?sort=semver&label=game-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/game-service)
 [![exam-service](https://img.shields.io/docker/v/inercaso/exam-service?sort=semver&label=exam-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/inercaso/exam-service)
@@ -28,6 +29,7 @@ wings of the university to explore, tying academic progress directly to survival
 
 ![Architecture diagram](docs/architecture.png)
 
+- **Gateway**: the single entry point: routing, authorization, task limits, WebSocket negotiation
 - **Player**: identity, auth, profiles, XP/levels, inventory, trading
 - **Game**: sessions, day/night cycle, timed actions, zombie encounters
 - **Exam**: exam generation, grading, academic history, achievements
@@ -37,7 +39,10 @@ wings of the university to explore, tying academic progress directly to survival
 - **Base**: what players have built: base level, facilities, barricades
 - **Crafting**: recipes and crafting, delivering items into Player's inventory
 
-Game orchestrates a session by calling World, Zombie and Exam over REST; Resource, Base and
+Clients and services reach each other's REST APIs only through the Gateway (services
+authenticate with `X-Internal-Key`); WebSocket URLs are negotiated at the Gateway and the
+connection then goes directly to the service. Game orchestrates a session by calling World, Zombie
+and Exam over REST; Resource, Base and
 Crafting react to what Game reports via async events, and publish their own events (level-ups,
 exam results, wing unlocks) for services that depend on them. See the [Communication
 Contract](docs/communication.md) for the full endpoint and event contract.
@@ -57,6 +62,7 @@ docker compose up
 
 | Service | URL |
 |---|---|
+| **Gateway** (entry point) | http://localhost:8080 |
 | Player | http://localhost:8081 |
 | Game | http://localhost:8082 |
 | Exam | http://localhost:8083 |
@@ -65,6 +71,29 @@ docker compose up
 | Resource | http://localhost:8086 |
 | Base | http://localhost:8087 |
 | Crafting | http://localhost:8088 |
+
+### Gateway
+
+- **Repository:** [`services/gateway`](https://github.com/TimurCravtov/KahootWithUndeadGateway),
+  Python / FastAPI (the lab's "banned" language).
+- **Image:** [`timurcravtov/gateway`](https://hub.docker.com/r/timurcravtov/gateway), version set
+  by `GATEWAY_SERVICE_TAG` (currently `2`).
+- **Routes** by the first path segment to the owning service (prefixes in the
+  [Communication Contract](docs/communication.md#conventions)). Base, Crafting, Exam, World and
+  Resource are configured to call other services through it, so all REST traffic, client and
+  service-to-service, passes the gateway.
+- **Authorizes** every client request: the login JWT (`Authorization: Bearer` or the
+  `access_token` cookie) is verified with Player's JWKS (`GATEWAY_AUTH_MODE=jwks`; `secret` for
+  HS256 with `GATEWAY_JWT_SECRET`, `off` to disable). The `Authorization` header is never forwarded;
+  services receive the verified player as `X-Player-Id`. Services authenticate with
+  `X-Internal-Key`.
+- **Limits:** requests past `GATEWAY_TASK_TIMEOUT` seconds answer `504`, requests beyond
+  `GATEWAY_MAX_CONCURRENT_TASKS` in flight answer `429`. Zombie and Resource enforce the same
+  limits themselves (`408` / `429`).
+- **WebSockets:** `GET /ws/game` returns Game's Socket.IO URL for the browser and
+  `GET /ws/{player|game|exam|world|resource}` (internal) a producer's `/events` URL. The gateway
+  never relays the connection.
+- **Try it:** http://localhost:8080/docs, health check `GET /health`.
 
 ### Player Service
 
@@ -115,7 +144,7 @@ docker compose up
 ### Zombie Service
 
 - **Image:** [`nevaletik/kahoot-zombie-service`](https://hub.docker.com/r/nevaletik/kahoot-zombie-service),
-  version set by `ZOMBIE_SERVICE_TAG` (currently `1.2.0`).
+  version set by `ZOMBIE_SERVICE_TAG` (currently `2`).
 - **Needs:** its own Postgres (`zombie-db`, started by compose and seeded from
   [`db/zombie-service/init.sql`](db/zombie-service/init.sql) with ten definitions: ids `5`/`6`/`7`
   are the math/physics/programming professors, `9` and `10` are not, matching Exam's stand-in);
@@ -131,13 +160,14 @@ docker compose up
 ### Resource Service
 
 - **Image:** [`nevaletik/kahoot-resource-service`](https://hub.docker.com/r/nevaletik/kahoot-resource-service),
-  version set by `RESOURCE_SERVICE_TAG` (currently `1.2.0`).
+  version set by `RESOURCE_SERVICE_TAG` (currently `2`).
 - **Needs:** its own Postgres (`resource-db`, started by compose and seeded from
   [`db/resource-service/init.sql`](db/resource-service/init.sql) with balances and ledger history
   for players `1`-`3`); password defaults to `qwerty`, override with `RESOURCE_POSTGRES_PASSWORD`.
   Other players get balances when `player.registered` is delivered for them.
 - **Talks to:** Player and Game over their `/events` streams (set `RESOURCE_PLAYER_EVENTS_URL` /
-  `RESOURCE_GAME_EVENTS_URL`), and World for node resource types (`RESOURCE_WORLD_SERVICE_URL`).
+  `RESOURCE_GAME_EVENTS_URL`, or `gateway` to negotiate them at the Gateway), and World for node
+  resource types through the Gateway (`RESOURCE_WORLD_SERVICE_URL`, default `http://gateway:8080`).
   While those are empty it uses a built-in copy of the rooms and accepts events over HTTP at
   `POST /resources/internal/events`. It publishes `resource.gathered` on `ws://resource:8086/events`.
   Base and Crafting reserve/commit through it with `INTERNAL_KEY`.
