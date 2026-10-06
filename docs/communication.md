@@ -44,6 +44,10 @@ prefix above. Services call each other through the gateway too, sending `X-Inter
   `POST /auth/register`, `POST /auth/login` and `GET /auth/jwks` are public. The `Authorization`
   header is never forwarded; the service receives `X-Player-Id: <sub>` set by the gateway (a
   client-sent `X-Player-Id` is overwritten). Internal callers keep their own `X-Player-Id`.
+- **Login cookie:** the `access_token` cookie carries the same JWT, so it is not forwarded either:
+  the gateway removes it from the `Cookie` header (other cookies are kept). Access is decided only
+  at the gateway; every service reads the acting player from `X-Player-Id` and never sees or
+  verifies the token.
 - **Internal endpoints** (`/<prefix>/internal/...`) answer `404` at the gateway without a valid
   `X-Internal-Key`.
 - **Limits:** `504 GATEWAY_TIMEOUT` past the task timeout, `429 TOO_MANY_REQUESTS` (with
@@ -71,11 +75,15 @@ The cookie is a JWT signed by Player Service with RS256:
 { "sub": 42, "username": "razvan", "iat": 1757440000, "exp": 1757526400 }
 ```
 
-Every service verifies the signature locally with Player Service's public key from `GET /auth/jwks`
-(cached, refreshed hourly, `kid` selects the key). No service calls Player Service to validate a
-request. `sub` is the authenticated player id; endpoints taking a `{id}` for a player return
-`403 FORBIDDEN` if it differs from `sub`, unless the caller is internal. The WebSocket handshake
-sends the same cookie.
+The gateway verifies the signature with Player Service's public key from `GET /auth/jwks` (cached,
+refreshed hourly, `kid` selects the key) and rejects a missing or invalid token with
+`401 UNAUTHENTICATED`. Neither the cookie nor the `Authorization` header is forwarded: the service
+receives the verified `sub` as `X-Player-Id` and trusts it, because only the gateway reaches it with
+a player request. No service calls Player Service to validate a request. Endpoints taking a `{id}`
+for a player return `403 FORBIDDEN` if it differs from `X-Player-Id`, unless the caller is internal.
+Wherever an endpoint below says **Auth: cookie**, read it as "a logged-in player, identified by
+`X-Player-Id`". A WebSocket opened directly on a service does not pass the gateway; it still sends
+the cookie in its handshake (see [Service events](#service-events) and the Game Socket.IO namespace).
 
 ### Service-to-service
 
@@ -1168,8 +1176,8 @@ Question   { questionId: int, subject: string, text: string, options: [string], 
 The campus: wings, rooms, resource nodes, zombie spawn points. Geography only — what players build
 on it belongs to Base.
 
-**Current implementation:** until JWT verification is wired in (`AUTH_MODE=jwks`), World reads the
-acting player from the `X-Player-Id` header instead of the cookie. It consumes Exam's WebSocket
+**Auth:** World reads the acting player from the `X-Player-Id` header set by the gateway, not from
+the cookie. It consumes Exam's WebSocket
 stream, and also accepts events over HTTP at `POST /world/internal/events`.
 
 ### Endpoints
@@ -1515,9 +1523,8 @@ SpawnPoint { pointId: int, roomId: int, zombieTypes: [ZombieType] }
 
 Zombie definitions: types, stats, abilities, sprites. Read-only at runtime.
 
-**Current implementation:** until Player's JWKS is wired in, the `access_token` cookie is decoded
-but its signature is not verified (`sub`/`exp` are still checked). Definitions start empty; add
-them with `POST /zombies`.
+**Auth:** Zombie reads the acting player from `X-Player-Id` set by the gateway; it does not read
+the cookie. Definitions start empty; add them with `POST /zombies`.
 
 ### Endpoints
 
@@ -1605,8 +1612,8 @@ Spending is two-phase so a caller that fails after spending can undo it:
 **reserve → do the work → commit** (or release). Reservations not committed within 60 s are
 released automatically.
 
-**Current implementation:** until Player's JWKS is wired in, the `access_token` cookie is decoded
-but its signature is not verified. Resource serves `resource.gathered` on `ws://resource:8086/events`
+**Auth:** Resource reads the acting player from `X-Player-Id` set by the gateway; it does not read
+the cookie. Resource serves `resource.gathered` on `ws://resource:8086/events`
 and consumes Player's and Game's streams when `PLAYER_EVENTS_URL` / `GAME_EVENTS_URL` are set;
 until then it also accepts events over HTTP at `POST /resources/internal/events` (same handlers,
 same `eventId` deduplication). Room → node resource types come from World's
@@ -1862,8 +1869,8 @@ write releases the reservation.
 Base `level` is its highest facility level; `storageCapacity` is 100 per storage level. A new base
 has only `storage` at level 1.
 
-**Current implementation:** until JWT verification is added, Base reads the acting player from the
-`X-Player-Id` header instead of the cookie, and receives events over HTTP at
+**Auth:** Base reads the acting player from the `X-Player-Id` header set by the gateway, not from
+the cookie. Until it connects to Player, it receives events over HTTP at
 `POST /base/internal/events` instead of a WebSocket connection to Player.
 
 ### Endpoints
@@ -2084,8 +2091,8 @@ Recipes and crafting. Output items are delivered into the Player Service invento
 A player's level for `available` is the higher of Player's `GET /players/{id}` and the last
 `player.leveled_up` seen. Unlocked wings are global: once World reports a wing, every player has it.
 
-**Current implementation:** until JWT verification is added, Crafting reads the acting player from
-the `X-Player-Id` header instead of the cookie (internal callers must send it too), and receives
+**Auth:** Crafting reads the acting player from the `X-Player-Id` header set by the gateway, not
+from the cookie (internal callers must send it too). Until it connects to Player, it receives
 events over HTTP at `POST /crafting/internal/events` instead of WebSocket connections to Player,
 Exam and World.
 

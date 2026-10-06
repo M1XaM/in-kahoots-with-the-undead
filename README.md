@@ -86,8 +86,8 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 - **Authorizes** every client request: the login JWT (`Authorization: Bearer` or the
   `access_token` cookie) is verified with Player's JWKS (`GATEWAY_AUTH_MODE=jwks`; `secret` for
   HS256 with `GATEWAY_JWT_SECRET`, `off` to disable). The `Authorization` header is never forwarded;
-  services receive the verified player as `X-Player-Id`. Services authenticate with
-  `X-Internal-Key`.
+  services receive the verified player as `X-Player-Id`. The `access_token` cookie is stripped
+  too, so no service sees the token. Services authenticate with `X-Internal-Key`.
 - **Limits:** requests past `GATEWAY_TASK_TIMEOUT` seconds answer `504`, requests beyond
   `GATEWAY_MAX_CONCURRENT_TASKS` in flight answer `429`. Zombie and Resource enforce the same
   limits themselves (`408` / `429`).
