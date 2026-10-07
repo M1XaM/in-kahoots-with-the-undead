@@ -25,3 +25,6 @@
 [submodule "services/gateway"]
 	path = services/gateway
 	url = https://github.com/TimurCravtov/KahootWithUndeadGateway.git
+[submodule "services/client"]
+	path = services/client
+	url = git@github.com:M1XaM/kahoots-client.git
