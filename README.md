@@ -62,6 +62,7 @@ docker compose up
 
 | Service | URL |
 |---|---|
+| **Client** (React app) | http://localhost:3000 |
 | **Gateway** (entry point) | http://localhost:8080 |
 | Game (Socket.IO only) | http://localhost:8082 |
 
@@ -95,6 +96,22 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
   `GET /ws/{player|game|exam|world|resource}` (internal) a producer's `/events` URL. The gateway
   never relays the connection.
 - **Try it:** http://localhost:8080/docs, health check `GET /health`.
+
+### Client
+
+- **Repository:** [`services/client`](https://github.com/M1XaM/kahoots-client), React / Vite, served
+  by nginx.
+- **Image:** [`mixam052/kahoots-client`](https://hub.docker.com/r/mixam052/kahoots-client), version
+  set by `CLIENT_SERVICE_TAG` (currently `2`).
+- **Talks to:** the Gateway only. The browser calls the client's own `/api`, which nginx proxies
+  to `http://gateway:8080`, so no service is reached directly.
+- **Has:** one page per service, a status page for all of them, and the gateway's access rules
+  and load behaviour.
+- **Sign-in:** players register and log in through the Gateway at Player Service; the login cookie
+  is all the app needs. Its service actions (starting an exam, granting XP or resources) send
+  `X-Internal-Key`, taken from `CLIENT_DEV_INTERNAL_KEY`: the key reaches the browser, so set it
+  on a local machine only.
+- **Try it:** http://localhost:3000.
 
 ### Player Service
 

@@ -299,6 +299,20 @@ services:
       - base
       - crafting
 
+  client:
+    image: ${CLIENT_DOCKERHUB_USERNAME:-mixam052}/kahoots-client:${CLIENT_SERVICE_TAG:-2}
+    restart: unless-stopped
+    environment:
+      # the browser only calls the client's own /api, which nginx proxies to the gateway
+      GATEWAY_URL: http://gateway:8080
+      # lets the app perform service actions (start an exam, grant XP); it reaches the
+      # browser, so leave it empty outside local development
+      DEV_INTERNAL_KEY: ${CLIENT_DEV_INTERNAL_KEY:-}
+    ports:
+      - "${CLIENT_PORT:-3000}:80"
+    depends_on:
+      - gateway
+
 volumes:
   player-db-data:
   game-db-data:
