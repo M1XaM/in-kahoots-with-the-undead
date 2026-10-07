@@ -1,0 +1,25 @@
+# Publishes every service on the host for debugging. docker-compose.yml deliberately exposes only the
+# gateway (and Game's Socket.IO port), so all client traffic has to pass the gateway's authorization.
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+services:
+  player:
+    ports:
+      - "${PLAYER_PORT:-8081}:${PLAYER_PORT:-8081}"
+  exam:
+    ports:
+      - "${EXAM_PORT:-8083}:${EXAM_PORT:-8083}"
+  world:
+    ports:
+      - "${WORLD_PORT:-8084}:${WORLD_PORT:-8084}"
+  zombie:
+    ports:
+      - "${ZOMBIE_PORT:-8085}:${ZOMBIE_PORT:-8085}"
+  resource:
+    ports:
+      - "${RESOURCE_PORT:-8086}:${RESOURCE_PORT:-8086}"
+  base:
+    ports:
+      - "${BASE_PORT:-8087}:${BASE_PORT:-8087}"
+  crafting:
+    ports:
+      - "${CRAFTING_PORT:-8088}:${CRAFTING_PORT:-8088}"
