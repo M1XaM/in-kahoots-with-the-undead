@@ -63,14 +63,15 @@ docker compose up
 | Service | URL |
 |---|---|
 | **Gateway** (entry point) | http://localhost:8080 |
-| Player | http://localhost:8081 |
-| Game | http://localhost:8082 |
-| Exam | http://localhost:8083 |
-| World | http://localhost:8084 |
-| Zombie | http://localhost:8085 |
-| Resource | http://localhost:8086 |
-| Base | http://localhost:8087 |
-| Crafting | http://localhost:8088 |
+| Game (Socket.IO only) | http://localhost:8082 |
+
+Only the gateway and Game's Socket.IO port are published, so every REST call from a client has to pass
+the gateway's authorization. To reach a service directly while debugging (Player 8081, Exam 8083, World
+8084, Zombie 8085, Resource 8086, Base 8087, Crafting 8088), add the override:
+
+```
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+```
 
 ### Gateway
 
@@ -98,19 +99,24 @@ docker compose up
 ### Player Service
 
 - **Image:** [`timurcravtov/player-service`](https://hub.docker.com/r/timurcravtov/player-service),
-  version set by `PLAYER_SERVICE_TAG` (default `latest`).
+  version set by `PLAYER_SERVICE_TAG` (default `2`).
 - **Needs:** its own Postgres (`player-db`, started by compose); password defaults to `qwerty`, override with `PLAYER_POSTGRES_PASSWORD`.
-- **Talks to:** nobody synchronously. It issues the login cookie and publishes the JWKS the other
-  services use to verify it.
+- **Talks to:** Game, over its event stream: it asks the gateway for the stream URL (`GATEWAY_URL`) and
+  keeps `online` in step with `game.presence_changed`. It issues the login cookie, publishes the JWKS
+  the gateway verifies it with, serves `POST /players/{id}/xp` and streams `player.registered` and
+  `player.leveled_up` on `ws://player:8081/events`.
 - **Try it:** Postman collection in [`docs/postman/player-service`](docs/postman/player-service).
 
 ### Game Service
 
 - **Image:** [`timurcravtov/game-service`](https://hub.docker.com/r/timurcravtov/game-service),
-  version set by `GAME_SERVICE_TAG` (default `latest`).
+  version set by `GAME_SERVICE_TAG` (default `2`).
 - **Needs:** its own Postgres (`game-db`, started by compose); password defaults to `qwerty`, override with `GAME_POSTGRES_PASSWORD`.
-- **Talks to:** Player, World, Zombie, Exam, Resource and Base. Until they run, starting a
-  session or a timed action that depends on them will fail; creating lobbies works on its own.
+- **Talks to:** Player, World, Zombie, Exam, Resource and Base, always through the gateway
+  (`GATEWAY_URL`, with `X-Internal-Key`). Until they run, starting a session or a timed action that
+  depends on them will fail; creating lobbies works on its own. Game reads the acting player from
+  `X-Player-Id`; the Socket.IO handshake checks the login cookie itself against Player's JWKS and
+  publishes `game.presence_changed` on `ws://game:8082/events`.
 - **Try it:** Postman collection in [`docs/postman/game-service`](docs/postman/game-service).
   Log in through the Player collection first, since Game authenticates with the login cookie.
 
@@ -144,7 +150,7 @@ docker compose up
 ### Zombie Service
 
 - **Image:** [`nevaletik/kahoot-zombie-service`](https://hub.docker.com/r/nevaletik/kahoot-zombie-service),
-  version set by `ZOMBIE_SERVICE_TAG` (currently `2`).
+  version set by `ZOMBIE_SERVICE_TAG` (currently `1.2.0`).
 - **Needs:** its own Postgres (`zombie-db`, started by compose and seeded from
   [`db/zombie-service/init.sql`](db/zombie-service/init.sql) with ten definitions: ids `5`/`6`/`7`
   are the math/physics/programming professors, `9` and `10` are not, matching Exam's stand-in);
@@ -160,7 +166,7 @@ docker compose up
 ### Resource Service
 
 - **Image:** [`nevaletik/kahoot-resource-service`](https://hub.docker.com/r/nevaletik/kahoot-resource-service),
-  version set by `RESOURCE_SERVICE_TAG` (currently `2`).
+  version set by `RESOURCE_SERVICE_TAG` (currently `1.2.0`).
 - **Needs:** its own Postgres (`resource-db`, started by compose and seeded from
   [`db/resource-service/init.sql`](db/resource-service/init.sql) with balances and ledger history
   for players `1`-`3`); password defaults to `qwerty`, override with `RESOURCE_POSTGRES_PASSWORD`.
