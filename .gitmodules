@@ -24,4 +24,4 @@
 	url = https://github.com/inercaso/exam-service.git
 [submodule "services/gateway"]
 	path = services/gateway
-	url = git@github.com:TimurCravtov/KahootWithUndeadGateway.git
+	url = https://github.com/TimurCravtov/KahootWithUndeadGateway.git
