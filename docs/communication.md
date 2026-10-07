@@ -1870,8 +1870,8 @@ Base `level` is its highest facility level; `storageCapacity` is 100 per storage
 has only `storage` at level 1.
 
 **Auth:** Base reads the acting player from the `X-Player-Id` header set by the gateway, not from
-the cookie. Until it connects to Player, it receives events over HTTP at
-`POST /base/internal/events` instead of a WebSocket connection to Player.
+the cookie. It consumes Player's WebSocket stream (URL negotiated with `GET /ws/player` at the
+gateway), and also accepts events over HTTP at `POST /base/internal/events`.
 
 ### Endpoints
 
@@ -2092,9 +2092,9 @@ A player's level for `available` is the higher of Player's `GET /players/{id}` a
 `player.leveled_up` seen. Unlocked wings are global: once World reports a wing, every player has it.
 
 **Auth:** Crafting reads the acting player from the `X-Player-Id` header set by the gateway, not
-from the cookie (internal callers must send it too). Until it connects to Player, it receives
-events over HTTP at `POST /crafting/internal/events` instead of WebSocket connections to Player,
-Exam and World.
+from the cookie (internal callers must send it too). It consumes Player's, Exam's and World's
+WebSocket streams (URLs negotiated with `GET /ws/{service}` at the gateway), and also accepts events
+over HTTP at `POST /crafting/internal/events`.
 
 ### Endpoints
 

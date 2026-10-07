@@ -89,8 +89,8 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
   services receive the verified player as `X-Player-Id`. The `access_token` cookie is stripped
   too, so no service sees the token. Services authenticate with `X-Internal-Key`.
 - **Limits:** requests past `GATEWAY_TASK_TIMEOUT` seconds answer `504`, requests beyond
-  `GATEWAY_MAX_CONCURRENT_TASKS` in flight answer `429`. Zombie and Resource enforce the same
-  limits themselves (`408` / `429`).
+  `GATEWAY_MAX_CONCURRENT_TASKS` in flight answer `429`. Zombie, Resource, Base and Crafting enforce
+  the same limits themselves (`408` / `429`).
 - **WebSockets:** `GET /ws/game` returns Game's Socket.IO URL for the browser and
   `GET /ws/{player|game|exam|world|resource}` (internal) a producer's `/events` URL. The gateway
   never relays the connection.
@@ -186,20 +186,28 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 ### Base Service
 
 - **Image:** [`mixam052/kahoots-base-service`](https://hub.docker.com/r/mixam052/kahoots-base-service),
-  version set by `BASE_SERVICE_TAG` (currently `0.1.0`).
+  version set by `BASE_SERVICE_TAG` (currently `2`).
 - **Needs:** its own Postgres (`base-db`, started by compose); password defaults to `qwerty`, override with `BASE_POSTGRES_PASSWORD`.
-- **Talks to:** Resource, World and Player. Until they run, spending endpoints (upgrades,
-  barricades, Kiki) return `503 SERVICE_UNAVAILABLE`; reading and creating bases work on their own.
+- **Talks to:** Resource, World and Player over REST through the Gateway (`GATEWAY_URL`). Until
+  they run, spending endpoints (upgrades, barricades, Kiki) return `503 SERVICE_UNAVAILABLE`;
+  reading and creating bases work on their own. It consumes `player.registered` from Player's
+  `/events` stream, negotiated at the Gateway, so a new player gets a base right after registering.
+- **Limits:** `BASE_TASK_TIMEOUT_MS` (`408`) and `BASE_MAX_CONCURRENT_TASKS` (`429`).
 - **Try it:** Postman collection in [`docs/postman/base-service`](docs/postman/base-service).
 
 ### Crafting Service
 
 - **Image:** [`mixam052/kahoots-crafting-service`](https://hub.docker.com/r/mixam052/kahoots-crafting-service),
-  version set by `CRAFTING_SERVICE_TAG` (currently `0.1.0`).
+  version set by `CRAFTING_SERVICE_TAG` (currently `2`).
 - **Needs:** its own Postgres (`crafting-db`, started by compose); password defaults to `qwerty`, override with `CRAFTING_POSTGRES_PASSWORD`.
-  Recipes start empty; add them with `POST /crafting/recipes`.
-- **Talks to:** Resource and Player. Until they run, crafting returns `503 SERVICE_UNAVAILABLE`;
-  recipes, availability and events work on their own.
+  Seeded from [`db/crafting-service/init.sql`](db/crafting-service/init.sql) with five recipes
+  (two gated: one by level, one by a passed math exam and the Math Wing); their output items are
+  seeded into Player's catalogue by [`db/player-service/init.sql`](db/player-service/init.sql).
+- **Talks to:** Resource and Player over REST through the Gateway (`GATEWAY_URL`). Until they run,
+  crafting returns `503 SERVICE_UNAVAILABLE`; recipes and availability work on their own. It
+  consumes Player's, Exam's and World's `/events` streams, negotiated at the Gateway, to track
+  levels, passed subjects and unlocked wings.
+- **Limits:** `CRAFTING_TASK_TIMEOUT_MS` (`408`) and `CRAFTING_MAX_CONCURRENT_TASKS` (`429`).
 - **Try it:** Postman collection in [`docs/postman/crafting-service`](docs/postman/crafting-service).
 
 ## GitHub Workflow
