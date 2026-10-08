@@ -1531,7 +1531,7 @@ the cookie. Definitions start empty; add them with `POST /zombies`.
 <details>
 <summary><b>GET</b> <code>/zombies</code> — List zombie definitions</summary>
 
-**Caller:** internal (Game) · **Auth:** `X-Internal-Key` · **Idempotent:** —
+**Caller:** client, internal (Game) · **Auth:** cookie or `X-Internal-Key` · **Idempotent:** —
 
 | Query param | Type | Effect |
 |---|---|---|
