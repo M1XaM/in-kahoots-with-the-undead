@@ -167,38 +167,41 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 ### Zombie Service
 
 - **Image:** [`nevaletik/kahoot-zombie-service`](https://hub.docker.com/r/nevaletik/kahoot-zombie-service),
-  version set by `ZOMBIE_SERVICE_TAG` (currently `1.2.0`).
+  version set by `ZOMBIE_SERVICE_TAG` (currently `2.0.0`; versions are `<lab>.<minor>.<patch>`).
 - **Needs:** its own Postgres (`zombie-db`, started by compose and seeded from
   [`db/zombie-service/init.sql`](db/zombie-service/init.sql) with ten definitions: ids `5`/`6`/`7`
   are the math/physics/programming professors, `9` and `10` are not, matching Exam's stand-in);
   password defaults to `qwerty`, override with `ZOMBIE_POSTGRES_PASSWORD`.
   `INTERNAL_KEY` is the `X-Internal-Key` every route except the health check expects.
-- **Talks to:** nobody. It verifies Player's login cookie on `GET /zombies/{id}`; until Player's
-  JWKS is wired in, the cookie is decoded without checking its signature.
-- **Try it:** Swagger UI at http://localhost:8085/docs (OpenAPI spec:
-  [`docs/openapi/zombie-service.openapi.json`](docs/openapi/zombie-service.openapi.json)), or the
-  Postman collection in [`docs/postman/zombie-service`](docs/postman/zombie-service) (also as a
-  single importable `zombie-service.postman_collection.json`).
+- **Talks to:** nobody. Players reach `GET /zombies/{id}` through the Gateway, which verifies the
+  token and forwards the player as `X-Player-Id`; the service never sees the token.
+- **Try it:** the Postman collection in [`docs/postman/zombie-service`](docs/postman/zombie-service)
+  (also as a single importable `zombie-service.postman_collection.json`) goes through the Gateway:
+  run **Auth (run first)** to register and log in a player. API reference:
+  [`docs/openapi/zombie-service.openapi.json`](docs/openapi/zombie-service.openapi.json) (Swagger UI
+  is served at `/docs` on the service port, which compose does not publish).
 
 ### Resource Service
 
 - **Image:** [`nevaletik/kahoot-resource-service`](https://hub.docker.com/r/nevaletik/kahoot-resource-service),
-  version set by `RESOURCE_SERVICE_TAG` (currently `1.2.0`).
+  version set by `RESOURCE_SERVICE_TAG` (currently `2.0.0`; versions are `<lab>.<minor>.<patch>`).
 - **Needs:** its own Postgres (`resource-db`, started by compose and seeded from
   [`db/resource-service/init.sql`](db/resource-service/init.sql) with balances and ledger history
   for players `1`-`3`); password defaults to `qwerty`, override with `RESOURCE_POSTGRES_PASSWORD`.
   Other players get balances when `player.registered` is delivered for them.
-- **Talks to:** Player and Game over their `/events` streams (set `RESOURCE_PLAYER_EVENTS_URL` /
-  `RESOURCE_GAME_EVENTS_URL`, or `gateway` to negotiate them at the Gateway), and World for node
-  resource types through the Gateway (`RESOURCE_WORLD_SERVICE_URL`, default `http://gateway:8080`).
-  While those are empty it uses a built-in copy of the rooms and accepts events over HTTP at
-  `POST /resources/internal/events`. It publishes `resource.gathered` on `ws://resource:8086/events`.
-  Base and Crafting reserve/commit through it with `INTERNAL_KEY`.
-- **Try it:** Swagger UI at http://localhost:8086/docs (OpenAPI spec:
-  [`docs/openapi/resource-service.openapi.json`](docs/openapi/resource-service.openapi.json)), or the
-  Postman collection in [`docs/postman/resource-service`](docs/postman/resource-service) (also as a
-  single importable `resource-service.postman_collection.json`). Players `1`-`3` are seeded; run the
-  Events folder to give player 42 balances.
+- **Talks to:** Player and Game over their `/events` streams, negotiated at the Gateway
+  (`RESOURCE_PLAYER_EVENTS_URL` / `RESOURCE_GAME_EVENTS_URL`, default `gateway`; empty = not
+  connected, then events can be delivered over HTTP at `POST /resources/internal/events`), and World
+  for node resource types through the Gateway (`RESOURCE_WORLD_SERVICE_URL`, default
+  `http://gateway:8080`; empty = built-in copy of the rooms). It publishes `resource.gathered` on
+  `ws://resource:8086/events` (`GET /ws/resource` on the Gateway). Players are identified by the
+  Gateway's `X-Player-Id`; Base and Crafting reserve/commit through it with `INTERNAL_KEY`.
+- **Try it:** the Postman collection in [`docs/postman/resource-service`](docs/postman/resource-service)
+  (also as a single importable `resource-service.postman_collection.json`) goes through the Gateway:
+  run **Auth (run first)** to register and log in a player, who gets zero balances from
+  `player.registered`. Players `1`-`3` are seeded; the Events folder gives player 42 balances. API
+  reference: [`docs/openapi/resource-service.openapi.json`](docs/openapi/resource-service.openapi.json)
+  (Swagger UI is served at `/docs` on the service port, which compose does not publish).
 
 ### Base Service
 
