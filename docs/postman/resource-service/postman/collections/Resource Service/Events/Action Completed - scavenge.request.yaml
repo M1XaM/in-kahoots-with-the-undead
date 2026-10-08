@@ -1,7 +1,7 @@
 name: Action Completed - scavenge
 $kind: http-request
 method: POST
-url: "http://localhost:8086/resources/internal/events"
+url: "http://localhost:8080/resources/internal/events"
 description: "Room 3 (Lab 204) / node 1 is metal, as in World Service's seed."
 headers:
   - key: Content-Type

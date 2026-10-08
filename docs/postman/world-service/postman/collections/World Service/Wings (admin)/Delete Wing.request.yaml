@@ -1,0 +1,7 @@
+name: Delete Wing
+$kind: http-request
+method: DELETE
+url: "http://localhost:8080/world/wings/{{wingId}}"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"

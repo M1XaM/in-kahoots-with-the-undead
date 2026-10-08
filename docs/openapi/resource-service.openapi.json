@@ -983,7 +983,7 @@
                         "internal-key": []
                     },
                     {
-                        "player-cookie": []
+                        "gateway-player": []
                     }
                 ],
                 "summary": "Current balances",
@@ -1061,7 +1061,7 @@
                 },
                 "security": [
                     {
-                        "player-cookie": []
+                        "gateway-player": []
                     }
                 ],
                 "summary": "Change history",
@@ -1334,7 +1334,7 @@
     "info": {
         "title": "Resource Service",
         "description": "Kahoot With Undead resource economy: per-player balances, a gather/spend ledger and two-phase reservations. Events: `resource.gathered` is served on the `/events` WebSocket (not shown here).",
-        "version": "1.2.0",
+        "version": "2.0.0",
         "contact": {}
     },
     "tags": [],
@@ -1352,11 +1352,11 @@
                 "name": "X-Internal-Key",
                 "description": "Shared secret for service-to-service calls"
             },
-            "player-cookie": {
+            "gateway-player": {
                 "type": "apiKey",
-                "in": "cookie",
-                "name": "access_token",
-                "description": "Player session JWT (signature not verified while Player JWKS is mocked)"
+                "in": "header",
+                "name": "X-Player-Id",
+                "description": "Set by the API Gateway after it verifies the player's token (Authorization is not forwarded). Use the gateway; enter an id here only to try the service directly"
             }
         },
         "schemas": {

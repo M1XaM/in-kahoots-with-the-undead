@@ -1,7 +1,0 @@
-name: Get Exam History
-$kind: http-request
-method: GET
-url: http://localhost:8083/exams/players/1
-headers:
-  - key: X-Player-Id
-    value: '1'

@@ -5,15 +5,15 @@ during a zombie apocalypse and must scavenge resources, build up their base, and
 including Professor Zombies, who force a pop quiz before letting you past. Passing exams unlocks new
 wings of the university to explore, tying academic progress directly to survival progress.
 
-[![gateway](https://img.shields.io/docker/v/timurcravtov/gateway?sort=semver&label=gateway&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/gateway)
-[![player-service](https://img.shields.io/docker/v/timurcravtov/player-service?sort=semver&label=player-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/player-service)
-[![game-service](https://img.shields.io/docker/v/timurcravtov/game-service?sort=semver&label=game-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/game-service)
-[![exam-service](https://img.shields.io/docker/v/inercaso/exam-service?sort=semver&label=exam-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/inercaso/exam-service)
-[![world-service](https://img.shields.io/docker/v/inercaso/world-service?sort=semver&label=world-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/inercaso/world-service)
-[![zombie-service](https://img.shields.io/docker/v/nevaletik/kahoot-zombie-service?sort=semver&label=zombie-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/nevaletik/kahoot-zombie-service)
-[![resource-service](https://img.shields.io/docker/v/nevaletik/kahoot-resource-service?sort=semver&label=resource-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/nevaletik/kahoot-resource-service)
-[![base-service](https://img.shields.io/docker/v/mixam052/kahoots-base-service?sort=semver&label=base-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/mixam052/kahoots-base-service)
-[![crafting-service](https://img.shields.io/docker/v/mixam052/kahoots-crafting-service?sort=semver&label=crafting-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/mixam052/kahoots-crafting-service)
+[![gateway](https://img.shields.io/docker/v/timurcravtov/gateway?sort=date&label=gateway&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/gateway)
+[![player-service](https://img.shields.io/docker/v/timurcravtov/player-service?sort=date&label=player-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/player-service)
+[![game-service](https://img.shields.io/docker/v/timurcravtov/game-service?sort=date&label=game-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/game-service)
+[![exam-service](https://img.shields.io/docker/v/inercaso/exam-service?sort=date&label=exam-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/inercaso/exam-service)
+[![world-service](https://img.shields.io/docker/v/inercaso/world-service?sort=date&label=world-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/inercaso/world-service)
+[![zombie-service](https://img.shields.io/docker/v/nevaletik/kahoot-zombie-service?sort=date&label=zombie-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/nevaletik/kahoot-zombie-service)
+[![resource-service](https://img.shields.io/docker/v/nevaletik/kahoot-resource-service?sort=date&label=resource-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/nevaletik/kahoot-resource-service)
+[![base-service](https://img.shields.io/docker/v/mixam052/kahoots-base-service?sort=date&label=base-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/mixam052/kahoots-base-service)
+[![crafting-service](https://img.shields.io/docker/v/mixam052/kahoots-crafting-service?sort=date&label=crafting-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/mixam052/kahoots-crafting-service)
 
 [![player-service postman](https://img.shields.io/badge/player--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/player-service)
 [![game-service postman](https://img.shields.io/badge/game--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/game-service)
@@ -140,65 +140,83 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 ### Exam Service
 
 - **Image:** [`inercaso/exam-service`](https://hub.docker.com/r/inercaso/exam-service),
-  version set by `EXAM_SERVICE_TAG` (currently `0.1.0`).
+  version set by `EXAM_SERVICE_TAG` (currently `2`, the lab number; `latest` points at the newest).
 - **Needs:** its own Postgres (`exam-db`, started by compose and seeded with the question bank and
   achievements from [`db/exam-service/init.sql`](db/exam-service/init.sql)); password defaults to
   `qwerty`, override with `EXAM_POSTGRES_PASSWORD`.
-- **Talks to:** Zombie (a professor's subject) and Player (player check, login cookie). Until they
-  run, it uses built-in stand-ins: `EXAM_ZOMBIE_CLIENT=mock` (zombies `5`/`6`/`7` are math/physics/
-  programming professors, `9` and `10` are not), `EXAM_PLAYER_CLIENT=mock` and `EXAM_AUTH_MODE=mock`
-  (player identity from the `X-Player-Id` header). Set them to `http`/`http`/`jwks` once those
-  services are up. Publishes `exam.completed` on `ws://exam:8083/events`.
-- **Try it:** Postman collection in [`docs/postman/exam-service`](docs/postman/exam-service).
+- **Talks to:** Zombie (a professor's subject) and Player (player check), always through the Gateway
+  (`GATEWAY_URL`, with `X-Internal-Key`). `EXAM_ZOMBIE_CLIENT` / `EXAM_PLAYER_CLIENT` default to
+  `http`; set them to `mock` to run Exam alone with built-in stand-ins (zombies `5`/`6`/`7` are
+  math/physics/programming professors, `9` and `10` are not; every player id exists). Players are
+  identified by the Gateway's `X-Player-Id`; the service never sees the token. Publishes
+  `exam.completed` on `ws://exam:8083/events` (`GET /ws/exam` on the Gateway).
+- **Limits:** a request past `EXAM_TASK_TIMEOUT_MS` (default 10 s) answers `408 REQUEST_TIMEOUT`;
+  beyond `EXAM_MAX_CONCURRENT_TASKS` (default 100) in flight, `429 TOO_MANY_REQUESTS` with
+  `Retry-After`.
+- **Try it:** the Postman collection in [`docs/postman/exam-service`](docs/postman/exam-service)
+  (also as a single importable `exam-service.postman_collection.json`) goes through the Gateway:
+  run **Auth (run first)** to register and log in a player, then create and answer an exam.
 
 ### World Service
 
 - **Image:** [`inercaso/world-service`](https://hub.docker.com/r/inercaso/world-service),
-  version set by `WORLD_SERVICE_TAG` (currently `0.1.0`).
+  version set by `WORLD_SERVICE_TAG` (currently `2`, the lab number; `latest` points at the newest).
 - **Needs:** its own Postgres (`world-db`, started by compose and seeded with the campus map from
   [`db/world-service/init.sql`](db/world-service/init.sql)); password defaults to `qwerty`,
   override with `WORLD_POSTGRES_PASSWORD`.
-- **Talks to:** Exam, over its event stream: a passed `exam.completed` unlocks the matching wing
-  and publishes `world.wing_unlocked` on `ws://world:8084/events`. Client calls use
-  `WORLD_AUTH_MODE=mock` (`X-Player-Id` header) until Player's login cookie is wired in (`jwks`).
-- **Try it:** Postman collection in [`docs/postman/world-service`](docs/postman/world-service).
-  Pass an exam through the Exam collection and the matching wing shows `unlocked: true`.
+- **Talks to:** Exam, over its event stream, negotiated at the Gateway (`WORLD_EXAM_EVENTS_URL`,
+  default `gateway`: `GET /ws/exam`, then a direct connection; `off` = not connected, then events can
+  be delivered over HTTP at `POST /world/internal/events`). A passed `exam.completed` unlocks the
+  matching wing and publishes `world.wing_unlocked` on `ws://world:8084/events` (`GET /ws/world` on
+  the Gateway). Players are identified by the Gateway's `X-Player-Id`; the service never sees the
+  token.
+- **Limits:** `WORLD_TASK_TIMEOUT_MS` (default 10 s, then `408 REQUEST_TIMEOUT`) and
+  `WORLD_MAX_CONCURRENT_TASKS` (default 100, then `429 TOO_MANY_REQUESTS` with `Retry-After`).
+- **Try it:** the Postman collection in [`docs/postman/world-service`](docs/postman/world-service)
+  (also as a single importable `world-service.postman_collection.json`) goes through the Gateway:
+  run **Auth (run first)**, then pass an exam through the Exam collection and the matching wing
+  shows `unlocked: true`.
 
 ### Zombie Service
 
 - **Image:** [`nevaletik/kahoot-zombie-service`](https://hub.docker.com/r/nevaletik/kahoot-zombie-service),
-  version set by `ZOMBIE_SERVICE_TAG` (currently `1.2.0`).
+  version set by `ZOMBIE_SERVICE_TAG` (currently `2`, the lab number; each release is also tagged
+  `<lab>.<minor>.<patch>` and `latest`).
 - **Needs:** its own Postgres (`zombie-db`, started by compose and seeded from
   [`db/zombie-service/init.sql`](db/zombie-service/init.sql) with ten definitions: ids `5`/`6`/`7`
   are the math/physics/programming professors, `9` and `10` are not, matching Exam's stand-in);
   password defaults to `qwerty`, override with `ZOMBIE_POSTGRES_PASSWORD`.
   `INTERNAL_KEY` is the `X-Internal-Key` every route except the health check expects.
-- **Talks to:** nobody. It verifies Player's login cookie on `GET /zombies/{id}`; until Player's
-  JWKS is wired in, the cookie is decoded without checking its signature.
-- **Try it:** Swagger UI at http://localhost:8085/docs (OpenAPI spec:
-  [`docs/openapi/zombie-service.openapi.json`](docs/openapi/zombie-service.openapi.json)), or the
-  Postman collection in [`docs/postman/zombie-service`](docs/postman/zombie-service) (also as a
-  single importable `zombie-service.postman_collection.json`).
+- **Talks to:** nobody. Players reach `GET /zombies/{id}` through the Gateway, which verifies the
+  token and forwards the player as `X-Player-Id`; the service never sees the token.
+- **Try it:** the Postman collection in [`docs/postman/zombie-service`](docs/postman/zombie-service)
+  (also as a single importable `zombie-service.postman_collection.json`) goes through the Gateway:
+  run **Auth (run first)** to register and log in a player. API reference:
+  [`docs/openapi/zombie-service.openapi.json`](docs/openapi/zombie-service.openapi.json) (Swagger UI
+  is served at `/docs` on the service port, which compose does not publish).
 
 ### Resource Service
 
 - **Image:** [`nevaletik/kahoot-resource-service`](https://hub.docker.com/r/nevaletik/kahoot-resource-service),
-  version set by `RESOURCE_SERVICE_TAG` (currently `1.2.0`).
+  version set by `RESOURCE_SERVICE_TAG` (currently `2`, the lab number; each release is also tagged
+  `<lab>.<minor>.<patch>` and `latest`).
 - **Needs:** its own Postgres (`resource-db`, started by compose and seeded from
   [`db/resource-service/init.sql`](db/resource-service/init.sql) with balances and ledger history
   for players `1`-`3`); password defaults to `qwerty`, override with `RESOURCE_POSTGRES_PASSWORD`.
   Other players get balances when `player.registered` is delivered for them.
-- **Talks to:** Player and Game over their `/events` streams (set `RESOURCE_PLAYER_EVENTS_URL` /
-  `RESOURCE_GAME_EVENTS_URL`, or `gateway` to negotiate them at the Gateway), and World for node
-  resource types through the Gateway (`RESOURCE_WORLD_SERVICE_URL`, default `http://gateway:8080`).
-  While those are empty it uses a built-in copy of the rooms and accepts events over HTTP at
-  `POST /resources/internal/events`. It publishes `resource.gathered` on `ws://resource:8086/events`.
-  Base and Crafting reserve/commit through it with `INTERNAL_KEY`.
-- **Try it:** Swagger UI at http://localhost:8086/docs (OpenAPI spec:
-  [`docs/openapi/resource-service.openapi.json`](docs/openapi/resource-service.openapi.json)), or the
-  Postman collection in [`docs/postman/resource-service`](docs/postman/resource-service) (also as a
-  single importable `resource-service.postman_collection.json`). Players `1`-`3` are seeded; run the
-  Events folder to give player 42 balances.
+- **Talks to:** Player and Game over their `/events` streams, negotiated at the Gateway
+  (`RESOURCE_PLAYER_EVENTS_URL` / `RESOURCE_GAME_EVENTS_URL`, default `gateway`; empty = not
+  connected, then events can be delivered over HTTP at `POST /resources/internal/events`), and World
+  for node resource types through the Gateway (`RESOURCE_WORLD_SERVICE_URL`, default
+  `http://gateway:8080`; empty = built-in copy of the rooms). It publishes `resource.gathered` on
+  `ws://resource:8086/events` (`GET /ws/resource` on the Gateway). Players are identified by the
+  Gateway's `X-Player-Id`; Base and Crafting reserve/commit through it with `INTERNAL_KEY`.
+- **Try it:** the Postman collection in [`docs/postman/resource-service`](docs/postman/resource-service)
+  (also as a single importable `resource-service.postman_collection.json`) goes through the Gateway:
+  run **Auth (run first)** to register and log in a player, who gets zero balances from
+  `player.registered`. Players `1`-`3` are seeded; the Events folder gives player 42 balances. API
+  reference: [`docs/openapi/resource-service.openapi.json`](docs/openapi/resource-service.openapi.json)
+  (Swagger UI is served at `/docs` on the service port, which compose does not publish).
 
 ### Base Service
 

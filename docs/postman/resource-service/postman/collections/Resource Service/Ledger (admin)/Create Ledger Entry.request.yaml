@@ -1,7 +1,7 @@
 name: Create Ledger Entry
 $kind: http-request
 method: POST
-url: "http://localhost:8086/resources/ledger"
+url: "http://localhost:8080/resources/ledger"
 headers:
   - key: Content-Type
     value: "application/json"

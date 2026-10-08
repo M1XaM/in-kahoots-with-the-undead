@@ -147,18 +147,18 @@ services:
       retries: 10
 
   exam:
-    image: ${EXAM_DOCKERHUB_USERNAME:-inercaso}/exam-service:${EXAM_SERVICE_TAG:-0.1.0}
+    image: ${EXAM_DOCKERHUB_USERNAME:-inercaso}/exam-service:${EXAM_SERVICE_TAG:-2}
     restart: unless-stopped
     environment:
       PORT: ${EXAM_PORT:-8083}
       DATABASE_URL: postgres://${EXAM_POSTGRES_USER:-postgres}:${EXAM_POSTGRES_PASSWORD:-qwerty}@exam-db:5432/${EXAM_POSTGRES_DB:-exam}?sslmode=disable
       INTERNAL_KEY: ${INTERNAL_KEY:-changeme}
-      AUTH_MODE: ${EXAM_AUTH_MODE:-mock}
-      # service-to-service REST goes through the gateway
-      PLAYER_URL: http://gateway:8080
-      PLAYER_CLIENT: ${EXAM_PLAYER_CLIENT:-mock}
-      ZOMBIE_URL: http://gateway:8080
-      ZOMBIE_CLIENT: ${EXAM_ZOMBIE_CLIENT:-mock}
+      TASK_TIMEOUT_MS: ${EXAM_TASK_TIMEOUT_MS:-10000}
+      MAX_CONCURRENT_TASKS: ${EXAM_MAX_CONCURRENT_TASKS:-100}
+      # REST to Player and Zombie goes through the gateway; `mock` = built-in stand-ins
+      GATEWAY_URL: http://gateway:8080
+      PLAYER_CLIENT: ${EXAM_PLAYER_CLIENT:-http}
+      ZOMBIE_CLIENT: ${EXAM_ZOMBIE_CLIENT:-http}
     depends_on:
       exam-db:
         condition: service_healthy
@@ -180,16 +180,18 @@ services:
       retries: 10
 
   world:
-    image: ${WORLD_DOCKERHUB_USERNAME:-inercaso}/world-service:${WORLD_SERVICE_TAG:-0.1.0}
+    image: ${WORLD_DOCKERHUB_USERNAME:-inercaso}/world-service:${WORLD_SERVICE_TAG:-2}
     restart: unless-stopped
     environment:
       PORT: ${WORLD_PORT:-8084}
       DATABASE_URL: postgres://${WORLD_POSTGRES_USER:-postgres}:${WORLD_POSTGRES_PASSWORD:-qwerty}@world-db:5432/${WORLD_POSTGRES_DB:-world}?sslmode=disable
       INTERNAL_KEY: ${INTERNAL_KEY:-changeme}
-      AUTH_MODE: ${WORLD_AUTH_MODE:-mock}
-      # service-to-service REST goes through the gateway; WebSockets stay direct
-      PLAYER_URL: http://gateway:8080
-      EXAM_EVENTS_URL: ws://exam:${EXAM_PORT:-8083}/events
+      TASK_TIMEOUT_MS: ${WORLD_TASK_TIMEOUT_MS:-10000}
+      MAX_CONCURRENT_TASKS: ${WORLD_MAX_CONCURRENT_TASKS:-100}
+      # `gateway` = ask the gateway for Exam's /events URL, then connect directly;
+      # `off` = not connected (use POST /world/internal/events)
+      EXAM_EVENTS_URL: ${WORLD_EXAM_EVENTS_URL-gateway}
+      GATEWAY_URL: http://gateway:8080
     depends_on:
       world-db:
         condition: service_healthy
@@ -211,7 +213,7 @@ services:
       retries: 10
 
   zombie:
-    image: ${ZOMBIE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-zombie-service:${ZOMBIE_SERVICE_TAG:-1.2.0}
+    image: ${ZOMBIE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-zombie-service:${ZOMBIE_SERVICE_TAG:-2}
     restart: unless-stopped
     environment:
       PORT: ${ZOMBIE_PORT:-8085}
@@ -244,7 +246,7 @@ services:
       retries: 10
 
   resource:
-    image: ${RESOURCE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-resource-service:${RESOURCE_SERVICE_TAG:-1.2.0}
+    image: ${RESOURCE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-resource-service:${RESOURCE_SERVICE_TAG:-2}
     restart: unless-stopped
     environment:
       PORT: ${RESOURCE_PORT:-8086}
@@ -258,10 +260,10 @@ services:
       DB_NAME: ${RESOURCE_POSTGRES_DB:-resource}
       # World is called through the gateway; empty = built-in World mock
       WORLD_SERVICE_URL: ${RESOURCE_WORLD_SERVICE_URL-http://gateway:8080}
-      # empty = not connected (use POST /resources/internal/events); `gateway` =
-      # ask the gateway for the producer's /events URL, then connect directly
-      PLAYER_EVENTS_URL: ${RESOURCE_PLAYER_EVENTS_URL:-}
-      GAME_EVENTS_URL: ${RESOURCE_GAME_EVENTS_URL:-}
+      # `gateway` = ask the gateway for the producer's /events URL, then connect
+      # directly; empty = not connected (use POST /resources/internal/events)
+      PLAYER_EVENTS_URL: ${RESOURCE_PLAYER_EVENTS_URL-gateway}
+      GAME_EVENTS_URL: ${RESOURCE_GAME_EVENTS_URL-gateway}
       GATEWAY_URL: http://gateway:8080
     depends_on:
       resource-db:

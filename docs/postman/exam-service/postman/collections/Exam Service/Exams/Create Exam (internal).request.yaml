@@ -1,0 +1,24 @@
+name: Create Exam (internal)
+$kind: http-request
+method: POST
+url: "http://localhost:8080/exams"
+description: "What Game sends on a professor encounter. Exam asks Zombie (zombie 5, the math professor) and Player through the gateway."
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+  - key: Idempotency-Key
+    value: "{{$guid}}"
+body:
+  type: json
+  content: |
+    { "playerId": {{playerId}}, "zombieId": 5, "encounterId": "enc-{{$timestamp}}" }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      const exam = pm.response.json();
+      pm.collectionVariables.set('examId', exam.examId);
+      pm.collectionVariables.set('examSubject', exam.subject);
+      pm.collectionVariables.set('examQuestions', JSON.stringify(exam.questions.map((q) => q.questionId)));

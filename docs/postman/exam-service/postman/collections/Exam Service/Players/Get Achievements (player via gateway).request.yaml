@@ -1,0 +1,7 @@
+name: Get Achievements (player via gateway)
+$kind: http-request
+method: GET
+url: "http://localhost:8080/exams/players/{{playerId}}/achievements"
+headers:
+  - key: Authorization
+    value: "Bearer {{accessToken}}"

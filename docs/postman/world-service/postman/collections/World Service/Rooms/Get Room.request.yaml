@@ -1,7 +1,0 @@
-name: Get Room
-$kind: http-request
-method: GET
-url: http://localhost:8084/world/rooms/3
-headers:
-  - key: X-Internal-Key
-    value: changeme

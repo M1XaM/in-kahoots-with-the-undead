@@ -1,0 +1,19 @@
+name: Register Player
+$kind: http-request
+method: POST
+url: "http://localhost:8080/auth/register"
+headers:
+  - key: Content-Type
+    value: "application/json"
+body:
+  type: json
+  content: |
+    {
+      "username": "demo{{$timestamp}}",
+      "password": "hunter2hunter2"
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.collectionVariables.set('username', pm.response.json().username);

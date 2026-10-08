@@ -1,0 +1,7 @@
+name: Get Exam History (player via gateway)
+$kind: http-request
+method: GET
+url: "http://localhost:8080/exams/players/{{playerId}}"
+headers:
+  - key: Authorization
+    value: "Bearer {{accessToken}}"

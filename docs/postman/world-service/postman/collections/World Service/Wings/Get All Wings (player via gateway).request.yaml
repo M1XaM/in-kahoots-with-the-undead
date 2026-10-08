@@ -1,0 +1,7 @@
+name: Get All Wings (player via gateway)
+$kind: http-request
+method: GET
+url: "http://localhost:8080/world/wings"
+headers:
+  - key: Authorization
+    value: "Bearer {{accessToken}}"

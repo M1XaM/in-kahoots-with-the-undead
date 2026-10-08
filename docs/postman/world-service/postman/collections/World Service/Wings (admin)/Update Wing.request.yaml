@@ -1,0 +1,18 @@
+name: Update Wing
+$kind: http-request
+method: PUT
+url: "http://localhost:8080/world/wings/{{wingId}}"
+description: "Locked to unlocked publishes world.wing_unlocked, as a passed exam would."
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+body:
+  type: json
+  content: |
+    {
+      "name": "{{wingName}}",
+      "unlocked": true,
+      "unlockedBySubject": "chemistry"
+    }
