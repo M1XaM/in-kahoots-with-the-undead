@@ -167,7 +167,8 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 ### Zombie Service
 
 - **Image:** [`nevaletik/kahoot-zombie-service`](https://hub.docker.com/r/nevaletik/kahoot-zombie-service),
-  version set by `ZOMBIE_SERVICE_TAG` (currently `2.0.0`; versions are `<lab>.<minor>.<patch>`).
+  version set by `ZOMBIE_SERVICE_TAG` (currently `2`, the lab number; each release is also tagged
+  `<lab>.<minor>.<patch>` and `latest`).
 - **Needs:** its own Postgres (`zombie-db`, started by compose and seeded from
   [`db/zombie-service/init.sql`](db/zombie-service/init.sql) with ten definitions: ids `5`/`6`/`7`
   are the math/physics/programming professors, `9` and `10` are not, matching Exam's stand-in);
@@ -184,7 +185,8 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 ### Resource Service
 
 - **Image:** [`nevaletik/kahoot-resource-service`](https://hub.docker.com/r/nevaletik/kahoot-resource-service),
-  version set by `RESOURCE_SERVICE_TAG` (currently `2.0.0`; versions are `<lab>.<minor>.<patch>`).
+  version set by `RESOURCE_SERVICE_TAG` (currently `2`, the lab number; each release is also tagged
+  `<lab>.<minor>.<patch>` and `latest`).
 - **Needs:** its own Postgres (`resource-db`, started by compose and seeded from
   [`db/resource-service/init.sql`](db/resource-service/init.sql) with balances and ledger history
   for players `1`-`3`); password defaults to `qwerty`, override with `RESOURCE_POSTGRES_PASSWORD`.
