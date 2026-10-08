@@ -1,0 +1,8 @@
+name: Negotiate World Stream URL (internal)
+$kind: http-request
+method: GET
+url: "http://localhost:8080/ws/world"
+description: "Where Game and Crafting open World's /events WebSocket (world.wing_unlocked)."
+headers:
+  - key: X-Internal-Key
+    value: "changeme"

@@ -1,0 +1,7 @@
+name: Get Exam (player via gateway)
+$kind: http-request
+method: GET
+url: "http://localhost:8080/exams/{{examId}}"
+headers:
+  - key: Authorization
+    value: "Bearer {{accessToken}}"

@@ -1,0 +1,24 @@
+name: Create Wing
+$kind: http-request
+method: POST
+url: "http://localhost:8080/world/wings"
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+body:
+  type: json
+  content: |
+    {
+      "name": "Chemistry Wing {{$timestamp}}",
+      "unlocked": false,
+      "unlockedBySubject": "chemistry"
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      const wing = pm.response.json();
+      pm.collectionVariables.set('wingId', wing.wingId);
+      pm.collectionVariables.set('wingName', wing.name);

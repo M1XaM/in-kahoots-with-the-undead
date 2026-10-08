@@ -1,0 +1,8 @@
+name: Get All Rooms (invalid token, 401)
+$kind: http-request
+method: GET
+url: "http://localhost:8080/world/rooms"
+description: "The gateway validates the Authorization header itself and answers 401 UNAUTHENTICATED; World is never reached and never sees the header."
+headers:
+  - key: Authorization
+    value: "Bearer not-a-valid-token"

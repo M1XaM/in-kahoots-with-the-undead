@@ -1,0 +1,413 @@
+{
+  "info": {
+    "name": "Exam Service",
+    "description": "Exam Service through the API Gateway (http://localhost:8080); only the gateway is published in the team compose. Run 'Auth (run first)' to register and log in a player: the gateway verifies the token, strips it and forwards the player as X-Player-Id. Internal requests (what Game sends) use X-Internal-Key (INTERNAL_KEY in the team .env, default changeme). Run the Exams folder in order: it creates an exam for the logged-in player against the math professor, answers it correctly and passes, which unlocks the Math Wing in World.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "playerId",
+      "value": ""
+    },
+    {
+      "key": "username",
+      "value": ""
+    },
+    {
+      "key": "examId",
+      "value": ""
+    },
+    {
+      "key": "examSubject",
+      "value": ""
+    },
+    {
+      "key": "examQuestions",
+      "value": ""
+    },
+    {
+      "key": "answers",
+      "value": ""
+    },
+    {
+      "key": "questionId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth (run first)",
+      "item": [
+        {
+          "name": "Register Player",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"demo{{$timestamp}}\",\n  \"password\": \"hunter2hunter2\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('username', pm.response.json().username);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Log In",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"hunter2hunter2\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const cookie = pm.response.headers.get('Set-Cookie') || '';",
+                  "const match = cookie.match(/access_token=([^;]+)/);",
+                  "if (match) pm.collectionVariables.set('accessToken', match[1]);",
+                  "pm.collectionVariables.set('playerId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Gateway Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/health"
+      }
+    },
+    {
+      "name": "Exams",
+      "item": [
+        {
+          "name": "Create Exam (internal)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": "{{baseUrl}}/exams",
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"playerId\": {{playerId}}, \"zombieId\": 5, \"encounterId\": \"enc-{{$timestamp}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "What Game sends on a professor encounter. Exam asks Zombie (zombie 5, the math professor) and Player through the gateway."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const exam = pm.response.json();",
+                  "pm.collectionVariables.set('examId', exam.examId);",
+                  "pm.collectionVariables.set('examSubject', exam.subject);",
+                  "pm.collectionVariables.set('examQuestions', JSON.stringify(exam.questions.map((q) => q.questionId)));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Exam (player via gateway)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/exams/{{examId}}"
+          }
+        },
+        {
+          "name": "Get Exam (invalid token, 401)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer not-a-valid-token"
+              }
+            ],
+            "url": "{{baseUrl}}/exams/{{examId}}",
+            "description": "The gateway validates the Authorization header itself and answers 401 UNAUTHENTICATED; Exam is never reached and never sees the header."
+          }
+        },
+        {
+          "name": "Submit Answers (player via gateway)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/exams/{{examId}}/answers",
+            "body": {
+              "mode": "raw",
+              "raw": "{{answers}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Answers every question correctly from the internal question bank, so the exam passes and",
+                  "// World unlocks the subject's wing (exam.completed over Exam's event stream).",
+                  "const base = pm.variables.get('baseUrl') || 'http://localhost:8080';",
+                  "const questions = JSON.parse(pm.collectionVariables.get('examQuestions') || '[]');",
+                  "const subject = pm.collectionVariables.get('examSubject');",
+                  "pm.sendRequest({",
+                  "  url: `${base}/exams/questions?subject=${subject}`,",
+                  "  header: { 'X-Internal-Key': 'changeme' },",
+                  "}, (err, res) => {",
+                  "  const bank = err ? [] : res.json();",
+                  "  const correct = Object.fromEntries(bank.map((q) => [q.questionId, q.correctOption]));",
+                  "  const answers = questions.map((id) => ({ questionId: id, option: correct[id] ?? 0 }));",
+                  "  pm.collectionVariables.set('answers', JSON.stringify({ answers }));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Players",
+      "item": [
+        {
+          "name": "Get Exam History (player via gateway)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/exams/players/{{playerId}}"
+          }
+        },
+        {
+          "name": "Get Achievements (player via gateway)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/exams/players/{{playerId}}/achievements"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Questions (admin)",
+      "item": [
+        {
+          "name": "Get All Questions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/exams/questions?subject=math"
+          }
+        },
+        {
+          "name": "Get Question",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/exams/questions/1"
+          }
+        },
+        {
+          "name": "Create Question",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/exams/questions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"math\",\n  \"text\": \"12 / 4 = ?\",\n  \"options\": [\"2\", \"3\", \"4\", \"6\"],\n  \"correctOption\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('questionId', pm.response.json().questionId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Question",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/exams/questions/{{questionId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"math\",\n  \"text\": \"12 / 3 = ?\",\n  \"options\": [\"2\", \"3\", \"4\", \"6\"],\n  \"correctOption\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete Question",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/exams/questions/{{questionId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Events",
+      "item": [
+        {
+          "name": "Negotiate Event Stream URL (internal)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/ws/exam",
+            "description": "Where consumers (World, Game, Crafting) open Exam's /events WebSocket. They then connect to the returned URL directly with X-Internal-Key; the gateway never relays."
+          }
+        }
+      ]
+    }
+  ]
+}
