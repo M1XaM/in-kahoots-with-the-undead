@@ -1,0 +1,546 @@
+{
+  "info": {
+    "name": "World Service",
+    "description": "World Service through the API Gateway (http://localhost:8080); only the gateway is published in the team compose. Run 'Auth (run first)' to register and log in a player: the gateway verifies the token, strips it and forwards the player as X-Player-Id. Internal requests (Game, Base, Resource and admin) use X-Internal-Key (INTERNAL_KEY in the team .env, default changeme). Pass an exam through the Exam collection and the matching wing shows unlocked: true.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "playerId",
+      "value": ""
+    },
+    {
+      "key": "username",
+      "value": ""
+    },
+    {
+      "key": "roomId",
+      "value": ""
+    },
+    {
+      "key": "wingId",
+      "value": ""
+    },
+    {
+      "key": "wingName",
+      "value": ""
+    },
+    {
+      "key": "pointId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth (run first)",
+      "item": [
+        {
+          "name": "Register Player",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"demo{{$timestamp}}\",\n  \"password\": \"hunter2hunter2\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('username', pm.response.json().username);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Log In",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"hunter2hunter2\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const cookie = pm.response.headers.get('Set-Cookie') || '';",
+                  "const match = cookie.match(/access_token=([^;]+)/);",
+                  "if (match) pm.collectionVariables.set('accessToken', match[1]);",
+                  "pm.collectionVariables.set('playerId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Gateway Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/health"
+      }
+    },
+    {
+      "name": "Rooms",
+      "item": [
+        {
+          "name": "Get All Rooms (player via gateway)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/world/rooms?unlocked=true"
+          }
+        },
+        {
+          "name": "Get Room (player via gateway)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/world/rooms/3"
+          }
+        },
+        {
+          "name": "Get Rooms by Wing (internal)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/world/rooms?wingId=1"
+          }
+        },
+        {
+          "name": "Get All Rooms (invalid token, 401)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer not-a-valid-token"
+              }
+            ],
+            "url": "{{baseUrl}}/world/rooms",
+            "description": "The gateway validates the Authorization header itself and answers 401 UNAUTHENTICATED; World is never reached and never sees the header."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Rooms (admin)",
+      "item": [
+        {
+          "name": "Create Room",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/world/rooms",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Chem Lab\",\n  \"type\": \"laboratory\",\n  \"wingId\": 2,\n  \"resourceNode\": { \"resourceType\": \"metal\" }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('roomId', pm.response.json().roomId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Room",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/world/rooms/{{roomId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Chem Lab 2\",\n  \"type\": \"laboratory\",\n  \"wingId\": 2,\n  \"resourceNode\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete Room",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/world/rooms/{{roomId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Wings",
+      "item": [
+        {
+          "name": "Get All Wings (player via gateway)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/world/wings"
+          }
+        },
+        {
+          "name": "Get Wing (player via gateway)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/world/wings/4"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Wings (admin)",
+      "item": [
+        {
+          "name": "Create Wing",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/world/wings",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Chemistry Wing {{$timestamp}}\",\n  \"unlocked\": false,\n  \"unlockedBySubject\": \"chemistry\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const wing = pm.response.json();",
+                  "pm.collectionVariables.set('wingId', wing.wingId);",
+                  "pm.collectionVariables.set('wingName', wing.name);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Wing",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/world/wings/{{wingId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"{{wingName}}\",\n  \"unlocked\": true,\n  \"unlockedBySubject\": \"chemistry\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Locked to unlocked publishes world.wing_unlocked, as a passed exam would."
+          }
+        },
+        {
+          "name": "Delete Wing",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/world/wings/{{wingId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Spawn Points (internal)",
+      "item": [
+        {
+          "name": "Get Spawn Points",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/world/spawn-points?roomId=3"
+          }
+        },
+        {
+          "name": "Get Spawn Point",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/world/spawn-points/2"
+          }
+        },
+        {
+          "name": "Create Spawn Point",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/world/spawn-points",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roomId\": 3,\n  \"zombieTypes\": [\"dean\"]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('pointId', pm.response.json().pointId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Spawn Point",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/world/spawn-points/{{pointId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roomId\": 3,\n  \"zombieTypes\": [\"dean\", \"janitor\"]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete Spawn Point",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/world/spawn-points/{{pointId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Events",
+      "item": [
+        {
+          "name": "Exam Completed (internal)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/world/internal/events",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"{{$guid}}\",\n  \"type\": \"exam.completed\",\n  \"version\": 1,\n  \"occurredAt\": \"2026-10-08T12:00:00Z\",\n  \"payload\": { \"examId\": 17, \"playerId\": 1, \"subject\": \"math\", \"passed\": true, \"grade\": 8 }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "HTTP stand-in for Exam's event stream: applied exactly like the WebSocket consumer (deduplicated on eventId)."
+          }
+        },
+        {
+          "name": "Negotiate Exam Stream URL (internal)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/ws/exam",
+            "description": "What World does on every (re)connect: the gateway returns Exam's /events URL and World connects to it directly."
+          }
+        },
+        {
+          "name": "Negotiate World Stream URL (internal)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/ws/world",
+            "description": "Where Game and Crafting open World's /events WebSocket (world.wing_unlocked)."
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+name: Exam Completed (internal)
+$kind: http-request
+method: POST
+url: "http://localhost:8080/world/internal/events"
+description: "HTTP stand-in for Exam's event stream: applied exactly like the WebSocket consumer (deduplicated on eventId)."
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+body:
+  type: json
+  content: |
+    {
+      "eventId": "{{$guid}}",
+      "type": "exam.completed",
+      "version": 1,
+      "occurredAt": "2026-10-08T12:00:00Z",
+      "payload": { "examId": 17, "playerId": 1, "subject": "math", "passed": true, "grade": 8 }
+    }

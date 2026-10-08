@@ -1,0 +1,7 @@
+name: Delete Question
+$kind: http-request
+method: DELETE
+url: "http://localhost:8080/exams/questions/{{questionId}}"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"

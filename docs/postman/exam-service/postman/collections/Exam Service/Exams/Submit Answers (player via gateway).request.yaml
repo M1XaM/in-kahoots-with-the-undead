@@ -1,0 +1,31 @@
+name: Submit Answers (player via gateway)
+$kind: http-request
+method: POST
+url: "http://localhost:8080/exams/{{examId}}/answers"
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: Authorization
+    value: "Bearer {{accessToken}}"
+body:
+  type: json
+  content: |
+    {{answers}}
+scripts:
+  - type: beforeRequest
+    language: text/javascript
+    code: |-
+      // Answers every question correctly from the internal question bank, so the exam passes and
+      // World unlocks the subject's wing (exam.completed over Exam's event stream).
+      const base = pm.variables.get('baseUrl') || 'http://localhost:8080';
+      const questions = JSON.parse(pm.collectionVariables.get('examQuestions') || '[]');
+      const subject = pm.collectionVariables.get('examSubject');
+      pm.sendRequest({
+        url: `${base}/exams/questions?subject=${subject}`,
+        header: { 'X-Internal-Key': 'changeme' },
+      }, (err, res) => {
+        const bank = err ? [] : res.json();
+        const correct = Object.fromEntries(bank.map((q) => [q.questionId, q.correctOption]));
+        const answers = questions.map((id) => ({ questionId: id, option: correct[id] ?? 0 }));
+        pm.collectionVariables.set('answers', JSON.stringify({ answers }));
+      });

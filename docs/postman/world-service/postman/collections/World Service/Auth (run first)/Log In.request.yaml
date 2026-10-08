@@ -1,0 +1,22 @@
+name: Log In
+$kind: http-request
+method: POST
+url: "http://localhost:8080/auth/login"
+headers:
+  - key: Content-Type
+    value: "application/json"
+body:
+  type: json
+  content: |
+    {
+      "username": "{{username}}",
+      "password": "hunter2hunter2"
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      const cookie = pm.response.headers.get('Set-Cookie') || '';
+      const match = cookie.match(/access_token=([^;]+)/);
+      if (match) pm.collectionVariables.set('accessToken', match[1]);
+      pm.collectionVariables.set('playerId', pm.response.json().id);

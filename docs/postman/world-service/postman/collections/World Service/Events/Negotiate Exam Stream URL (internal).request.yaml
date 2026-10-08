@@ -1,0 +1,8 @@
+name: Negotiate Exam Stream URL (internal)
+$kind: http-request
+method: GET
+url: "http://localhost:8080/ws/exam"
+description: "What World does on every (re)connect: the gateway returns Exam's /events URL and World connects to it directly."
+headers:
+  - key: X-Internal-Key
+    value: "changeme"

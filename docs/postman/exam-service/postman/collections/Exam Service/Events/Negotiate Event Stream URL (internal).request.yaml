@@ -1,0 +1,8 @@
+name: Negotiate Event Stream URL (internal)
+$kind: http-request
+method: GET
+url: "http://localhost:8080/ws/exam"
+description: "Where consumers (World, Game, Crafting) open Exam's /events WebSocket. They then connect to the returned URL directly with X-Internal-Key; the gateway never relays."
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
