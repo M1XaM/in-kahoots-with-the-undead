@@ -74,7 +74,7 @@
                 ]
             },
             "get": {
-                "description": "Caller: Game (loads them when a session starts) and players (the bestiary). Definitions are read-only game data.",
+                "description": "Caller: Game (loads them when a session starts).",
                 "operationId": "ZombieController_list",
                 "parameters": [
                     {
@@ -120,9 +120,6 @@
                 "security": [
                     {
                         "internal-key": []
-                    },
-                    {
-                        "gateway-player": []
                     }
                 ],
                 "summary": "List zombie definitions",
@@ -316,7 +313,7 @@
     "info": {
         "title": "Zombie Service",
         "description": "Kahoot With Undead zombie definitions: types, stats, abilities, sprites. Read-only for other services at runtime.",
-        "version": "2.0.1",
+        "version": "2.0.2",
         "contact": {}
     },
     "tags": [],

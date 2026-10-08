@@ -1334,7 +1334,7 @@
     "info": {
         "title": "Resource Service",
         "description": "Kahoot With Undead resource economy: per-player balances, a gather/spend ledger and two-phase reservations. Events: `resource.gathered` is served on the `/events` WebSocket (not shown here).",
-        "version": "2.0.0",
+        "version": "2.0.2",
         "contact": {}
     },
     "tags": [],
