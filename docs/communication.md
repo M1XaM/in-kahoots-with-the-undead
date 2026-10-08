@@ -922,10 +922,11 @@ Action     { actionId: uuid, playerId: int, type: ActionType, roomId: int,
 
 Exams, grading, per-player academic history and achievements.
 
-**Current implementation:** until Player and Zombie are running, Exam can use stand-ins, all on by
-default in compose: `AUTH_MODE=mock` reads the acting player from the `X-Player-Id` header instead
-of the cookie, `PLAYER_CLIENT=mock` accepts every player id, and `ZOMBIE_CLIENT=mock` serves
-built-in professor zombies. `jwks` / `http` switch each one to the real service.
+**Auth:** Exam reads the acting player from the `X-Player-Id` header set by the gateway, not from
+the cookie. It calls Player and Zombie through the gateway with `X-Internal-Key`; to run Exam
+alone, `PLAYER_CLIENT=mock` accepts every player id and `ZOMBIE_CLIENT=mock` serves built-in
+professor zombies. It serves `exam.completed` on `ws://exam:8083/events` (`GET /ws/exam` at the
+gateway).
 
 ### Endpoints
 
@@ -1177,8 +1178,9 @@ The campus: wings, rooms, resource nodes, zombie spawn points. Geography only â€
 on it belongs to Base.
 
 **Auth:** World reads the acting player from the `X-Player-Id` header set by the gateway, not from
-the cookie. It consumes Exam's WebSocket
-stream, and also accepts events over HTTP at `POST /world/internal/events`.
+the cookie. It consumes Exam's WebSocket stream (URL negotiated with `GET /ws/exam` at the gateway)
+and also accepts events over HTTP at `POST /world/internal/events`. It serves `world.wing_unlocked`
+on `ws://world:8084/events` (`GET /ws/world` at the gateway).
 
 ### Endpoints
 
