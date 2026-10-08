@@ -211,7 +211,7 @@ services:
       retries: 10
 
   zombie:
-    image: ${ZOMBIE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-zombie-service:${ZOMBIE_SERVICE_TAG:-1.2.0}
+    image: ${ZOMBIE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-zombie-service:${ZOMBIE_SERVICE_TAG:-2.0.0}
     restart: unless-stopped
     environment:
       PORT: ${ZOMBIE_PORT:-8085}
@@ -244,7 +244,7 @@ services:
       retries: 10
 
   resource:
-    image: ${RESOURCE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-resource-service:${RESOURCE_SERVICE_TAG:-1.2.0}
+    image: ${RESOURCE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-resource-service:${RESOURCE_SERVICE_TAG:-2.0.0}
     restart: unless-stopped
     environment:
       PORT: ${RESOURCE_PORT:-8086}
@@ -258,10 +258,10 @@ services:
       DB_NAME: ${RESOURCE_POSTGRES_DB:-resource}
       # World is called through the gateway; empty = built-in World mock
       WORLD_SERVICE_URL: ${RESOURCE_WORLD_SERVICE_URL-http://gateway:8080}
-      # empty = not connected (use POST /resources/internal/events); `gateway` =
-      # ask the gateway for the producer's /events URL, then connect directly
-      PLAYER_EVENTS_URL: ${RESOURCE_PLAYER_EVENTS_URL:-}
-      GAME_EVENTS_URL: ${RESOURCE_GAME_EVENTS_URL:-}
+      # `gateway` = ask the gateway for the producer's /events URL, then connect
+      # directly; empty = not connected (use POST /resources/internal/events)
+      PLAYER_EVENTS_URL: ${RESOURCE_PLAYER_EVENTS_URL-gateway}
+      GAME_EVENTS_URL: ${RESOURCE_GAME_EVENTS_URL-gateway}
       GATEWAY_URL: http://gateway:8080
     depends_on:
       resource-db:
