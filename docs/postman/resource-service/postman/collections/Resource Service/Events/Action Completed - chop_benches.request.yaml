@@ -1,8 +1,8 @@
 name: Action Completed - chop_benches
 $kind: http-request
 method: POST
-url: "http://localhost:8086/resources/internal/events"
-description: "Credits 5-15 wood and publishes resource.gathered on ws://localhost:8086/events."
+url: "http://localhost:8080/resources/internal/events"
+description: "Credits 5-15 wood and publishes resource.gathered on ws://resource:8086/events (negotiate it with GET /ws/resource on the gateway)."
 headers:
   - key: Content-Type
     value: "application/json"

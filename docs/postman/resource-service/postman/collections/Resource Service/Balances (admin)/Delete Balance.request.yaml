@@ -1,7 +1,7 @@
 name: Delete Balance
 $kind: http-request
 method: DELETE
-url: "http://localhost:8086/resources/balances/{{balanceId}}"
+url: "http://localhost:8080/resources/balances/{{balanceId}}"
 headers:
   - key: X-Internal-Key
     value: "changeme"

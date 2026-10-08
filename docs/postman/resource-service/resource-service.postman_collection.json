@@ -1,16 +1,90 @@
 {
   "info": {
     "name": "Resource Service",
-    "description": "Resource Service (port 8086). Run the Events folder first to give player 42 balances. Internal key defaults to `changeme` (INTERNAL_KEY in the team .env). The player cookie is an unsigned mock JWT for sub=42 (Player JWKS is mocked).",
+    "description": "Resource Service through the API Gateway (http://localhost:8080); only the gateway is published in the team compose. Run 'Auth (run first)' to register and log in a player: the gateway verifies the token, strips it and forwards the player as X-Player-Id. Internal requests use X-Internal-Key (INTERNAL_KEY in the team .env, default changeme).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
     {
-      "name": "Health Check",
+      "name": "Auth (run first)",
+      "item": [
+        {
+          "name": "Register Player",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"demo{{$timestamp}}\",\n  \"password\": \"hunter2hunter2\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('username', pm.response.json().username);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Log In",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"hunter2hunter2\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const cookie = pm.response.headers.get('Set-Cookie') || '';",
+                  "const match = cookie.match(/access_token=([^;]+)/);",
+                  "if (match) pm.collectionVariables.set('accessToken', match[1]);",
+                  "pm.collectionVariables.set('playerId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Gateway Health Check",
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{baseUrl}}/"
+        "url": "{{baseUrl}}/health"
       }
     },
     {
@@ -58,7 +132,7 @@
               }
             ],
             "url": "{{baseUrl}}/resources/internal/events",
-            "description": "Credits 5-15 wood and publishes resource.gathered on ws://localhost:8086/events.",
+            "description": "Credits 5-15 wood and publishes resource.gathered on ws://resource:8086/events (negotiate it with GET /ws/resource on the gateway).",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"eventId\": \"{{$guid}}\",\n  \"type\": \"game.action_completed\",\n  \"version\": 1,\n  \"occurredAt\": \"2026-09-25T10:00:00Z\",\n  \"payload\": {\n    \"actionId\": \"{{$guid}}\",\n    \"sessionId\": \"7a90\",\n    \"playerId\": 42,\n    \"type\": \"chop_benches\",\n    \"roomId\": 1,\n    \"nodeId\": null,\n    \"completedAt\": \"2026-09-25T10:00:00Z\"\n  }\n}",
@@ -130,29 +204,29 @@
           }
         },
         {
-          "name": "Get Balances (player cookie)",
+          "name": "Get Balances (player via gateway)",
           "request": {
             "method": "GET",
             "header": [
               {
-                "key": "Cookie",
-                "value": "access_token=x.eyJzdWIiOjQyLCJ1c2VybmFtZSI6InJhenZhbiJ9.y"
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
               }
             ],
-            "url": "{{baseUrl}}/resources/players/42"
+            "url": "{{baseUrl}}/resources/players/{{playerId}}"
           }
         },
         {
-          "name": "Get Ledger (player cookie)",
+          "name": "Get Ledger (player via gateway)",
           "request": {
             "method": "GET",
             "header": [
               {
-                "key": "Cookie",
-                "value": "access_token=x.eyJzdWIiOjQyLCJ1c2VybmFtZSI6InJhenZhbiJ9.y"
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
               }
             ],
-            "url": "{{baseUrl}}/resources/players/42/ledger?limit=50"
+            "url": "{{baseUrl}}/resources/players/{{playerId}}/ledger?limit=50"
           }
         },
         {
@@ -556,7 +630,7 @@
   "variable": [
     {
       "key": "baseUrl",
-      "value": "http://localhost:8086"
+      "value": "http://localhost:8080"
     },
     {
       "key": "reservationId",
@@ -568,6 +642,18 @@
     },
     {
       "key": "ledgerEntryId",
+      "value": ""
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "playerId",
+      "value": ""
+    },
+    {
+      "key": "username",
       "value": ""
     }
   ]
