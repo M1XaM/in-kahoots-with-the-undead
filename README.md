@@ -8,8 +8,8 @@ wings of the university to explore, tying academic progress directly to survival
 [![gateway](https://img.shields.io/docker/v/timurcravtov/gateway?sort=semver&label=gateway&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/gateway)
 [![player-service](https://img.shields.io/docker/v/timurcravtov/player-service?sort=semver&label=player-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/player-service)
 [![game-service](https://img.shields.io/docker/v/timurcravtov/game-service?sort=semver&label=game-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/game-service)
-[![exam-service](https://img.shields.io/docker/v/inercaso/exam-service?sort=semver&label=exam-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/inercaso/exam-service)
-[![world-service](https://img.shields.io/docker/v/inercaso/world-service?sort=semver&label=world-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/inercaso/world-service)
+[![exam-service](https://img.shields.io/docker/v/inercaso/exam-service?sort=date&label=exam-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/inercaso/exam-service)
+[![world-service](https://img.shields.io/docker/v/inercaso/world-service?sort=date&label=world-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/inercaso/world-service)
 [![zombie-service](https://img.shields.io/docker/v/nevaletik/kahoot-zombie-service?sort=semver&label=zombie-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/nevaletik/kahoot-zombie-service)
 [![resource-service](https://img.shields.io/docker/v/nevaletik/kahoot-resource-service?sort=semver&label=resource-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/nevaletik/kahoot-resource-service)
 [![base-service](https://img.shields.io/docker/v/mixam052/kahoots-base-service?sort=semver&label=base-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/mixam052/kahoots-base-service)
@@ -140,29 +140,42 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 ### Exam Service
 
 - **Image:** [`inercaso/exam-service`](https://hub.docker.com/r/inercaso/exam-service),
-  version set by `EXAM_SERVICE_TAG` (currently `0.1.0`).
+  version set by `EXAM_SERVICE_TAG` (currently `2`, the lab number; `latest` points at the newest).
 - **Needs:** its own Postgres (`exam-db`, started by compose and seeded with the question bank and
   achievements from [`db/exam-service/init.sql`](db/exam-service/init.sql)); password defaults to
   `qwerty`, override with `EXAM_POSTGRES_PASSWORD`.
-- **Talks to:** Zombie (a professor's subject) and Player (player check, login cookie). Until they
-  run, it uses built-in stand-ins: `EXAM_ZOMBIE_CLIENT=mock` (zombies `5`/`6`/`7` are math/physics/
-  programming professors, `9` and `10` are not), `EXAM_PLAYER_CLIENT=mock` and `EXAM_AUTH_MODE=mock`
-  (player identity from the `X-Player-Id` header). Set them to `http`/`http`/`jwks` once those
-  services are up. Publishes `exam.completed` on `ws://exam:8083/events`.
-- **Try it:** Postman collection in [`docs/postman/exam-service`](docs/postman/exam-service).
+- **Talks to:** Zombie (a professor's subject) and Player (player check), always through the Gateway
+  (`GATEWAY_URL`, with `X-Internal-Key`). `EXAM_ZOMBIE_CLIENT` / `EXAM_PLAYER_CLIENT` default to
+  `http`; set them to `mock` to run Exam alone with built-in stand-ins (zombies `5`/`6`/`7` are
+  math/physics/programming professors, `9` and `10` are not; every player id exists). Players are
+  identified by the Gateway's `X-Player-Id`; the service never sees the token. Publishes
+  `exam.completed` on `ws://exam:8083/events` (`GET /ws/exam` on the Gateway).
+- **Limits:** a request past `EXAM_TASK_TIMEOUT_MS` (default 10 s) answers `408 REQUEST_TIMEOUT`;
+  beyond `EXAM_MAX_CONCURRENT_TASKS` (default 100) in flight, `429 TOO_MANY_REQUESTS` with
+  `Retry-After`.
+- **Try it:** the Postman collection in [`docs/postman/exam-service`](docs/postman/exam-service)
+  (also as a single importable `exam-service.postman_collection.json`) goes through the Gateway:
+  run **Auth (run first)** to register and log in a player, then create and answer an exam.
 
 ### World Service
 
 - **Image:** [`inercaso/world-service`](https://hub.docker.com/r/inercaso/world-service),
-  version set by `WORLD_SERVICE_TAG` (currently `0.1.0`).
+  version set by `WORLD_SERVICE_TAG` (currently `2`, the lab number; `latest` points at the newest).
 - **Needs:** its own Postgres (`world-db`, started by compose and seeded with the campus map from
   [`db/world-service/init.sql`](db/world-service/init.sql)); password defaults to `qwerty`,
   override with `WORLD_POSTGRES_PASSWORD`.
-- **Talks to:** Exam, over its event stream: a passed `exam.completed` unlocks the matching wing
-  and publishes `world.wing_unlocked` on `ws://world:8084/events`. Client calls use
-  `WORLD_AUTH_MODE=mock` (`X-Player-Id` header) until Player's login cookie is wired in (`jwks`).
-- **Try it:** Postman collection in [`docs/postman/world-service`](docs/postman/world-service).
-  Pass an exam through the Exam collection and the matching wing shows `unlocked: true`.
+- **Talks to:** Exam, over its event stream, negotiated at the Gateway (`WORLD_EXAM_EVENTS_URL`,
+  default `gateway`: `GET /ws/exam`, then a direct connection; `off` = not connected, then events can
+  be delivered over HTTP at `POST /world/internal/events`). A passed `exam.completed` unlocks the
+  matching wing and publishes `world.wing_unlocked` on `ws://world:8084/events` (`GET /ws/world` on
+  the Gateway). Players are identified by the Gateway's `X-Player-Id`; the service never sees the
+  token.
+- **Limits:** `WORLD_TASK_TIMEOUT_MS` (default 10 s, then `408 REQUEST_TIMEOUT`) and
+  `WORLD_MAX_CONCURRENT_TASKS` (default 100, then `429 TOO_MANY_REQUESTS` with `Retry-After`).
+- **Try it:** the Postman collection in [`docs/postman/world-service`](docs/postman/world-service)
+  (also as a single importable `world-service.postman_collection.json`) goes through the Gateway:
+  run **Auth (run first)**, then pass an exam through the Exam collection and the matching wing
+  shows `unlocked: true`.
 
 ### Zombie Service
 
