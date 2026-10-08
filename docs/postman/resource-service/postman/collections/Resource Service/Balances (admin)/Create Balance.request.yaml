@@ -1,7 +1,7 @@
 name: Create Balance
 $kind: http-request
 method: POST
-url: "http://localhost:8086/resources/balances"
+url: "http://localhost:8080/resources/balances"
 headers:
   - key: Content-Type
     value: "application/json"

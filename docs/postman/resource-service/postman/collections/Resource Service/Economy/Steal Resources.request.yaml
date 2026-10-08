@@ -1,7 +1,7 @@
 name: Steal Resources
 $kind: http-request
 method: POST
-url: "http://localhost:8086/resources/players/42/steal"
+url: "http://localhost:8080/resources/players/42/steal"
 headers:
   - key: Content-Type
     value: "application/json"

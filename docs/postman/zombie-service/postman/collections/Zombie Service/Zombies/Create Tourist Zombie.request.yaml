@@ -1,7 +1,7 @@
 name: Create Tourist Zombie
 $kind: http-request
 method: POST
-url: "http://localhost:8085/zombies"
+url: "http://localhost:8080/zombies"
 headers:
   - key: Content-Type
     value: "application/json"

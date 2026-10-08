@@ -1,7 +1,7 @@
 name: Published Events
 $kind: http-request
 method: GET
-url: "http://localhost:8086/resources/internal/events?since=0"
+url: "http://localhost:8080/resources/internal/events?since=0"
 description: "Outbox: the events /events subscribers receive (resource.gathered)."
 headers:
   - key: X-Internal-Key

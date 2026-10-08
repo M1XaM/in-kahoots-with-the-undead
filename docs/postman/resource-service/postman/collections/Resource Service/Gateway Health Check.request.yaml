@@ -1,0 +1,4 @@
+name: Gateway Health Check
+$kind: http-request
+method: GET
+url: "http://localhost:8080/health"

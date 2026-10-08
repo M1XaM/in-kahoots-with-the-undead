@@ -1,7 +1,7 @@
 name: Update Zombie
 $kind: http-request
 method: PATCH
-url: "http://localhost:8085/zombies/{{zombieId}}"
+url: "http://localhost:8080/zombies/{{zombieId}}"
 headers:
   - key: Content-Type
     value: "application/json"

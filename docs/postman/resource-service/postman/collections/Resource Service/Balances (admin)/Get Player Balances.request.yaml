@@ -1,7 +1,7 @@
 name: Get Player Balances
 $kind: http-request
 method: GET
-url: "http://localhost:8086/resources/players/43/balances"
+url: "http://localhost:8080/resources/players/43/balances"
 headers:
   - key: X-Internal-Key
     value: "changeme"

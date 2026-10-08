@@ -1,7 +1,7 @@
 name: Player Registered
 $kind: http-request
 method: POST
-url: "http://localhost:8086/resources/internal/events"
+url: "http://localhost:8080/resources/internal/events"
 description: "HTTP delivery of player.registered (same handler as the WebSocket consumer): creates zero balances for player 42."
 headers:
   - key: Content-Type

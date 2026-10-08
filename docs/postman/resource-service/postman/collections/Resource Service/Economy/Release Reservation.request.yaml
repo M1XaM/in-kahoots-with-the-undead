@@ -1,7 +1,7 @@
 name: Release Reservation
 $kind: http-request
 method: DELETE
-url: "http://localhost:8086/resources/reservations/{{reservationId}}"
+url: "http://localhost:8080/resources/reservations/{{reservationId}}"
 description: "409 ALREADY_COMMITTED after a commit; reserve again to see 204."
 headers:
   - key: X-Internal-Key
