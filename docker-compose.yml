@@ -8,6 +8,7 @@ services:
       POSTGRES_DB: ${PLAYER_POSTGRES_DB:-player}
     volumes:
       - player-db-data:/var/lib/postgresql/data
+      - ./db/player-service/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${PLAYER_POSTGRES_USER:-postgres} -d ${PLAYER_POSTGRES_DB:-player}"]
       interval: 5s
@@ -15,7 +16,7 @@ services:
       retries: 10
 
   player:
-    image: ${DOCKERHUB_USERNAME:-timurcravtov}/player-service:${PLAYER_SERVICE_TAG:-latest}
+    image: ${DOCKERHUB_USERNAME:-timurcravtov}/player-service:${PLAYER_SERVICE_TAG:-2}
     restart: unless-stopped
     environment:
       PORT: ${PLAYER_PORT:-8081}
@@ -23,8 +24,10 @@ services:
       INTERNAL_KEY: ${INTERNAL_KEY:-changeme}
       JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:-supersecret}
       KAFKA_BROKERS: ${KAFKA_BROKERS:-localhost:9092}
-    ports:
-      - "${PLAYER_PORT:-8081}:${PLAYER_PORT:-8081}"
+      TASK_TIMEOUT_MS: ${PLAYER_TASK_TIMEOUT_MS:-10000}
+      MAX_CONCURRENT_TASKS: ${PLAYER_MAX_CONCURRENT_TASKS:-100}
+      # events and service-to-service REST go through the gateway
+      GATEWAY_URL: http://gateway:8080
     depends_on:
       player-db:
         condition: service_healthy
@@ -45,7 +48,7 @@ services:
       retries: 10
 
   game:
-    image: ${DOCKERHUB_USERNAME:-timurcravtov}/game-service:${GAME_SERVICE_TAG:-latest}
+    image: ${DOCKERHUB_USERNAME:-timurcravtov}/game-service:${GAME_SERVICE_TAG:-2}
     restart: unless-stopped
     environment:
       PORT: ${GAME_PORT:-8082}
@@ -53,6 +56,11 @@ services:
       INTERNAL_KEY: ${INTERNAL_KEY:-changeme}
       JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:-supersecret}
       KAFKA_BROKERS: ${KAFKA_BROKERS:-localhost:9092}
+      TASK_TIMEOUT_MS: ${GAME_TASK_TIMEOUT_MS:-10000}
+      MAX_CONCURRENT_TASKS: ${GAME_MAX_CONCURRENT_TASKS:-100}
+      # signing keys for the Socket.IO handshake and service-to-service REST go through the gateway
+      GATEWAY_URL: http://gateway:8080
+    # Socket.IO clients connect here directly (GET /ws/game); REST goes through the gateway
     ports:
       - "${GAME_PORT:-8082}:${GAME_PORT:-8082}"
     depends_on:
@@ -75,17 +83,17 @@ services:
       retries: 10
 
   base:
-    image: ${BASE_DOCKERHUB_USERNAME:-mixam052}/kahoots-base-service:${BASE_SERVICE_TAG:-0.1.0}
+    image: ${BASE_DOCKERHUB_USERNAME:-mixam052}/kahoots-base-service:${BASE_SERVICE_TAG:-2}
     restart: unless-stopped
     environment:
       PORT: ${BASE_PORT:-8087}
       DATABASE_URL: postgres://${BASE_POSTGRES_USER:-postgres}:${BASE_POSTGRES_PASSWORD:-qwerty}@base-db:5432/${BASE_POSTGRES_DB:-base}?sslmode=disable
       INTERNAL_KEY: ${INTERNAL_KEY:-changeme}
-      PLAYER_URL: http://player:${PLAYER_PORT:-8081}
-      RESOURCE_URL: http://resource:8086
-      WORLD_URL: http://world:8084
-    ports:
-      - "${BASE_PORT:-8087}:${BASE_PORT:-8087}"
+      # REST to Resource, World and Player goes through the gateway, which also
+      # negotiates the URL of Player's event stream
+      GATEWAY_URL: http://gateway:8080
+      TASK_TIMEOUT_MS: ${BASE_TASK_TIMEOUT_MS:-10000}
+      MAX_CONCURRENT_TASKS: ${BASE_MAX_CONCURRENT_TASKS:-100}
     depends_on:
       base-db:
         condition: service_healthy
@@ -99,6 +107,7 @@ services:
       POSTGRES_DB: ${CRAFTING_POSTGRES_DB:-crafting}
     volumes:
       - crafting-db-data:/var/lib/postgresql/data
+      - ./db/crafting-service/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${CRAFTING_POSTGRES_USER:-postgres} -d ${CRAFTING_POSTGRES_DB:-crafting}"]
       interval: 5s
@@ -106,16 +115,17 @@ services:
       retries: 10
 
   crafting:
-    image: ${CRAFTING_DOCKERHUB_USERNAME:-mixam052}/kahoots-crafting-service:${CRAFTING_SERVICE_TAG:-0.1.0}
+    image: ${CRAFTING_DOCKERHUB_USERNAME:-mixam052}/kahoots-crafting-service:${CRAFTING_SERVICE_TAG:-2}
     restart: unless-stopped
     environment:
       PORT: ${CRAFTING_PORT:-8088}
       DATABASE_URL: postgres://${CRAFTING_POSTGRES_USER:-postgres}:${CRAFTING_POSTGRES_PASSWORD:-qwerty}@crafting-db:5432/${CRAFTING_POSTGRES_DB:-crafting}?sslmode=disable
       INTERNAL_KEY: ${INTERNAL_KEY:-changeme}
-      PLAYER_URL: http://player:${PLAYER_PORT:-8081}
-      RESOURCE_URL: http://resource:8086
-    ports:
-      - "${CRAFTING_PORT:-8088}:${CRAFTING_PORT:-8088}"
+      # REST to Resource and Player goes through the gateway, which also negotiates
+      # the URLs of Player's, Exam's and World's event streams
+      GATEWAY_URL: http://gateway:8080
+      TASK_TIMEOUT_MS: ${CRAFTING_TASK_TIMEOUT_MS:-10000}
+      MAX_CONCURRENT_TASKS: ${CRAFTING_MAX_CONCURRENT_TASKS:-100}
     depends_on:
       crafting-db:
         condition: service_healthy
@@ -144,12 +154,11 @@ services:
       DATABASE_URL: postgres://${EXAM_POSTGRES_USER:-postgres}:${EXAM_POSTGRES_PASSWORD:-qwerty}@exam-db:5432/${EXAM_POSTGRES_DB:-exam}?sslmode=disable
       INTERNAL_KEY: ${INTERNAL_KEY:-changeme}
       AUTH_MODE: ${EXAM_AUTH_MODE:-mock}
-      PLAYER_URL: http://player:${PLAYER_PORT:-8081}
+      # service-to-service REST goes through the gateway
+      PLAYER_URL: http://gateway:8080
       PLAYER_CLIENT: ${EXAM_PLAYER_CLIENT:-mock}
-      ZOMBIE_URL: http://zombie:8085
+      ZOMBIE_URL: http://gateway:8080
       ZOMBIE_CLIENT: ${EXAM_ZOMBIE_CLIENT:-mock}
-    ports:
-      - "${EXAM_PORT:-8083}:${EXAM_PORT:-8083}"
     depends_on:
       exam-db:
         condition: service_healthy
@@ -178,10 +187,9 @@ services:
       DATABASE_URL: postgres://${WORLD_POSTGRES_USER:-postgres}:${WORLD_POSTGRES_PASSWORD:-qwerty}@world-db:5432/${WORLD_POSTGRES_DB:-world}?sslmode=disable
       INTERNAL_KEY: ${INTERNAL_KEY:-changeme}
       AUTH_MODE: ${WORLD_AUTH_MODE:-mock}
-      PLAYER_URL: http://player:${PLAYER_PORT:-8081}
+      # service-to-service REST goes through the gateway; WebSockets stay direct
+      PLAYER_URL: http://gateway:8080
       EXAM_EVENTS_URL: ws://exam:${EXAM_PORT:-8083}/events
-    ports:
-      - "${WORLD_PORT:-8084}:${WORLD_PORT:-8084}"
     depends_on:
       world-db:
         condition: service_healthy
@@ -203,18 +211,18 @@ services:
       retries: 10
 
   zombie:
-    image: ${ZOMBIE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-zombie-service:${ZOMBIE_SERVICE_TAG:-1.1.0}
+    image: ${ZOMBIE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-zombie-service:${ZOMBIE_SERVICE_TAG:-1.2.0}
     restart: unless-stopped
     environment:
       PORT: ${ZOMBIE_PORT:-8085}
       INTERNAL_API_KEY: ${INTERNAL_KEY:-changeme}
+      TASK_TIMEOUT_MS: ${ZOMBIE_TASK_TIMEOUT_MS:-10000}
+      MAX_CONCURRENT_TASKS: ${ZOMBIE_MAX_CONCURRENT_TASKS:-100}
       DB_HOST: zombie-db
       DB_PORT: 5432
       DB_USERNAME: ${ZOMBIE_POSTGRES_USER:-postgres}
       DB_PASSWORD: ${ZOMBIE_POSTGRES_PASSWORD:-qwerty}
       DB_NAME: ${ZOMBIE_POSTGRES_DB:-zombie}
-    ports:
-      - "${ZOMBIE_PORT:-8085}:${ZOMBIE_PORT:-8085}"
     depends_on:
       zombie-db:
         condition: service_healthy
@@ -236,27 +244,74 @@ services:
       retries: 10
 
   resource:
-    image: ${RESOURCE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-resource-service:${RESOURCE_SERVICE_TAG:-1.1.0}
+    image: ${RESOURCE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-resource-service:${RESOURCE_SERVICE_TAG:-1.2.0}
     restart: unless-stopped
     environment:
       PORT: ${RESOURCE_PORT:-8086}
       INTERNAL_API_KEY: ${INTERNAL_KEY:-changeme}
+      TASK_TIMEOUT_MS: ${RESOURCE_TASK_TIMEOUT_MS:-10000}
+      MAX_CONCURRENT_TASKS: ${RESOURCE_MAX_CONCURRENT_TASKS:-100}
       DB_HOST: resource-db
       DB_PORT: 5432
       DB_USERNAME: ${RESOURCE_POSTGRES_USER:-postgres}
       DB_PASSWORD: ${RESOURCE_POSTGRES_PASSWORD:-qwerty}
       DB_NAME: ${RESOURCE_POSTGRES_DB:-resource}
-      # empty = built-in World mock; http://world:8084 to use the real World Service
-      WORLD_SERVICE_URL: ${RESOURCE_WORLD_SERVICE_URL:-}
-      # empty = not connected (use POST /resources/internal/events);
-      # ws://player:8081/events and ws://game:8082/events once they serve /events
+      # World is called through the gateway; empty = built-in World mock
+      WORLD_SERVICE_URL: ${RESOURCE_WORLD_SERVICE_URL-http://gateway:8080}
+      # empty = not connected (use POST /resources/internal/events); `gateway` =
+      # ask the gateway for the producer's /events URL, then connect directly
       PLAYER_EVENTS_URL: ${RESOURCE_PLAYER_EVENTS_URL:-}
       GAME_EVENTS_URL: ${RESOURCE_GAME_EVENTS_URL:-}
-    ports:
-      - "${RESOURCE_PORT:-8086}:${RESOURCE_PORT:-8086}"
+      GATEWAY_URL: http://gateway:8080
     depends_on:
       resource-db:
         condition: service_healthy
+
+  gateway:
+    image: ${GATEWAY_DOCKERHUB_USERNAME:-timurcravtov}/gateway:${GATEWAY_SERVICE_TAG:-2}
+    restart: unless-stopped
+    environment:
+      PLAYER_SERVICE_URL: http://player:${PLAYER_PORT:-8081}
+      GAME_SERVICE_URL: http://game:${GAME_PORT:-8082}
+      EXAM_SERVICE_URL: http://exam:${EXAM_PORT:-8083}
+      WORLD_SERVICE_URL: http://world:${WORLD_PORT:-8084}
+      ZOMBIE_SERVICE_URL: http://zombie:${ZOMBIE_PORT:-8085}
+      RESOURCE_SERVICE_URL: http://resource:${RESOURCE_PORT:-8086}
+      BASE_SERVICE_URL: http://base:${BASE_PORT:-8087}
+      CRAFTING_SERVICE_URL: http://crafting:${CRAFTING_PORT:-8088}
+      # handed to browsers by GET /ws/game, so it must be reachable from the host
+      GAME_PUBLIC_WS_URL: ws://localhost:${GAME_PORT:-8082}
+      INTERNAL_KEY: ${INTERNAL_KEY:-changeme}
+      # jwks (Player's GET /auth/jwks, per the contract) | secret (HS256) | off
+      AUTH_MODE: ${GATEWAY_AUTH_MODE:-jwks}
+      JWT_SECRET: ${GATEWAY_JWT_SECRET:-}
+      TASK_TIMEOUT: ${GATEWAY_TASK_TIMEOUT:-30}
+      MAX_CONCURRENT_TASKS: ${GATEWAY_MAX_CONCURRENT_TASKS:-100}
+    ports:
+      - "${GATEWAY_PORT:-8080}:8080"
+    depends_on:
+      - player
+      - game
+      - exam
+      - world
+      - zombie
+      - resource
+      - base
+      - crafting
+
+  client:
+    image: ${CLIENT_DOCKERHUB_USERNAME:-mixam052}/kahoots-client:${CLIENT_SERVICE_TAG:-2}
+    restart: unless-stopped
+    environment:
+      # the browser only calls the client's own /api, which nginx proxies to the gateway
+      GATEWAY_URL: http://gateway:8080
+      # lets the app perform service actions (start an exam, grant XP); it reaches the
+      # browser, so leave it empty outside local development
+      DEV_INTERNAL_KEY: ${CLIENT_DEV_INTERNAL_KEY:-}
+    ports:
+      - "${CLIENT_PORT:-3000}:80"
+    depends_on:
+      - gateway
 
 volumes:
   player-db-data:

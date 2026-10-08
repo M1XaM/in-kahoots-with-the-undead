@@ -1,0 +1,578 @@
+{
+    "openapi": "3.0.0",
+    "paths": {
+        "/": {
+            "get": {
+                "operationId": "HealthController_getHealth",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "summary": "Health check",
+                "tags": [
+                    "health"
+                ],
+                "security": []
+            }
+        },
+        "/zombies": {
+            "post": {
+                "operationId": "ZombieController_create",
+                "parameters": [],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateZombieDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ZombieResponseDto"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "VALIDATION_ERROR",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED: missing or invalid credentials",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "internal-key": []
+                    }
+                ],
+                "summary": "Create a zombie definition",
+                "tags": [
+                    "zombies"
+                ]
+            },
+            "get": {
+                "description": "Caller: Game (loads them when a session starts).",
+                "operationId": "ZombieController_list",
+                "parameters": [
+                    {
+                        "name": "type",
+                        "required": false,
+                        "in": "query",
+                        "schema": {
+                            "enum": [
+                                "professor",
+                                "tourist",
+                                "dean",
+                                "janitor"
+                            ],
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/ZombieResponseDto"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED: missing or invalid credentials",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "internal-key": []
+                    }
+                ],
+                "summary": "List zombie definitions",
+                "tags": [
+                    "zombies"
+                ]
+            }
+        },
+        "/zombies/{id}": {
+            "get": {
+                "description": "Caller: client, Exam (reads a professor's subject).",
+                "operationId": "ZombieController_findOne",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "number"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ZombieResponseDto"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED: missing or invalid credentials",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "ZOMBIE_NOT_FOUND",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "internal-key": []
+                    },
+                    {
+                        "player-cookie": []
+                    }
+                ],
+                "summary": "One zombie definition",
+                "tags": [
+                    "zombies"
+                ]
+            },
+            "patch": {
+                "operationId": "ZombieController_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "number"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateZombieDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ZombieResponseDto"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "VALIDATION_ERROR",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED: missing or invalid credentials",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "ZOMBIE_NOT_FOUND",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "internal-key": []
+                    }
+                ],
+                "summary": "Update a zombie definition",
+                "tags": [
+                    "zombies"
+                ]
+            },
+            "delete": {
+                "operationId": "ZombieController_remove",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "number"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": ""
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED: missing or invalid credentials",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "ZOMBIE_NOT_FOUND",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "internal-key": []
+                    }
+                ],
+                "summary": "Delete a zombie definition",
+                "tags": [
+                    "zombies"
+                ]
+            }
+        }
+    },
+    "info": {
+        "title": "Zombie Service",
+        "description": "Kahoot With Undead zombie definitions: types, stats, abilities, sprites. Read-only for other services at runtime.",
+        "version": "1.2.0",
+        "contact": {}
+    },
+    "tags": [],
+    "servers": [
+        {
+            "url": "/",
+            "description": "This instance"
+        }
+    ],
+    "components": {
+        "securitySchemes": {
+            "internal-key": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-Internal-Key",
+                "description": "Shared secret for service-to-service calls"
+            },
+            "player-cookie": {
+                "type": "apiKey",
+                "in": "cookie",
+                "name": "access_token",
+                "description": "Player session JWT (signature not verified while Player JWKS is mocked)"
+            }
+        },
+        "schemas": {
+            "ZombieStatsDto": {
+                "type": "object",
+                "properties": {
+                    "health": {
+                        "type": "number",
+                        "minimum": 0
+                    },
+                    "speed": {
+                        "type": "number",
+                        "minimum": 0
+                    },
+                    "attack": {
+                        "type": "number",
+                        "minimum": 0
+                    },
+                    "perception": {
+                        "type": "number",
+                        "minimum": 0
+                    }
+                },
+                "required": [
+                    "health",
+                    "speed",
+                    "attack",
+                    "perception"
+                ]
+            },
+            "CreateZombieDto": {
+                "type": "object",
+                "properties": {
+                    "type": {
+                        "enum": [
+                            "professor",
+                            "tourist",
+                            "dean",
+                            "janitor"
+                        ],
+                        "type": "string",
+                        "example": "professor"
+                    },
+                    "subject": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Set only for professors (e.g. `math`, `physics`, `programming`).",
+                        "example": "math"
+                    },
+                    "abilities": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "administer_exam",
+                                "steal_xp",
+                                "steal_resources",
+                                "sprint"
+                            ]
+                        },
+                        "example": [
+                            "administer_exam"
+                        ]
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "spriteUrl": {
+                        "type": "string"
+                    },
+                    "stats": {
+                        "$ref": "#/components/schemas/ZombieStatsDto"
+                    }
+                },
+                "required": [
+                    "type",
+                    "abilities",
+                    "name",
+                    "spriteUrl",
+                    "stats"
+                ]
+            },
+            "ZombieStatsResponseDto": {
+                "type": "object",
+                "properties": {
+                    "health": {
+                        "type": "number",
+                        "example": 120
+                    },
+                    "speed": {
+                        "type": "number",
+                        "example": 1
+                    },
+                    "attack": {
+                        "type": "number",
+                        "example": 8
+                    },
+                    "perception": {
+                        "type": "number",
+                        "example": 3
+                    }
+                },
+                "required": [
+                    "health",
+                    "speed",
+                    "attack",
+                    "perception"
+                ]
+            },
+            "ZombieResponseDto": {
+                "type": "object",
+                "properties": {
+                    "zombieId": {
+                        "type": "number",
+                        "example": 5
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "professor",
+                            "tourist",
+                            "dean",
+                            "janitor"
+                        ],
+                        "example": "professor"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Prof. Grosu"
+                    },
+                    "subject": {
+                        "type": "string",
+                        "nullable": true,
+                        "example": "math",
+                        "description": "Set only for professors"
+                    },
+                    "spriteUrl": {
+                        "type": "string",
+                        "example": "/sprites/prof_grosu.png"
+                    },
+                    "stats": {
+                        "$ref": "#/components/schemas/ZombieStatsResponseDto"
+                    },
+                    "abilities": {
+                        "type": "array",
+                        "example": [
+                            "administer_exam"
+                        ],
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "administer_exam",
+                                "steal_xp",
+                                "steal_resources",
+                                "sprint"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "zombieId",
+                    "type",
+                    "name",
+                    "subject",
+                    "spriteUrl",
+                    "stats",
+                    "abilities"
+                ]
+            },
+            "ErrorBodyDto": {
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "example": "ZOMBIE_NOT_FOUND"
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "No zombie 42"
+                    }
+                },
+                "required": [
+                    "code",
+                    "message"
+                ]
+            },
+            "ErrorEnvelopeDto": {
+                "type": "object",
+                "properties": {
+                    "error": {
+                        "$ref": "#/components/schemas/ErrorBodyDto"
+                    }
+                },
+                "required": [
+                    "error"
+                ]
+            },
+            "UpdateZombieDto": {
+                "type": "object",
+                "properties": {
+                    "type": {
+                        "enum": [
+                            "professor",
+                            "tourist",
+                            "dean",
+                            "janitor"
+                        ],
+                        "type": "string",
+                        "example": "professor"
+                    },
+                    "abilities": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "administer_exam",
+                                "steal_xp",
+                                "steal_resources",
+                                "sprint"
+                            ]
+                        }
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "subject": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "spriteUrl": {
+                        "type": "string"
+                    },
+                    "stats": {
+                        "$ref": "#/components/schemas/ZombieStatsDto"
+                    }
+                }
+            }
+        }
+    }
+}

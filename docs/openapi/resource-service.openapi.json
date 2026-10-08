@@ -1,0 +1,1960 @@
+{
+    "openapi": "3.0.0",
+    "paths": {
+        "/": {
+            "get": {
+                "operationId": "HealthController_getHealth",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "summary": "Health check",
+                "tags": [
+                    "health"
+                ],
+                "security": []
+            }
+        },
+        "/resources/balances": {
+            "post": {
+                "operationId": "BalanceController_create",
+                "parameters": [],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateBalanceDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BalanceResponseDto"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED: missing or invalid credentials",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "internal-key": []
+                    }
+                ],
+                "summary": "Create a balance row",
+                "tags": [
+                    "admin: balances"
+                ]
+            },
+            "get": {
+                "operationId": "BalanceController_list",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/BalanceResponseDto"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED: missing or invalid credentials",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "internal-key": []
+                    }
+                ],
+                "summary": "List all balance rows",
+                "tags": [
+                    "admin: balances"
+                ]
+            }
+        },
+        "/resources/players/{id}/balances": {
+            "get": {
+                "operationId": "BalanceController_listForPlayer",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "number"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/BalanceResponseDto"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED: missing or invalid credentials",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "internal-key": []
+                    }
+                ],
+                "summary": "List a player's balance rows",
+                "tags": [
+                    "admin: balances"
+                ]
+            }
+        },
+        "/resources/balances/{id}": {
+            "get": {
+                "operationId": "BalanceController_findOne",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BalanceResponseDto"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED: missing or invalid credentials",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "internal-key": []
+                    }
+                ],
+                "summary": "Get a balance row",
+                "tags": [
+                    "admin: balances"
+                ]
+            },
+            "patch": {
+                "operationId": "BalanceController_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateBalanceDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BalanceResponseDto"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED: missing or invalid credentials",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "internal-key": []
+                    }
+                ],
+                "summary": "Set a balance amount",
+                "tags": [
+                    "admin: balances"
+                ]
+            },
+            "delete": {
+                "operationId": "BalanceController_remove",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": ""
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED: missing or invalid credentials",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "internal-key": []
+                    }
+                ],
+                "summary": "Delete a balance row",
+                "tags": [
+                    "admin: balances"
+                ]
+            }
+        },
+        "/resources/ledger": {
+            "post": {
+                "operationId": "LedgerController_create",
+                "parameters": [],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateLedgerEntryDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/LedgerEntryAdminResponseDto"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED: missing or invalid credentials",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "internal-key": []
+                    }
+                ],
+                "summary": "Create a ledger entry",
+                "tags": [
+                    "admin: ledger"
+                ]
+            },
+            "get": {
+                "operationId": "LedgerController_list",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/LedgerEntryAdminResponseDto"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED: missing or invalid credentials",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "internal-key": []
+                    }
+                ],
+                "summary": "List all ledger entries",
+                "tags": [
+                    "admin: ledger"
+                ]
+            }
+        },
+        "/resources/ledger/{id}": {
+            "get": {
+                "operationId": "LedgerController_findOne",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/LedgerEntryAdminResponseDto"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED: missing or invalid credentials",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "internal-key": []
+                    }
+                ],
+                "summary": "Get a ledger entry",
+                "tags": [
+                    "admin: ledger"
+                ]
+            },
+            "patch": {
+                "operationId": "LedgerController_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateLedgerEntryDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/LedgerEntryAdminResponseDto"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED: missing or invalid credentials",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "internal-key": []
+                    }
+                ],
+                "summary": "Update a ledger entry",
+                "tags": [
+                    "admin: ledger"
+                ]
+            },
+            "delete": {
+                "operationId": "LedgerController_remove",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": ""
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED: missing or invalid credentials",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "internal-key": []
+                    }
+                ],
+                "summary": "Delete a ledger entry",
+                "tags": [
+                    "admin: ledger"
+                ]
+            }
+        },
+        "/resources/reservations": {
+            "get": {
+                "operationId": "ReservationController_list",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/ReservationResponseDto"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED: missing or invalid credentials",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "internal-key": []
+                    }
+                ],
+                "summary": "List all reservations",
+                "tags": [
+                    "admin: reservations"
+                ]
+            }
+        },
+        "/resources/players/{id}/reservations": {
+            "get": {
+                "operationId": "ReservationController_listForPlayer",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "number"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/ReservationResponseDto"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED: missing or invalid credentials",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "internal-key": []
+                    }
+                ],
+                "summary": "List a player's reservations",
+                "tags": [
+                    "admin: reservations"
+                ]
+            },
+            "post": {
+                "description": "Atomically checks every requested resource against the free balance and holds the amounts for 60 s. Either all resources are reserved or none. Caller: Base, Crafting.",
+                "operationId": "EconomyController_reserve",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "number"
+                        }
+                    },
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "description": "UUID; a repeated key within 24 h returns the original response without a second write",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ReserveResourcesDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReservationCreatedResponseDto"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED: missing or invalid credentials",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "PLAYER_NOT_FOUND",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "INSUFFICIENT_RESOURCES: at least one resource is short",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "internal-key": []
+                    }
+                ],
+                "summary": "Reserve resources for a spend",
+                "tags": [
+                    "economy"
+                ]
+            }
+        },
+        "/resources/reservations/{id}": {
+            "get": {
+                "operationId": "ReservationController_findOne",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReservationResponseDto"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED: missing or invalid credentials",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "internal-key": []
+                    }
+                ],
+                "summary": "Get a reservation",
+                "tags": [
+                    "admin: reservations"
+                ]
+            },
+            "patch": {
+                "operationId": "ReservationController_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateReservationDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReservationResponseDto"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED: missing or invalid credentials",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "internal-key": []
+                    }
+                ],
+                "summary": "Update a reservation (bypasses the economy rules)",
+                "tags": [
+                    "admin: reservations"
+                ]
+            },
+            "delete": {
+                "description": "Returns held amounts to the free balance. Releasing an already released or expired reservation is a no-op.",
+                "operationId": "EconomyController_release",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Released (or already released/expired)"
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED: missing or invalid credentials",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "RESERVATION_NOT_FOUND",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "ALREADY_COMMITTED",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "internal-key": []
+                    }
+                ],
+                "summary": "Release a reservation",
+                "tags": [
+                    "economy"
+                ]
+            }
+        },
+        "/resources/players/{id}": {
+            "get": {
+                "description": "Balances exclude amounts held by open reservations.",
+                "operationId": "EconomyController_balances",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "number"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PlayerBalancesResponseDto"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED: missing or invalid credentials",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN: a player cookie for another player's id",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "PLAYER_NOT_FOUND: no balances for this player",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "internal-key": []
+                    },
+                    {
+                        "player-cookie": []
+                    }
+                ],
+                "summary": "Current balances",
+                "tags": [
+                    "economy"
+                ]
+            }
+        },
+        "/resources/players/{id}/ledger": {
+            "get": {
+                "description": "Newest first. `nodeId` records where a resource was gathered.",
+                "operationId": "EconomyController_ledger",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "number"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "required": false,
+                        "in": "query",
+                        "description": "Default 50, max 200",
+                        "schema": {
+                            "type": "number"
+                        }
+                    },
+                    {
+                        "name": "before",
+                        "required": false,
+                        "in": "query",
+                        "description": "Cursor (ISO datetime)",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/LedgerEntryResponseDto"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED: missing or invalid credentials",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN: a player cookie for another player's id",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "player-cookie": []
+                    }
+                ],
+                "summary": "Change history",
+                "tags": [
+                    "economy"
+                ]
+            }
+        },
+        "/resources/reservations/{id}/commit": {
+            "post": {
+                "description": "Deducts the reserved amounts permanently and writes `spent` ledger entries. Committing twice returns the same result.",
+                "operationId": "EconomyController_commit",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PlayerBalancesResponseDto"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED: missing or invalid credentials",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "RESERVATION_NOT_FOUND",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "RESERVATION_RELEASED: already released through DELETE",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    },
+                    "410": {
+                        "description": "RESERVATION_EXPIRED: auto-released after 60 s",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "internal-key": []
+                    }
+                ],
+                "summary": "Finalize a spend",
+                "tags": [
+                    "economy"
+                ]
+            }
+        },
+        "/resources/players/{id}/steal": {
+            "post": {
+                "description": "Takes min(requested, free balance) per resource and never fails for insufficient balance. Writes `stolen` ledger entries. Caller: Game.",
+                "operationId": "EconomyController_steal",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "number"
+                        }
+                    },
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "description": "UUID; a repeated key within 24 h returns the original response without a second write",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StealResourcesDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/StealResponseDto"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED: missing or invalid credentials",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "PLAYER_NOT_FOUND",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "internal-key": []
+                    }
+                ],
+                "summary": "Tourist zombie theft",
+                "tags": [
+                    "economy"
+                ]
+            }
+        },
+        "/resources/internal/events": {
+            "post": {
+                "description": "Stand-in for the Player/Game `/events` WebSocket streams: runs the same handler, deduplicated on `eventId`.",
+                "operationId": "InternalEventsController_deliver",
+                "parameters": [],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/EventEnvelopeDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "202": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DispatchResultDto"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "VALIDATION_ERROR: malformed envelope or payload",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED: missing or invalid credentials",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "internal-key": []
+                    }
+                ],
+                "summary": "Deliver an event over HTTP",
+                "tags": [
+                    "events"
+                ]
+            },
+            "get": {
+                "description": "The outbox that `ws://<host>:8086/events` subscribers are replayed from (`resource.gathered`).",
+                "operationId": "InternalEventsController_published",
+                "parameters": [
+                    {
+                        "name": "since",
+                        "required": false,
+                        "in": "query",
+                        "schema": {
+                            "type": "number"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/PublishedEventDto"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED: missing or invalid credentials",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "internal-key": []
+                    }
+                ],
+                "summary": "Events this service produced",
+                "tags": [
+                    "events"
+                ]
+            }
+        }
+    },
+    "info": {
+        "title": "Resource Service",
+        "description": "Kahoot With Undead resource economy: per-player balances, a gather/spend ledger and two-phase reservations. Events: `resource.gathered` is served on the `/events` WebSocket (not shown here).",
+        "version": "1.2.0",
+        "contact": {}
+    },
+    "tags": [],
+    "servers": [
+        {
+            "url": "/",
+            "description": "This instance"
+        }
+    ],
+    "components": {
+        "securitySchemes": {
+            "internal-key": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-Internal-Key",
+                "description": "Shared secret for service-to-service calls"
+            },
+            "player-cookie": {
+                "type": "apiKey",
+                "in": "cookie",
+                "name": "access_token",
+                "description": "Player session JWT (signature not verified while Player JWKS is mocked)"
+            }
+        },
+        "schemas": {
+            "ErrorBodyDto": {
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "example": "INSUFFICIENT_RESOURCES"
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "Need 10 wood, have 4"
+                    }
+                },
+                "required": [
+                    "code",
+                    "message"
+                ]
+            },
+            "ErrorEnvelopeDto": {
+                "type": "object",
+                "properties": {
+                    "error": {
+                        "$ref": "#/components/schemas/ErrorBodyDto"
+                    }
+                },
+                "required": [
+                    "error"
+                ]
+            },
+            "CreateBalanceDto": {
+                "type": "object",
+                "properties": {
+                    "playerId": {
+                        "type": "number"
+                    },
+                    "resourceType": {
+                        "type": "string"
+                    },
+                    "amount": {
+                        "type": "number",
+                        "minimum": 0
+                    }
+                },
+                "required": [
+                    "playerId",
+                    "resourceType",
+                    "amount"
+                ]
+            },
+            "BalanceResponseDto": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "playerId": {
+                        "type": "number"
+                    },
+                    "resourceType": {
+                        "type": "string",
+                        "example": "wood"
+                    },
+                    "amount": {
+                        "type": "number"
+                    },
+                    "createdAt": {
+                        "format": "date-time",
+                        "type": "string"
+                    },
+                    "updatedAt": {
+                        "format": "date-time",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "playerId",
+                    "resourceType",
+                    "amount",
+                    "createdAt",
+                    "updatedAt"
+                ]
+            },
+            "UpdateBalanceDto": {
+                "type": "object",
+                "properties": {
+                    "amount": {
+                        "type": "number",
+                        "minimum": 0
+                    }
+                },
+                "required": [
+                    "amount"
+                ]
+            },
+            "CreateLedgerEntryDto": {
+                "type": "object",
+                "properties": {
+                    "playerId": {
+                        "type": "number"
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "gathered",
+                            "spent",
+                            "stolen"
+                        ]
+                    },
+                    "resourceType": {
+                        "type": "string"
+                    },
+                    "amount": {
+                        "type": "number"
+                    },
+                    "nodeId": {
+                        "type": "number",
+                        "nullable": true
+                    },
+                    "actionId": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uuid"
+                    },
+                    "reservationId": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uuid"
+                    },
+                    "encounterId": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "playerId",
+                    "kind",
+                    "resourceType",
+                    "amount"
+                ]
+            },
+            "LedgerEntryAdminResponseDto": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "playerId": {
+                        "type": "number"
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "gathered",
+                            "spent",
+                            "stolen"
+                        ]
+                    },
+                    "resourceType": {
+                        "type": "string"
+                    },
+                    "amount": {
+                        "type": "number"
+                    },
+                    "nodeId": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "actionId": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "reservationId": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "encounterId": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "createdAt": {
+                        "format": "date-time",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "playerId",
+                    "kind",
+                    "resourceType",
+                    "amount",
+                    "nodeId",
+                    "actionId",
+                    "reservationId",
+                    "encounterId",
+                    "createdAt"
+                ]
+            },
+            "UpdateLedgerEntryDto": {
+                "type": "object",
+                "properties": {
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "gathered",
+                            "spent",
+                            "stolen"
+                        ]
+                    },
+                    "resourceType": {
+                        "type": "string"
+                    },
+                    "amount": {
+                        "type": "number"
+                    },
+                    "nodeId": {
+                        "type": "number",
+                        "nullable": true
+                    },
+                    "actionId": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uuid"
+                    },
+                    "reservationId": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uuid"
+                    }
+                }
+            },
+            "ReservationResponseDto": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "playerId": {
+                        "type": "number"
+                    },
+                    "resources": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "integer"
+                        },
+                        "example": {
+                            "wood": 10,
+                            "metal": 5
+                        }
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "open",
+                            "committed",
+                            "released",
+                            "expired"
+                        ]
+                    },
+                    "expiresAt": {
+                        "format": "date-time",
+                        "type": "string"
+                    },
+                    "createdAt": {
+                        "format": "date-time",
+                        "type": "string"
+                    },
+                    "updatedAt": {
+                        "format": "date-time",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "playerId",
+                    "resources",
+                    "status",
+                    "expiresAt",
+                    "createdAt",
+                    "updatedAt"
+                ]
+            },
+            "UpdateReservationDto": {
+                "type": "object",
+                "properties": {
+                    "resources": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "integer"
+                        }
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "open",
+                            "committed",
+                            "released",
+                            "expired"
+                        ]
+                    }
+                }
+            },
+            "PlayerBalancesResponseDto": {
+                "type": "object",
+                "properties": {
+                    "playerId": {
+                        "type": "number",
+                        "example": 42
+                    },
+                    "balances": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "integer"
+                        },
+                        "description": "Free balance per resource (amounts held by open reservations excluded)",
+                        "example": {
+                            "wood": 12,
+                            "metal": 4,
+                            "paper": 7,
+                            "food": 20,
+                            "textbooks": 2,
+                            "chemicals": 0,
+                            "electronics": 0
+                        }
+                    }
+                },
+                "required": [
+                    "playerId",
+                    "balances"
+                ]
+            },
+            "LedgerEntryResponseDto": {
+                "type": "object",
+                "properties": {
+                    "entryId": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "gathered",
+                            "spent",
+                            "stolen"
+                        ]
+                    },
+                    "resourceType": {
+                        "type": "string",
+                        "example": "food"
+                    },
+                    "amount": {
+                        "type": "number",
+                        "example": 12,
+                        "description": "Positive when gained, negative when spent/stolen"
+                    },
+                    "nodeId": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "Where it was gathered"
+                    },
+                    "actionId": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uuid"
+                    },
+                    "reservationId": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uuid"
+                    },
+                    "encounterId": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "at": {
+                        "format": "date-time",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "entryId",
+                    "kind",
+                    "resourceType",
+                    "amount",
+                    "nodeId",
+                    "actionId",
+                    "reservationId",
+                    "encounterId",
+                    "at"
+                ]
+            },
+            "ReserveResourcesDto": {
+                "type": "object",
+                "properties": {
+                    "resources": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "integer",
+                            "minimum": 1
+                        },
+                        "example": {
+                            "wood": 10,
+                            "metal": 5
+                        }
+                    }
+                },
+                "required": [
+                    "resources"
+                ]
+            },
+            "ReservationCreatedResponseDto": {
+                "type": "object",
+                "properties": {
+                    "reservationId": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "expiresAt": {
+                        "format": "date-time",
+                        "type": "string",
+                        "description": "60 s after creation; auto-released afterwards"
+                    }
+                },
+                "required": [
+                    "reservationId",
+                    "expiresAt"
+                ]
+            },
+            "StealResourcesDto": {
+                "type": "object",
+                "properties": {
+                    "resources": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "integer",
+                            "minimum": 1
+                        },
+                        "example": {
+                            "food": 5,
+                            "wood": 3
+                        }
+                    },
+                    "encounterId": {
+                        "type": "string",
+                        "description": "The Game encounter that caused the theft.",
+                        "example": "a5c2\u00e2\u20ac\u00a6"
+                    }
+                },
+                "required": [
+                    "resources",
+                    "encounterId"
+                ]
+            },
+            "StealResponseDto": {
+                "type": "object",
+                "properties": {
+                    "taken": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "integer"
+                        },
+                        "description": "Amount actually taken per requested resource",
+                        "example": {
+                            "food": 4,
+                            "wood": 3
+                        }
+                    }
+                },
+                "required": [
+                    "taken"
+                ]
+            },
+            "EventEnvelopeDto": {
+                "type": "object",
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "player.registered",
+                            "game.action_completed"
+                        ]
+                    },
+                    "payload": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": "player.registered: { playerId, username } \u00c2\u00b7 game.action_completed: { actionId, sessionId, playerId, type, roomId, nodeId, completedAt }",
+                        "example": {
+                            "playerId": 42,
+                            "username": "razvan"
+                        }
+                    },
+                    "eventId": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "version": {
+                        "type": "number"
+                    },
+                    "occurredAt": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "type",
+                    "payload",
+                    "eventId",
+                    "version",
+                    "occurredAt"
+                ]
+            },
+            "DispatchResultDto": {
+                "type": "object",
+                "properties": {
+                    "eventId": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "handled",
+                            "duplicate",
+                            "ignored"
+                        ]
+                    },
+                    "result": {
+                        "type": "object",
+                        "description": "Handler result when handled"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "Why the event was ignored"
+                    }
+                },
+                "required": [
+                    "eventId",
+                    "status"
+                ]
+            },
+            "EventEnvelopeResponseDto": {
+                "type": "object",
+                "properties": {
+                    "eventId": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "type": {
+                        "type": "string",
+                        "example": "resource.gathered"
+                    },
+                    "version": {
+                        "type": "number",
+                        "example": 1
+                    },
+                    "occurredAt": {
+                        "type": "string"
+                    },
+                    "payload": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "example": {
+                            "actionId": "e3f1\u00e2\u20ac\u00a6",
+                            "playerId": 42,
+                            "resourceType": "food",
+                            "amount": 12,
+                            "nodeId": 2
+                        }
+                    }
+                },
+                "required": [
+                    "eventId",
+                    "type",
+                    "version",
+                    "occurredAt",
+                    "payload"
+                ]
+            },
+            "PublishedEventDto": {
+                "type": "object",
+                "properties": {
+                    "seq": {
+                        "type": "number",
+                        "example": 1042
+                    },
+                    "event": {
+                        "$ref": "#/components/schemas/EventEnvelopeResponseDto"
+                    }
+                },
+                "required": [
+                    "seq",
+                    "event"
+                ]
+            }
+        }
+    }
+}
