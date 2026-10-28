@@ -28,3 +28,6 @@
 [submodule "services/client"]
 	path = services/client
 	url = git@github.com:M1XaM/kahoots-client.git
+[submodule "services/service-discovery"]
+	path = services/service-discovery
+	url = https://github.com/inercaso/KahootWithUndeadDiscovery.git
