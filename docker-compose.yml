@@ -322,7 +322,7 @@ services:
         condition: service_healthy
 
   gateway:
-    image: ${GATEWAY_DOCKERHUB_USERNAME:-timurcravtov}/gateway:${GATEWAY_SERVICE_TAG:-2}
+    image: ${GATEWAY_DOCKERHUB_USERNAME:-timurcravtov}/gateway:${GATEWAY_SERVICE_TAG:-3}
     restart: unless-stopped
     environment:
       PLAYER_SERVICE_URL: http://player:${PLAYER_PORT:-8081}
