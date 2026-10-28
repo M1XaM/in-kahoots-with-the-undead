@@ -147,7 +147,9 @@ at one replica: its live sessions are kept in memory.
   the token in `TELEGRAM_BOT_TOKEN` and the chat ids, comma-separated, in `TELEGRAM_CHATS_IDS`
   in `.env` (never commit them). Without a token alerts only go to the log.
 - **Try it:** `curl -H 'X-Internal-Key: changeme' localhost:8089/services` lists every instance with
-  its health and load; `GET /status` and `GET /health` are public.
+  its health and load; `GET /status` and `GET /health` are public. Swagger UI at
+  http://localhost:8089/docs; API reference:
+  [`docs/openapi/service-discovery.openapi.json`](docs/openapi/service-discovery.openapi.json).
 
 ### Client
 

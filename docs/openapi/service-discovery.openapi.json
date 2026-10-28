@@ -1,0 +1,462 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "Kahoot Service Discovery",
+        "version": "3.0.0"
+    },
+    "paths": {
+        "/health": {
+            "get": {
+                "tags": [
+                    "health"
+                ],
+                "summary": "Health",
+                "operationId": "health_health_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": {
+                                        "type": "string"
+                                    },
+                                    "type": "object",
+                                    "title": "Response Health Health Get"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/status": {
+            "get": {
+                "tags": [
+                    "health"
+                ],
+                "summary": "Status",
+                "operationId": "status_status_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": true,
+                                    "type": "object",
+                                    "title": "Response Status Status Get"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/services/register": {
+            "post": {
+                "tags": [
+                    "registry"
+                ],
+                "summary": "Register",
+                "description": "Called by every instance on startup; registering again refreshes it (200).",
+                "operationId": "register_services_register_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Registration"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": true,
+                                    "type": "object",
+                                    "title": "Response Register Services Register Post"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/services/{service}/instances/{instance_id}/heartbeat": {
+            "put": {
+                "tags": [
+                    "registry"
+                ],
+                "summary": "Heartbeat",
+                "description": "A 404 tells the instance to register again (for example after discovery restarted).",
+                "operationId": "heartbeat_services__service__instances__instance_id__heartbeat_put",
+                "parameters": [
+                    {
+                        "name": "service",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Service"
+                        }
+                    },
+                    {
+                        "name": "instance_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Instance Id"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Successful Response"
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/services/{service}/instances/{instance_id}": {
+            "delete": {
+                "tags": [
+                    "registry"
+                ],
+                "summary": "Deregister",
+                "operationId": "deregister_services__service__instances__instance_id__delete",
+                "parameters": [
+                    {
+                        "name": "service",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Service"
+                        }
+                    },
+                    {
+                        "name": "instance_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Instance Id"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Successful Response"
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/services": {
+            "get": {
+                "tags": [
+                    "registry"
+                ],
+                "summary": "List Services",
+                "operationId": "list_services_services_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": {
+                                        "items": {
+                                            "additionalProperties": true,
+                                            "type": "object"
+                                        },
+                                        "type": "array"
+                                    },
+                                    "type": "object",
+                                    "title": "Response List Services Services Get"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/services/{service}/instances": {
+            "get": {
+                "tags": [
+                    "registry"
+                ],
+                "summary": "List Instances",
+                "description": "`?healthy=true` is what the gateway balances across; an unknown service has none.",
+                "operationId": "list_instances_services__service__instances_get",
+                "parameters": [
+                    {
+                        "name": "service",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Service"
+                        }
+                    },
+                    {
+                        "name": "healthy",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": false,
+                            "title": "Healthy"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "additionalProperties": true
+                                    },
+                                    "title": "Response List Instances Services  Service  Instances Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/services/{service}/instances/{instance_id}/failures": {
+            "post": {
+                "tags": [
+                    "registry"
+                ],
+                "summary": "Report Failure",
+                "description": "A caller whose circuit breaker reached its threshold takes the instance out of rotation.\n\nIt comes back after its next passed health check or registration.",
+                "operationId": "report_failure_services__service__instances__instance_id__failures_post",
+                "parameters": [
+                    {
+                        "name": "service",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Service"
+                        }
+                    },
+                    {
+                        "name": "instance_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Instance Id"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/FailureReport"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "202": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true,
+                                    "title": "Response Report Failure Services  Service  Instances  Instance Id  Failures Post"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "FailureReport": {
+                "properties": {
+                    "reporter": {
+                        "type": "string",
+                        "maxLength": 100,
+                        "minLength": 1,
+                        "title": "Reporter",
+                        "examples": [
+                            "gateway"
+                        ]
+                    },
+                    "reason": {
+                        "type": "string",
+                        "maxLength": 500,
+                        "minLength": 1,
+                        "title": "Reason",
+                        "examples": [
+                            "circuit breaker threshold reached"
+                        ]
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "reporter",
+                    "reason"
+                ],
+                "title": "FailureReport"
+            },
+            "HTTPValidationError": {
+                "properties": {
+                    "detail": {
+                        "items": {
+                            "$ref": "#/components/schemas/ValidationError"
+                        },
+                        "type": "array",
+                        "title": "Detail"
+                    }
+                },
+                "type": "object",
+                "title": "HTTPValidationError"
+            },
+            "Registration": {
+                "properties": {
+                    "service": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]{1,40}$",
+                        "title": "Service",
+                        "examples": [
+                            "exam"
+                        ]
+                    },
+                    "instance_id": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+                        "title": "Instance Id",
+                        "examples": [
+                            "exam-3f2a"
+                        ]
+                    },
+                    "url": {
+                        "type": "string",
+                        "minLength": 1,
+                        "format": "uri",
+                        "title": "Url",
+                        "examples": [
+                            "http://exam-3f2a:8083"
+                        ]
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "service",
+                    "instance_id",
+                    "url"
+                ],
+                "title": "Registration"
+            },
+            "ValidationError": {
+                "properties": {
+                    "loc": {
+                        "items": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        },
+                        "type": "array",
+                        "title": "Location"
+                    },
+                    "msg": {
+                        "type": "string",
+                        "title": "Message"
+                    },
+                    "type": {
+                        "type": "string",
+                        "title": "Error Type"
+                    },
+                    "input": {
+                        "title": "Input"
+                    },
+                    "ctx": {
+                        "type": "object",
+                        "title": "Context"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "loc",
+                    "msg",
+                    "type"
+                ],
+                "title": "ValidationError"
+            }
+        }
+    }
+}
