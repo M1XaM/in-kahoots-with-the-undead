@@ -7,7 +7,8 @@
 
 | Service | Port | Path prefix |
 |---|---|---|
-| **Gateway** | 8080 | all of the below, plus `/ws/{service}` and `/health` |
+| **Gateway** | 8080 | all of the below, plus `/ws/{service}`, `/health` and `/status` |
+| Service Discovery | 8089 | `/services` (see [Scaling](#scaling)) |
 | Player | 8081 | `/auth`, `/players`, `/trades` |
 | Game | 8082 | `/game` |
 | Exam | 8083 | `/exams` |
@@ -51,13 +52,16 @@ prefix above. Services call each other through the gateway too, sending `X-Inter
 - **Internal endpoints** (`/<prefix>/internal/...`) answer `404` at the gateway without a valid
   `X-Internal-Key`.
 - **Limits:** `504 GATEWAY_TIMEOUT` past the task timeout, `429 TOO_MANY_REQUESTS` (with
-  `Retry-After`) over the concurrent task limit, `503 SERVICE_UNAVAILABLE` if the service is down.
+  `Retry-After`) over the concurrent task limit, `503 SERVICE_UNAVAILABLE` if the service is down,
+  has no healthy instance, or its circuit breaker is open.
+- **Instances:** requests go round-robin to the healthy instances Service Discovery lists, and
+  every response names the one that answered in `X-Upstream-Instance` (see [Scaling](#scaling)).
   Services apply their own limits and answer `408 REQUEST_TIMEOUT` / `429 TOO_MANY_REQUESTS`.
 - **WebSockets** are negotiated, not relayed: `GET /ws/game` returns
   `{ "url": "ws://localhost:8082/game", "protocol": "socket.io", "path": "/socket.io" }` for the
   client; with `X-Internal-Key`, `GET /ws/{player|game|exam|world|resource}` returns
-  `{ "url": "ws://<service>/events", "protocol": "websocket" }`. The socket is then opened directly
-  on the service.
+  `{ "url": "ws://<instance>/events", "instance": "<instance_id>", "protocol": "websocket" }` for
+  one of the producer's instances. The socket is then opened directly on that instance.
 
 ## Authentication
 
@@ -183,6 +187,147 @@ and persisted its own effect; it reconnects from its last acked `seq`.
   compares `occurredAt`.
 - **Liveness.** Both sides send WebSocket pings every 30 s and drop the connection after two
   missed pongs. A consumer reconnects with exponential backoff, 1 s doubling to 30 s.
+
+---
+
+## Scaling
+
+Every service runs as one or more instances that register with Service Discovery; the gateway
+balances requests across them. These rules apply to every service, whatever its language.
+
+### Instances
+
+- Every running instance has a `service` name (lowercase, as in the port table: `player`,
+  `base`, …) and a unique `instance_id`, by default `<service>-<hostname>` (under Docker the
+  hostname is the container id, e.g. `base-3f2a9c41d0e2`). Set by `SERVICE_NAME` / `INSTANCE_ID`.
+- **Instance-agnostic.** All state lives in the service's database; nothing another replica needs
+  is kept in memory. Game is the exception and runs as a single replica (live sessions).
+  - Producers serve the whole `/events` stream from their outbox, so any instance can serve it.
+  - Consumers let one replica consume each stream at a time, and mark an event processed in the
+    same transaction as its effect.
+  - An `Idempotency-Key` is claimed in the database before the request runs. A duplicate that
+    arrives while the first is still running (on any instance) gets
+    `409 IDEMPOTENCY_KEY_IN_USE` with `Retry-After: 1`.
+- **Limits are per instance:** the task timeout and the concurrent task limit apply to each
+  replica on its own.
+
+### Service Discovery
+
+`http://discovery:8089` inside compose (`DISCOVERY_URL`), http://localhost:8089 from the host.
+Every route except `/health` and `/status` needs `X-Internal-Key`.
+
+| Method | Path | Body / answer |
+|---|---|---|
+| `POST` | `/services/register` | `{ "service", "instance_id", "url" }` → `201` new, `200` refreshed |
+| `PUT` | `/services/{service}/instances/{id}/heartbeat` | `204`; `404` = not registered, register again |
+| `DELETE` | `/services/{service}/instances/{id}` | `204` |
+| `GET` | `/services` | every service with its instances (`healthy`, `load`, `consecutive_failures`, …) |
+| `GET` | `/services/{service}/instances?healthy=true` | the instances to send requests to |
+| `POST` | `/services/{service}/instances/{id}/failures` | `{ "reporter", "reason" }` → `202`: a caller's circuit breaker tripped |
+| `GET` | `/health`, `/status` | public |
+
+**What every instance does:**
+1. **On startup:** register with its own address, `http://<container IP>:<port>`. Not the compose
+   service name, which resolves to every replica. Retry with a backoff of 1 s doubling to 30 s
+   until Discovery answers.
+2. **While running:** send a heartbeat about every 10 s (Discovery drops an instance after 30 s
+   without any sign of life). A `404` means Discovery restarted or expired it: register again.
+3. **On `SIGTERM`:** deregister first, then stop accepting requests and finish the ones in flight.
+
+**Health checks and alerts:** Discovery calls every instance's `GET /status` every 5 s (in
+compose).
+- A timeout, an error or a non-`200` answer is a failed check. 3 in a row take the instance out
+  of rotation; a passed check brings it back.
+- Load = `active_tasks / max_concurrent_tasks`. At 0.7 Discovery logs a warning. At 0.9 it raises
+  a critical alert.
+- Critical load, an instance that stops answering, expires or is removed by a breaker, and its
+  recovery are logged and also sent to Telegram (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHATS_IDS`), at
+  most once per 5 minutes per alert and instance.
+
+### `GET /status`
+
+Public, outside the task limits, answered by every service in the same shape:
+
+```json
+{
+  "service": "base", "instance": "base-3f2a9c41d0e2", "status": "ok", "uptime_s": 1234,
+  "load": { "active_tasks": 3, "max_concurrent_tasks": 100 }
+}
+```
+
+`200` when the instance can serve requests; anything else (for example `503` with
+`"status": "unavailable"` when its database is down) counts as a failed health check.
+
+### Routing and load balancing
+
+- The gateway fetches `GET /services` every 2 s and routes each service only to its healthy
+  instances, **round-robin** in the order Discovery lists them. It never asks Discovery per
+  request.
+- A listed service without a healthy instance answers `503 SERVICE_UNAVAILABLE`. A service
+  Discovery never listed (it does not register yet) is reached at its static URL. When Discovery
+  is down, the last lists are kept.
+- Every response carries `X-Upstream-Instance: <instance_id>`, the instance that answered, also on
+  a failed call.
+- `GET /ws/{service}` returns the `/events` URL of one instance, chosen the same way, with its
+  `instance` id.
+
+### Circuit breaker
+
+Every service that calls another one (the gateway included) guards its calls with a circuit
+breaker per target service.
+
+- **Failure:** a timeout, a connection error or a `5xx` answer. A `4xx` is not a failure: the
+  target worked and refused.
+- **Trip:** 3 failures within the caller's task timeout × 3.5, counted over all endpoints of the
+  target: 35 s for the services (10 s timeout), 105 s for the gateway (30 s). Logged as
+  `circuit breaker tripped` (`ERROR`, with `target`, `target_instance`, `failures`, `window_s`).
+- **After a trip:**
+  - **The failing instance is known** (from `X-Upstream-Instance`, or because the caller chose
+    it): report it with `POST /services/{service}/instances/{id}/failures`. Discovery takes it
+    out of rotation and alerts the developers; the gateway also stops routing to it at once for
+    one window.
+  - **Otherwise:** the breaker opens. Calls to the target fail at once with `503` for one window,
+    then a single trial call decides whether it closes or stays open for another window.
+- Calls that finish or undo a spend (Resource commit and release) are still sent while the breaker
+  is open. Refusing them would leave a spend half done.
+
+### Logs
+
+Every service logs the same way: one JSON object per line on stdout, at `LOG_LEVEL`
+(`debug`, `info`, `warn`, `error`; default `info`).
+
+| Key | Content |
+|---|---|
+| `time` | UTC with milliseconds: `2026-10-27T15:04:05.123Z` |
+| `level` | `DEBUG`, `INFO`, `WARN` or `ERROR` |
+| `service` / `instance` | the instance's `service` name and `instance_id` |
+| `msg` | short fixed text with no values in it (`"request finished"`, not `"request 17 finished"`) |
+| `request_id` | on every line logged while handling a request or an event |
+
+- **Request id:** take `X-Request-Id` from the incoming request or mint one, return it in the
+  response and send it on every call to another service.
+- **Message names:**
+  - `request finished`, once per request: `method`, `path`, `status`, `duration_ms`, `caller`,
+    `player_id`. `INFO`, `WARN` for 4xx, `ERROR` for 5xx, `DEBUG` for `/health` and `/status`.
+  - `upstream call finished` / `upstream call failed`: `target`, `target_instance`, `status`,
+    `duration_ms`, `error`.
+  - `event consumed`: `producer`, `event_type`, `event_id`, `seq`, `outcome`.
+  - `event published`, `concurrency limit reached`, `task timeout exceeded`, `auth rejected`
+    (`reason`), `circuit breaker tripped`.
+  - Startup and shutdown: `service starting` (non-secret configuration), `service ready`,
+    `service stopped`.
+  - Discovery: `registered with discovery`, `discovery registration failed`.
+  - Business actions: `base created`, `item crafted`, `exam graded`, … with the ids involved.
+- **Rules:**
+  - Keys are `snake_case`; durations end in `_ms` / `_s`.
+  - Ids are strings (`"player_id":"17"`); statuses, durations, counts and load are numbers.
+  - `path` has no query string.
+  - Never log tokens, cookies, `X-Internal-Key`, passwords, secrets or request / response bodies.
+
+```json
+{"time":"2026-10-27T15:04:05.123Z","level":"INFO","service":"base","instance":"base-3f2a9c41d0e2","msg":"request finished","request_id":"9b1e0c3a4f5d4e6b","method":"POST","path":"/base/players/17/upgrades","status":201,"duration_ms":42,"caller":"player","player_id":"17"}
+{"time":"2026-10-27T15:04:09.000Z","level":"ERROR","service":"gateway","instance":"gateway-a1b2c3d4e5f6","msg":"circuit breaker tripped","target":"crafting","target_instance":"crafting-77de01aa9b3c","failures":3,"window_s":105}
+```
 
 ---
 
