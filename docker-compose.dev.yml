@@ -17,9 +17,11 @@ services:
   resource:
     ports:
       - "${RESOURCE_PORT:-8086}:${RESOURCE_PORT:-8086}"
+  # Base and Crafting run several replicas, which cannot share one host port: each replica gets a
+  # free one, shown by `docker compose port --index 2 base 8087`
   base:
     ports:
-      - "${BASE_PORT:-8087}:${BASE_PORT:-8087}"
+      - "${BASE_PORT:-8087}"
   crafting:
     ports:
-      - "${CRAFTING_PORT:-8088}:${CRAFTING_PORT:-8088}"
+      - "${CRAFTING_PORT:-8088}"
