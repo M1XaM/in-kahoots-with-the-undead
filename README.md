@@ -97,7 +97,7 @@ at one replica: its live sessions are kept in memory.
 - **Repository:** [`services/gateway`](https://github.com/TimurCravtov/KahootWithUndeadGateway),
   Python / FastAPI (the lab's "banned" language).
 - **Image:** [`timurcravtov/gateway`](https://hub.docker.com/r/timurcravtov/gateway), version set
-  by `GATEWAY_SERVICE_TAG` (currently `2`).
+  by `GATEWAY_SERVICE_TAG` (currently `3`).
 - **Routes** by the first path segment to the owning service (prefixes in the
   [Communication Contract](docs/communication.md#conventions)). Base, Crafting, Exam, World and
   Resource are configured to call other services through it, so all REST traffic, client and
@@ -111,8 +111,19 @@ at one replica: its live sessions are kept in memory.
   `GATEWAY_MAX_CONCURRENT_TASKS` in flight answer `429`. Zombie, Resource, Base and Crafting enforce
   the same limits themselves (`408` / `429`).
 - **WebSockets:** `GET /ws/game` returns Game's Socket.IO URL for the browser and
-  `GET /ws/{player|game|exam|world|resource}` (internal) a producer's `/events` URL. The gateway
-  never relays the connection.
+  `GET /ws/{player|game|exam|world|resource}` (internal) the `/events` URL of one of the
+  producer's instances. The gateway never relays the connection.
+- **Service Discovery:** with `DISCOVERY_URL` it fetches every service's instances every 2 s and
+  routes only to the healthy ones, **round-robin**, without asking Discovery per request. A service
+  Discovery has never listed (it does not register yet) is reached at its `*_SERVICE_URL`; a listed
+  service without a healthy instance answers `503`. When Discovery is down the last lists are kept.
+  Every response names the instance that answered in `X-Upstream-Instance`.
+- **Circuit breaker:** 3 failed calls (timeout, connection error or `5xx`) to one service within
+  105 s (`GATEWAY_TASK_TIMEOUT` × 3.5) trip it and log `circuit breaker tripped`. A failing instance
+  listed by Discovery leaves the rotation at once and is reported to Discovery; a service at its
+  static URL is answered `503` at once for 105 s, then one trial request decides.
+- **Status:** `GET /status` reports its load like every service, and the gateway registers itself
+  with Discovery, which checks it like any other instance.
 - **Try it:** http://localhost:8080/docs, health check `GET /health`.
 
 ### Service Discovery
