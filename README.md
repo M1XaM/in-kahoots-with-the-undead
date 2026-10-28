@@ -59,7 +59,6 @@ Requirements: Docker with Compose v2, and the service ports below free on your m
 
 ```
 cp .env.example .env   # adjust credentials/tags if needed
-git submodule update --init services/service-discovery   # until its image is on Docker Hub
 docker compose up
 ```
 
@@ -131,8 +130,7 @@ at one replica: its live sessions are kept in memory.
 - **Repository:** [`services/service-discovery`](https://github.com/inercaso/KahootWithUndeadDiscovery),
   Python / FastAPI (the lab's "banned" language).
 - **Image:** [`inercaso/service-discovery`](https://hub.docker.com/r/inercaso/service-discovery),
-  version set by `DISCOVERY_SERVICE_TAG` (currently `3`). Until that image is published, compose
-  builds it from the submodule.
+  version set by `DISCOVERY_SERVICE_TAG` (currently `3`).
 - **Registry:** every instance registers itself on startup (`POST /services/register` with its own
   container address), sends a heartbeat every few seconds and deregisters on shutdown; every service
   gets `DISCOVERY_URL: http://discovery:8089`. The gateway fetches `GET /services` every 2 s and
