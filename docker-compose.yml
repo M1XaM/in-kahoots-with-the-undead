@@ -42,6 +42,9 @@ services:
   player:
     image: ${DOCKERHUB_USERNAME:-timurcravtov}/player-service:${PLAYER_SERVICE_TAG:-3}
     restart: unless-stopped
+    # every replica shares player-db; change at runtime with `docker compose up -d --scale player=3`
+    deploy:
+      replicas: ${PLAYER_REPLICAS:-2}
     environment:
       PORT: ${PLAYER_PORT:-8081}
       DATABASE_URL: postgres://${PLAYER_POSTGRES_USER:-postgres}:${PLAYER_POSTGRES_PASSWORD:-qwerty}@player-db:5432/${PLAYER_POSTGRES_DB:-player}?sslmode=disable
@@ -76,6 +79,9 @@ services:
   game:
     image: ${DOCKERHUB_USERNAME:-timurcravtov}/game-service:${GAME_SERVICE_TAG:-3}
     restart: unless-stopped
+    # instance-agnostic: lobbies, presence and events live in game-db; `docker compose up -d --scale game=3`
+    deploy:
+      replicas: ${GAME_REPLICAS:-2}
     environment:
       PORT: ${GAME_PORT:-8082}
       DATABASE_URL: postgres://${GAME_POSTGRES_USER:-postgres}:${GAME_POSTGRES_PASSWORD:-qwerty}@game-db:5432/${GAME_POSTGRES_DB:-game}?sslmode=disable
@@ -88,9 +94,10 @@ services:
       GATEWAY_URL: http://gateway:8080
       # registers on startup, heartbeats, deregisters on shutdown
       DISCOVERY_URL: http://discovery:8089
-    # Socket.IO clients connect here directly (GET /ws/game); REST goes through the gateway
+    # Socket.IO clients connect here directly (GET /ws/game); REST goes through the gateway. Replicas
+    # cannot share one host port, so each takes the next free one from GAME_PORT up to GAME_PORT_LAST
     ports:
-      - "${GAME_PORT:-8082}:${GAME_PORT:-8082}"
+      - "${GAME_PORT:-8082}-${GAME_PORT_LAST:-8089}:${GAME_PORT:-8082}"
     depends_on:
       game-db:
         condition: service_healthy
@@ -190,6 +197,9 @@ services:
   exam:
     image: ${EXAM_DOCKERHUB_USERNAME:-inercaso}/exam-service:${EXAM_SERVICE_TAG:-3}
     restart: unless-stopped
+    # every replica shares exam-db; `docker compose up -d --scale exam=3`
+    deploy:
+      replicas: ${EXAM_REPLICAS:-2}
     environment:
       PORT: ${EXAM_PORT:-8083}
       DATABASE_URL: postgres://${EXAM_POSTGRES_USER:-postgres}:${EXAM_POSTGRES_PASSWORD:-qwerty}@exam-db:5432/${EXAM_POSTGRES_DB:-exam}?sslmode=disable
@@ -225,6 +235,9 @@ services:
   world:
     image: ${WORLD_DOCKERHUB_USERNAME:-inercaso}/world-service:${WORLD_SERVICE_TAG:-3}
     restart: unless-stopped
+    # every replica shares world-db; `docker compose up -d --scale world=3`
+    deploy:
+      replicas: ${WORLD_REPLICAS:-2}
     environment:
       PORT: ${WORLD_PORT:-8084}
       DATABASE_URL: postgres://${WORLD_POSTGRES_USER:-postgres}:${WORLD_POSTGRES_PASSWORD:-qwerty}@world-db:5432/${WORLD_POSTGRES_DB:-world}?sslmode=disable
@@ -260,6 +273,9 @@ services:
   zombie:
     image: ${ZOMBIE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-zombie-service:${ZOMBIE_SERVICE_TAG:-2}
     restart: unless-stopped
+    # every replica shares zombie-db; `docker compose up -d --scale zombie=3`
+    deploy:
+      replicas: ${ZOMBIE_REPLICAS:-2}
     environment:
       PORT: ${ZOMBIE_PORT:-8085}
       INTERNAL_API_KEY: ${INTERNAL_KEY:-changeme}
@@ -295,6 +311,9 @@ services:
   resource:
     image: ${RESOURCE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-resource-service:${RESOURCE_SERVICE_TAG:-2}
     restart: unless-stopped
+    # every replica shares resource-db; `docker compose up -d --scale resource=3`
+    deploy:
+      replicas: ${RESOURCE_REPLICAS:-2}
     environment:
       PORT: ${RESOURCE_PORT:-8086}
       INTERNAL_API_KEY: ${INTERNAL_KEY:-changeme}
