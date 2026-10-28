@@ -1,0 +1,17 @@
+name: Register Instance
+$kind: http-request
+method: POST
+url: "http://localhost:8089/services/register"
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+body:
+  type: json
+  content: |
+    {
+      "service": "demo",
+      "instance_id": "demo-1",
+      "url": "http://demo:9000"
+    }

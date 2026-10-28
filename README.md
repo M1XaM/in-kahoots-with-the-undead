@@ -16,6 +16,7 @@ wings of the university to explore, tying academic progress directly to survival
 [![base-service](https://img.shields.io/docker/v/mixam052/kahoots-base-service?sort=date&label=base-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/mixam052/kahoots-base-service)
 [![crafting-service](https://img.shields.io/docker/v/mixam052/kahoots-crafting-service?sort=date&label=crafting-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/mixam052/kahoots-crafting-service)
 
+[![service-discovery postman](https://img.shields.io/badge/service--discovery-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/service-discovery)
 [![player-service postman](https://img.shields.io/badge/player--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/player-service)
 [![game-service postman](https://img.shields.io/badge/game--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/game-service)
 [![exam-service postman](https://img.shields.io/badge/exam--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/exam-service)
@@ -147,7 +148,11 @@ at one replica: its live sessions are kept in memory.
   the token in `TELEGRAM_BOT_TOKEN` and the chat ids, comma-separated, in `TELEGRAM_CHATS_IDS`
   in `.env` (never commit them). Without a token alerts only go to the log.
 - **Try it:** `curl -H 'X-Internal-Key: changeme' localhost:8089/services` lists every instance with
-  its health and load; `GET /status` and `GET /health` are public. Swagger UI at
+  its health and load; `GET /status` and `GET /health` are public. The Postman collection in
+  [`docs/postman/service-discovery`](docs/postman/service-discovery) (also as a single importable
+  `service-discovery.postman_collection.json`) walks the registry (register, heartbeat, report a
+  failure, deregister) and sends requests through the gateway to show `X-Upstream-Instance`
+  changing between replicas. Swagger UI at
   http://localhost:8089/docs; API reference:
   [`docs/openapi/service-discovery.openapi.json`](docs/openapi/service-discovery.openapi.json).
 
