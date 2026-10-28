@@ -1,0 +1,7 @@
+name: Deregister Instance
+$kind: http-request
+method: DELETE
+url: "http://localhost:8089/services/demo/instances/demo-1"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"

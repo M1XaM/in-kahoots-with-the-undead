@@ -1,0 +1,226 @@
+{
+  "info": {
+    "name": "Service Discovery",
+    "description": "Service Discovery is published on http://localhost:8089 in the team compose; every registry route needs X-Internal-Key (INTERNAL_KEY in the team .env, default changeme). Registry: register, heartbeat, report a failure and deregister a demo instance. Load Balancing: send the same request through the gateway several times and watch X-Upstream-Instance change between the replicas.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Discovery Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{discoveryUrl}}/health"
+      }
+    },
+    {
+      "name": "Discovery Status",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{discoveryUrl}}/status"
+      }
+    },
+    {
+      "name": "Gateway Status",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/status"
+      }
+    },
+    {
+      "name": "Registry",
+      "item": [
+        {
+          "name": "List All Instances",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{discoveryUrl}}/services"
+          }
+        },
+        {
+          "name": "Healthy Base Instances",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{discoveryUrl}}/services/base/instances?healthy=true"
+          }
+        },
+        {
+          "name": "Register Instance",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{discoveryUrl}}/services/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"service\": \"demo\",\n  \"instance_id\": \"demo-1\",\n  \"url\": \"http://demo:9000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Heartbeat",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{discoveryUrl}}/services/demo/instances/demo-1/heartbeat"
+          }
+        },
+        {
+          "name": "Report Failure (circuit breaker)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{discoveryUrl}}/services/demo/instances/demo-1/failures",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reporter\": \"postman\",\n  \"reason\": \"circuit breaker tripped\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Deregister Instance",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{discoveryUrl}}/services/demo/instances/demo-1"
+          }
+        },
+        {
+          "name": "List Without Key (401)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{discoveryUrl}}/services"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Load Balancing",
+      "item": [
+        {
+          "name": "Base Through Gateway (send several times)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/base/players"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "console.log('answered by', pm.response.headers.get('X-Upstream-Instance'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crafting Through Gateway (send several times)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/crafting/recipes"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "console.log('answered by', pm.response.headers.get('X-Upstream-Instance'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Exam Event Stream URL",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/ws/exam"
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "discoveryUrl",
+      "value": "http://localhost:8089"
+    },
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    }
+  ]
+}

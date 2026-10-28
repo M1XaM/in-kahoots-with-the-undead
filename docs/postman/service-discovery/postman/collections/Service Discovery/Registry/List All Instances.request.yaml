@@ -1,0 +1,7 @@
+name: List All Instances
+$kind: http-request
+method: GET
+url: "http://localhost:8089/services"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"

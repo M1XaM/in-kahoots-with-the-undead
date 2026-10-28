@@ -1,0 +1,4 @@
+name: Discovery Status
+$kind: http-request
+method: GET
+url: "http://localhost:8089/status"
