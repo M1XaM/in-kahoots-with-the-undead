@@ -1,9 +1,6 @@
 services:
   discovery:
-    # built from the submodule (git submodule update --init services/service-discovery)
-    # while the image is not on Docker Hub yet
     image: ${DISCOVERY_DOCKERHUB_USERNAME:-inercaso}/service-discovery:${DISCOVERY_SERVICE_TAG:-3}
-    build: ./services/service-discovery
     restart: unless-stopped
     environment:
       PORT: 8089
