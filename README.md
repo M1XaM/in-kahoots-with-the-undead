@@ -83,7 +83,8 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 docker compose -f docker-compose.client.yml -f docker-compose.dev.yml up
 ```
 
-**Scaling:** Base and Crafting start with `BASE_REPLICAS` / `CRAFTING_REPLICAS` (2) replicas. Every
+**Scaling:** Player, Game, Exam, World, Zombie, Resource, Base and Crafting start with
+`<SERVICE>_REPLICAS` (`PLAYER_REPLICAS`, `GAME_REPLICAS`, ...; 2 each) replicas. Every
 replica registers with Service Discovery and the gateway balances across them, so replicas can be
 added and removed while everything runs:
 
@@ -93,8 +94,12 @@ docker compose up -d --scale base=1      # two stop, deregister, and leave the r
 curl -H 'X-Internal-Key: changeme' localhost:8089/services   # what Discovery sees
 ```
 
-Each response from the gateway names the replica that answered in `X-Upstream-Instance`. Game stays
-at one replica: its live sessions are kept in memory.
+Each response from the gateway names the replica that answered in `X-Upstream-Instance`. Game
+replicas keep lobbies, presence and the event stream in `game-db`, so any replica can serve any
+request. Each replica publishes its Socket.IO port on the next free host port from `GAME_PORT`
+(8082) to `GAME_PORT_LAST` (8089), but the gateway hands every browser the same
+`GAME_PUBLIC_WS_URL`, so browser sockets all land on one replica; the others serve REST and the
+`/events` stream.
 
 ### Gateway
 
@@ -190,8 +195,12 @@ at one replica: its live sessions are kept in memory.
 ### Game Service
 
 - **Image:** [`timurcravtov/game-service`](https://hub.docker.com/r/timurcravtov/game-service),
-  version set by `GAME_SERVICE_TAG` (default `3`).
+  version set by `GAME_SERVICE_TAG` (default `3`), `GAME_REPLICAS` (2) replicas.
 - **Needs:** its own Postgres (`game-db`, started by compose); password defaults to `qwerty`, override with `GAME_POSTGRES_PASSWORD`.
+- **Scaling:** instance-agnostic: lobbies, the event outbox and which sockets are joined (so
+  `game.presence_changed` fires when a player's first socket anywhere joins and their last one
+  anywhere leaves) are all in `game-db`. A replica refreshes its sockets every 10 s, releases them on
+  shutdown, and the survivors drop the ones of a replica that died after 30 s.
 - **Talks to:** Player, World, Zombie, Exam, Resource and Base, always through the gateway
   (`GATEWAY_URL`, with `X-Internal-Key`). Until they run, starting a session or a timed action that
   depends on them will fail; creating lobbies works on its own. Game reads the acting player from
