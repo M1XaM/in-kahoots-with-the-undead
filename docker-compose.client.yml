@@ -1,0 +1,20 @@
+# Every service from docker-compose.yml plus the React client:
+#   docker compose -f docker-compose.client.yml up
+# docker-compose.yml alone runs the backend without the client.
+include:
+  - docker-compose.yml
+
+services:
+  client:
+    image: ${CLIENT_DOCKERHUB_USERNAME:-mixam052}/kahoots-client:${CLIENT_SERVICE_TAG:-2}
+    restart: unless-stopped
+    environment:
+      # the browser only calls the client's own /api, which nginx proxies to the gateway
+      GATEWAY_URL: http://gateway:8080
+      # lets the app perform service actions (start an exam, grant XP); it reaches the
+      # browser, so leave it empty outside local development
+      DEV_INTERNAL_KEY: ${CLIENT_DEV_INTERNAL_KEY:-}
+    ports:
+      - "${CLIENT_PORT:-3000}:80"
+    depends_on:
+      - gateway

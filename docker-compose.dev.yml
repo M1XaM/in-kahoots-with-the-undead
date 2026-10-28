@@ -1,6 +1,7 @@
 # Publishes every service on the host for debugging. docker-compose.yml deliberately exposes only the
 # gateway (and Game's Socket.IO port), so all client traffic has to pass the gateway's authorization.
 #   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#   docker compose -f docker-compose.client.yml -f docker-compose.dev.yml up   (with the client)
 services:
   player:
     ports:

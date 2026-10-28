@@ -60,12 +60,15 @@ Requirements: Docker with Compose v2, and the service ports below free on your m
 
 ```
 cp .env.example .env   # adjust credentials/tags if needed
-docker compose up
+docker compose -f docker-compose.client.yml up   # every service and the React client
+docker compose up                                # every service, without the client
 ```
+
+`docker-compose.yml` holds the backend; `docker-compose.client.yml` includes it and adds the client.
 
 | Service | URL |
 |---|---|
-| **Client** (React app) | http://localhost:3000 |
+| **Client** (React app, only with `docker-compose.client.yml`) | http://localhost:3000 |
 | **Gateway** (entry point) | http://localhost:8080 |
 | Game (Socket.IO only) | http://localhost:8082 |
 | Service Discovery (registry, `X-Internal-Key`) | http://localhost:8089 |
@@ -73,10 +76,11 @@ docker compose up
 Only the gateway and Game's Socket.IO port are published, so every REST call from a client has to pass
 the gateway's authorization. To reach a service directly while debugging (Player 8081, Exam 8083, World
 8084, Zombie 8085, Resource 8086; each Base and Crafting replica gets a free host port, see
-`docker compose port --index 1 base 8087`), add the override:
+`docker compose port --index 1 base 8087`), add the override to either file:
 
 ```
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+docker compose -f docker-compose.client.yml -f docker-compose.dev.yml up
 ```
 
 **Scaling:** Base and Crafting start with `BASE_REPLICAS` / `CRAFTING_REPLICAS` (2) replicas. Every
@@ -159,7 +163,7 @@ at one replica: its live sessions are kept in memory.
 ### Client
 
 - **Repository:** [`services/client`](https://github.com/M1XaM/kahoots-client), React / Vite, served
-  by nginx.
+  by nginx. Runs from `docker-compose.client.yml`, which includes the whole backend.
 - **Image:** [`mixam052/kahoots-client`](https://hub.docker.com/r/mixam052/kahoots-client), version
   set by `CLIENT_SERVICE_TAG` (currently `2`).
 - **Talks to:** the Gateway only. The browser calls the client's own `/api`, which nginx proxies
@@ -170,7 +174,7 @@ at one replica: its live sessions are kept in memory.
   is all the app needs. Its service actions (starting an exam, granting XP or resources) send
   `X-Internal-Key`, taken from `CLIENT_DEV_INTERNAL_KEY`: the key reaches the browser, so set it
   on a local machine only.
-- **Try it:** http://localhost:3000.
+- **Try it:** `docker compose -f docker-compose.client.yml up`, then http://localhost:3000.
 
 ### Player Service
 
