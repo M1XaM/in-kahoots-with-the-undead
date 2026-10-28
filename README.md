@@ -72,11 +72,25 @@ docker compose up
 
 Only the gateway and Game's Socket.IO port are published, so every REST call from a client has to pass
 the gateway's authorization. To reach a service directly while debugging (Player 8081, Exam 8083, World
-8084, Zombie 8085, Resource 8086, Base 8087, Crafting 8088), add the override:
+8084, Zombie 8085, Resource 8086; each Base and Crafting replica gets a free host port, see
+`docker compose port --index 1 base 8087`), add the override:
 
 ```
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 ```
+
+**Scaling:** Base and Crafting start with `BASE_REPLICAS` / `CRAFTING_REPLICAS` (2) replicas. Every
+replica registers with Service Discovery and the gateway balances across them, so replicas can be
+added and removed while everything runs:
+
+```
+docker compose up -d --scale base=3      # a third replica registers, the gateway sends it requests
+docker compose up -d --scale base=1      # two stop, deregister, and leave the rotation
+curl -H 'X-Internal-Key: changeme' localhost:8089/services   # what Discovery sees
+```
+
+Each response from the gateway names the replica that answered in `X-Upstream-Instance`. Game stays
+at one replica: its live sessions are kept in memory.
 
 ### Gateway
 
@@ -250,19 +264,28 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 ### Base Service
 
 - **Image:** [`mixam052/kahoots-base-service`](https://hub.docker.com/r/mixam052/kahoots-base-service),
-  version set by `BASE_SERVICE_TAG` (currently `2`).
+  version set by `BASE_SERVICE_TAG` (currently `3`), `BASE_REPLICAS` (2) replicas.
 - **Needs:** its own Postgres (`base-db`, started by compose); password defaults to `qwerty`, override with `BASE_POSTGRES_PASSWORD`.
 - **Talks to:** Resource, World and Player over REST through the Gateway (`GATEWAY_URL`). Until
   they run, spending endpoints (upgrades, barricades, Kiki) return `503 SERVICE_UNAVAILABLE`;
   reading and creating bases work on their own. It consumes `player.registered` from Player's
   `/events` stream, negotiated at the Gateway, so a new player gets a base right after registering.
-- **Limits:** `BASE_TASK_TIMEOUT_MS` (`408`) and `BASE_MAX_CONCURRENT_TASKS` (`429`).
+- **Limits:** `BASE_TASK_TIMEOUT_MS` (`408`) and `BASE_MAX_CONCURRENT_TASKS` (`429`), per replica.
+- **Scaling:** each replica registers with Service Discovery and answers `GET /status` with its load.
+  Only one replica consumes Player's event stream at a time (a PostgreSQL advisory lock; another
+  takes over within 5 s), every event is applied once in a transaction, and an `Idempotency-Key` is
+  claimed in the database before the request runs, so a duplicate on another replica gets
+  `409 IDEMPOTENCY_KEY_IN_USE`.
+- **Circuit breaker:** 3 failed calls to one service within 35 s (task timeout × 3.5) trip it; the
+  failing instance named by the gateway's `X-Upstream-Instance` is reported to Discovery, otherwise
+  calls to that service fail fast with `503` for 35 s.
+- **Logs:** one JSON line per event in the shared format; `BASE_LOG_LEVEL` (`info`).
 - **Try it:** Postman collection in [`docs/postman/base-service`](docs/postman/base-service).
 
 ### Crafting Service
 
 - **Image:** [`mixam052/kahoots-crafting-service`](https://hub.docker.com/r/mixam052/kahoots-crafting-service),
-  version set by `CRAFTING_SERVICE_TAG` (currently `2`).
+  version set by `CRAFTING_SERVICE_TAG` (currently `3`), `CRAFTING_REPLICAS` (2) replicas.
 - **Needs:** its own Postgres (`crafting-db`, started by compose); password defaults to `qwerty`, override with `CRAFTING_POSTGRES_PASSWORD`.
   Seeded from [`db/crafting-service/init.sql`](db/crafting-service/init.sql) with five recipes
   (two gated: one by level, one by a passed math exam and the Math Wing); their output items are
@@ -271,7 +294,11 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
   crafting returns `503 SERVICE_UNAVAILABLE`; recipes and availability work on their own. It
   consumes Player's, Exam's and World's `/events` streams, negotiated at the Gateway, to track
   levels, passed subjects and unlocked wings.
-- **Limits:** `CRAFTING_TASK_TIMEOUT_MS` (`408`) and `CRAFTING_MAX_CONCURRENT_TASKS` (`429`).
+- **Limits:** `CRAFTING_TASK_TIMEOUT_MS` (`408`) and `CRAFTING_MAX_CONCURRENT_TASKS` (`429`), per replica.
+- **Scaling:** like Base: registers with Service Discovery, one replica per event stream (Player,
+  Exam, World), events applied once, `Idempotency-Key` claimed before a craft runs.
+- **Circuit breaker:** like Base, for its calls to Resource and Player.
+- **Logs:** shared JSON format; `CRAFTING_LOG_LEVEL` (`info`).
 - **Try it:** Postman collection in [`docs/postman/crafting-service`](docs/postman/crafting-service).
 
 ## GitHub Workflow
