@@ -6,6 +6,7 @@ including Professor Zombies, who force a pop quiz before letting you past. Passi
 wings of the university to explore, tying academic progress directly to survival progress.
 
 [![gateway](https://img.shields.io/docker/v/timurcravtov/gateway?sort=date&label=gateway&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/gateway)
+[![service-discovery](https://img.shields.io/docker/v/inercaso/service-discovery?sort=date&label=service-discovery&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/inercaso/service-discovery)
 [![player-service](https://img.shields.io/docker/v/timurcravtov/player-service?sort=date&label=player-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/player-service)
 [![game-service](https://img.shields.io/docker/v/timurcravtov/game-service?sort=date&label=game-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/game-service)
 [![exam-service](https://img.shields.io/docker/v/inercaso/exam-service?sort=date&label=exam-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/inercaso/exam-service)
@@ -30,6 +31,7 @@ wings of the university to explore, tying academic progress directly to survival
 ![Architecture diagram](docs/architecture.png)
 
 - **Gateway**: the single entry point: routing, authorization, task limits, WebSocket negotiation
+- **Service Discovery**: the registry of running instances: health checks, load alerts, Telegram notifications
 - **Player**: identity, auth, profiles, XP/levels, inventory, trading
 - **Game**: sessions, day/night cycle, timed actions, zombie encounters
 - **Exam**: exam generation, grading, academic history, achievements
@@ -57,6 +59,7 @@ Requirements: Docker with Compose v2, and the service ports below free on your m
 
 ```
 cp .env.example .env   # adjust credentials/tags if needed
+git submodule update --init services/service-discovery   # until its image is on Docker Hub
 docker compose up
 ```
 
@@ -65,6 +68,7 @@ docker compose up
 | **Client** (React app) | http://localhost:3000 |
 | **Gateway** (entry point) | http://localhost:8080 |
 | Game (Socket.IO only) | http://localhost:8082 |
+| Service Discovery (registry, `X-Internal-Key`) | http://localhost:8089 |
 
 Only the gateway and Game's Socket.IO port are published, so every REST call from a client has to pass
 the gateway's authorization. To reach a service directly while debugging (Player 8081, Exam 8083, World
@@ -96,6 +100,31 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
   `GET /ws/{player|game|exam|world|resource}` (internal) a producer's `/events` URL. The gateway
   never relays the connection.
 - **Try it:** http://localhost:8080/docs, health check `GET /health`.
+
+### Service Discovery
+
+- **Repository:** [`services/service-discovery`](https://github.com/inercaso/KahootWithUndeadDiscovery),
+  Python / FastAPI (the lab's "banned" language).
+- **Image:** [`inercaso/service-discovery`](https://hub.docker.com/r/inercaso/service-discovery),
+  version set by `DISCOVERY_SERVICE_TAG` (currently `3`). Until that image is published, compose
+  builds it from the submodule.
+- **Registry:** every instance registers itself on startup (`POST /services/register` with its own
+  container address), sends a heartbeat every few seconds and deregisters on shutdown; every service
+  gets `DISCOVERY_URL: http://discovery:8089`. The gateway fetches `GET /services` every 2 s and
+  routes to the healthy instances, round-robin. All registry routes need `X-Internal-Key`.
+- **Health checks:** every `DISCOVERY_HEALTH_INTERVAL_S` (5 s) it calls each instance's `/status`;
+  `DISCOVERY_FAILURE_THRESHOLD` (3) failed checks in a row take the instance out of rotation, and
+  `DISCOVERY_HEARTBEAT_TTL_S` (30 s) without a sign of life drop it. A caller whose circuit breaker
+  trips reports the instance with `POST /services/{service}/instances/{id}/failures`.
+- **Alerts:** load is `active_tasks / max_concurrent_tasks` from `/status`. At
+  `DISCOVERY_LOAD_WARN` (0.7) it logs a warning; at `DISCOVERY_LOAD_CRITICAL` (0.9), and when an
+  instance stops answering, expires or is removed by a breaker, the alert also goes to Telegram,
+  at most once per `DISCOVERY_ALERT_COOLDOWN_S` (300 s) per instance.
+- **Telegram:** create a bot with @BotFather, add it to the team chat and send it `/chatid`; put
+  the token in `TELEGRAM_BOT_TOKEN` and the chat ids, comma-separated, in `TELEGRAM_CHATS_IDS`
+  in `.env` (never commit them). Without a token alerts only go to the log.
+- **Try it:** `curl -H 'X-Internal-Key: changeme' localhost:8089/services` lists every instance with
+  its health and load; `GET /status` and `GET /health` are public.
 
 ### Client
 

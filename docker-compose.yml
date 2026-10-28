@@ -1,4 +1,31 @@
 services:
+  discovery:
+    # built from the submodule (git submodule update --init services/service-discovery)
+    # while the image is not on Docker Hub yet
+    image: ${DISCOVERY_DOCKERHUB_USERNAME:-inercaso}/service-discovery:${DISCOVERY_SERVICE_TAG:-3}
+    build: ./services/service-discovery
+    restart: unless-stopped
+    environment:
+      PORT: 8089
+      INTERNAL_KEY: ${INTERNAL_KEY:-changeme}
+      LOG_LEVEL: ${DISCOVERY_LOG_LEVEL:-info}
+      # every registered instance's /status is checked this often; 3 failed checks in a row
+      # take it out of rotation, 30 s without any sign of life drop it
+      HEALTH_INTERVAL_S: ${DISCOVERY_HEALTH_INTERVAL_S:-5}
+      HEALTH_TIMEOUT_S: ${DISCOVERY_HEALTH_TIMEOUT_S:-2}
+      FAILURE_THRESHOLD: ${DISCOVERY_FAILURE_THRESHOLD:-3}
+      HEARTBEAT_TTL_S: ${DISCOVERY_HEARTBEAT_TTL_S:-30}
+      # load = active tasks / max concurrent tasks; critical alerts also go to Telegram
+      LOAD_WARN: ${DISCOVERY_LOAD_WARN:-0.7}
+      LOAD_CRITICAL: ${DISCOVERY_LOAD_CRITICAL:-0.9}
+      ALERT_COOLDOWN_S: ${DISCOVERY_ALERT_COOLDOWN_S:-300}
+      # Telegram alerts stay off while the token is empty; send /chatid to the bot for a chat id
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHATS_IDS: ${TELEGRAM_CHATS_IDS:-}
+    # published so the registry can be shown from the host (GET /services needs X-Internal-Key)
+    ports:
+      - "${DISCOVERY_PORT:-8089}:8089"
+
   player-db:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -28,6 +55,8 @@ services:
       MAX_CONCURRENT_TASKS: ${PLAYER_MAX_CONCURRENT_TASKS:-100}
       # events and service-to-service REST go through the gateway
       GATEWAY_URL: http://gateway:8080
+      # registers on startup, heartbeats, deregisters on shutdown
+      DISCOVERY_URL: http://discovery:8089
     depends_on:
       player-db:
         condition: service_healthy
@@ -60,6 +89,8 @@ services:
       MAX_CONCURRENT_TASKS: ${GAME_MAX_CONCURRENT_TASKS:-100}
       # signing keys for the Socket.IO handshake and service-to-service REST go through the gateway
       GATEWAY_URL: http://gateway:8080
+      # registers on startup, heartbeats, deregisters on shutdown
+      DISCOVERY_URL: http://discovery:8089
     # Socket.IO clients connect here directly (GET /ws/game); REST goes through the gateway
     ports:
       - "${GAME_PORT:-8082}:${GAME_PORT:-8082}"
@@ -94,6 +125,9 @@ services:
       GATEWAY_URL: http://gateway:8080
       TASK_TIMEOUT_MS: ${BASE_TASK_TIMEOUT_MS:-10000}
       MAX_CONCURRENT_TASKS: ${BASE_MAX_CONCURRENT_TASKS:-100}
+      LOG_LEVEL: ${BASE_LOG_LEVEL:-info}
+      # registers on startup, heartbeats, deregisters on shutdown
+      DISCOVERY_URL: http://discovery:8089
     depends_on:
       base-db:
         condition: service_healthy
@@ -126,6 +160,9 @@ services:
       GATEWAY_URL: http://gateway:8080
       TASK_TIMEOUT_MS: ${CRAFTING_TASK_TIMEOUT_MS:-10000}
       MAX_CONCURRENT_TASKS: ${CRAFTING_MAX_CONCURRENT_TASKS:-100}
+      LOG_LEVEL: ${CRAFTING_LOG_LEVEL:-info}
+      # registers on startup, heartbeats, deregisters on shutdown
+      DISCOVERY_URL: http://discovery:8089
     depends_on:
       crafting-db:
         condition: service_healthy
@@ -159,6 +196,8 @@ services:
       GATEWAY_URL: http://gateway:8080
       PLAYER_CLIENT: ${EXAM_PLAYER_CLIENT:-http}
       ZOMBIE_CLIENT: ${EXAM_ZOMBIE_CLIENT:-http}
+      # registers on startup, heartbeats, deregisters on shutdown
+      DISCOVERY_URL: http://discovery:8089
     depends_on:
       exam-db:
         condition: service_healthy
@@ -192,6 +231,8 @@ services:
       # `off` = not connected (use POST /world/internal/events)
       EXAM_EVENTS_URL: ${WORLD_EXAM_EVENTS_URL-gateway}
       GATEWAY_URL: http://gateway:8080
+      # registers on startup, heartbeats, deregisters on shutdown
+      DISCOVERY_URL: http://discovery:8089
     depends_on:
       world-db:
         condition: service_healthy
@@ -225,6 +266,8 @@ services:
       DB_USERNAME: ${ZOMBIE_POSTGRES_USER:-postgres}
       DB_PASSWORD: ${ZOMBIE_POSTGRES_PASSWORD:-qwerty}
       DB_NAME: ${ZOMBIE_POSTGRES_DB:-zombie}
+      # registers on startup, heartbeats, deregisters on shutdown
+      DISCOVERY_URL: http://discovery:8089
     depends_on:
       zombie-db:
         condition: service_healthy
@@ -265,6 +308,8 @@ services:
       PLAYER_EVENTS_URL: ${RESOURCE_PLAYER_EVENTS_URL-gateway}
       GAME_EVENTS_URL: ${RESOURCE_GAME_EVENTS_URL-gateway}
       GATEWAY_URL: http://gateway:8080
+      # registers on startup, heartbeats, deregisters on shutdown
+      DISCOVERY_URL: http://discovery:8089
     depends_on:
       resource-db:
         condition: service_healthy
@@ -289,9 +334,13 @@ services:
       JWT_SECRET: ${GATEWAY_JWT_SECRET:-}
       TASK_TIMEOUT: ${GATEWAY_TASK_TIMEOUT:-30}
       MAX_CONCURRENT_TASKS: ${GATEWAY_MAX_CONCURRENT_TASKS:-100}
+      # routes to the healthy instances Discovery lists, round-robin; the *_SERVICE_URL above
+      # are only used for services Discovery has not listed (they do not register yet)
+      DISCOVERY_URL: http://discovery:8089
     ports:
       - "${GATEWAY_PORT:-8080}:8080"
     depends_on:
+      - discovery
       - player
       - game
       - exam
