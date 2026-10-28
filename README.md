@@ -168,7 +168,7 @@ at one replica: its live sessions are kept in memory.
 ### Player Service
 
 - **Image:** [`timurcravtov/player-service`](https://hub.docker.com/r/timurcravtov/player-service),
-  version set by `PLAYER_SERVICE_TAG` (default `2`).
+  version set by `PLAYER_SERVICE_TAG` (default `3`).
 - **Needs:** its own Postgres (`player-db`, started by compose); password defaults to `qwerty`, override with `PLAYER_POSTGRES_PASSWORD`.
 - **Talks to:** Game, over its event stream: it asks the gateway for the stream URL (`GATEWAY_URL`) and
   keeps `online` in step with `game.presence_changed`. It issues the login cookie, publishes the JWKS
@@ -179,7 +179,7 @@ at one replica: its live sessions are kept in memory.
 ### Game Service
 
 - **Image:** [`timurcravtov/game-service`](https://hub.docker.com/r/timurcravtov/game-service),
-  version set by `GAME_SERVICE_TAG` (default `2`).
+  version set by `GAME_SERVICE_TAG` (default `3`).
 - **Needs:** its own Postgres (`game-db`, started by compose); password defaults to `qwerty`, override with `GAME_POSTGRES_PASSWORD`.
 - **Talks to:** Player, World, Zombie, Exam, Resource and Base, always through the gateway
   (`GATEWAY_URL`, with `X-Internal-Key`). Until they run, starting a session or a timed action that
@@ -192,7 +192,7 @@ at one replica: its live sessions are kept in memory.
 ### Exam Service
 
 - **Image:** [`inercaso/exam-service`](https://hub.docker.com/r/inercaso/exam-service),
-  version set by `EXAM_SERVICE_TAG` (currently `2`, the lab number; `latest` points at the newest).
+  version set by `EXAM_SERVICE_TAG` (currently `3`, the lab number; `latest` points at the newest).
 - **Needs:** its own Postgres (`exam-db`, started by compose and seeded with the question bank and
   achievements from [`db/exam-service/init.sql`](db/exam-service/init.sql)); password defaults to
   `qwerty`, override with `EXAM_POSTGRES_PASSWORD`.
@@ -212,7 +212,7 @@ at one replica: its live sessions are kept in memory.
 ### World Service
 
 - **Image:** [`inercaso/world-service`](https://hub.docker.com/r/inercaso/world-service),
-  version set by `WORLD_SERVICE_TAG` (currently `2`, the lab number; `latest` points at the newest).
+  version set by `WORLD_SERVICE_TAG` (currently `3`, the lab number; `latest` points at the newest).
 - **Needs:** its own Postgres (`world-db`, started by compose and seeded with the campus map from
   [`db/world-service/init.sql`](db/world-service/init.sql)); password defaults to `qwerty`,
   override with `WORLD_POSTGRES_PASSWORD`.
