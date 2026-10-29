@@ -272,7 +272,7 @@ services:
       retries: 10
 
   zombie:
-    image: ${ZOMBIE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-zombie-service:${ZOMBIE_SERVICE_TAG:-2}
+    image: ${ZOMBIE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-zombie-service:${ZOMBIE_SERVICE_TAG:-3}
     restart: unless-stopped
     # every replica shares zombie-db; `docker compose up -d --scale zombie=3`
     deploy:
@@ -282,6 +282,7 @@ services:
       INTERNAL_API_KEY: ${INTERNAL_KEY:-changeme}
       TASK_TIMEOUT_MS: ${ZOMBIE_TASK_TIMEOUT_MS:-10000}
       MAX_CONCURRENT_TASKS: ${ZOMBIE_MAX_CONCURRENT_TASKS:-100}
+      LOG_LEVEL: ${ZOMBIE_LOG_LEVEL:-info}
       DB_HOST: zombie-db
       DB_PORT: 5432
       DB_USERNAME: ${ZOMBIE_POSTGRES_USER:-postgres}
@@ -310,7 +311,7 @@ services:
       retries: 10
 
   resource:
-    image: ${RESOURCE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-resource-service:${RESOURCE_SERVICE_TAG:-2}
+    image: ${RESOURCE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-resource-service:${RESOURCE_SERVICE_TAG:-3}
     restart: unless-stopped
     # every replica shares resource-db; `docker compose up -d --scale resource=3`
     deploy:
@@ -320,6 +321,7 @@ services:
       INTERNAL_API_KEY: ${INTERNAL_KEY:-changeme}
       TASK_TIMEOUT_MS: ${RESOURCE_TASK_TIMEOUT_MS:-10000}
       MAX_CONCURRENT_TASKS: ${RESOURCE_MAX_CONCURRENT_TASKS:-100}
+      LOG_LEVEL: ${RESOURCE_LOG_LEVEL:-info}
       DB_HOST: resource-db
       DB_PORT: 5432
       DB_USERNAME: ${RESOURCE_POSTGRES_USER:-postgres}
