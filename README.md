@@ -70,7 +70,7 @@ docker compose up                                # every service, without the cl
 |---|---|
 | **Client** (React app, only with `docker-compose.client.yml`) | http://localhost:3000 |
 | **Gateway** (entry point) | http://localhost:8080 |
-| Game (Socket.IO only) | http://localhost:8082 |
+| Game (Socket.IO only) | http://localhost:8090 |
 | Service Discovery (registry, `X-Internal-Key`) | http://localhost:8089 |
 
 Only the gateway and Game's Socket.IO port are published, so every REST call from a client has to pass
@@ -96,8 +96,8 @@ curl -H 'X-Internal-Key: changeme' localhost:8089/services   # what Discovery se
 
 Each response from the gateway names the replica that answered in `X-Upstream-Instance`. Game
 replicas keep lobbies, presence and the event stream in `game-db`, so any replica can serve any
-request. Each replica publishes its Socket.IO port on the next free host port from `GAME_PORT`
-(8082) to `GAME_PORT_LAST` (8089), but the gateway hands every browser the same
+request. Each replica publishes its Socket.IO port on the next free host port from
+`GAME_HOST_PORT` (8090) to `GAME_HOST_PORT_LAST` (8099), but the gateway hands every browser the same
 `GAME_PUBLIC_WS_URL`, so browser sockets all land on one replica; the others serve REST and the
 `/events` stream.
 

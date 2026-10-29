@@ -95,9 +95,10 @@ services:
       # registers on startup, heartbeats, deregisters on shutdown
       DISCOVERY_URL: http://discovery:8089
     # Socket.IO clients connect here directly (GET /ws/game); REST goes through the gateway. Replicas
-    # cannot share one host port, so each takes the next free one from GAME_PORT up to GAME_PORT_LAST
+    # cannot share one host port, so each takes the next free one from GAME_HOST_PORT up to
+    # GAME_HOST_PORT_LAST (a range of its own, clear of the other services' ports)
     ports:
-      - "${GAME_PORT:-8082}-${GAME_PORT_LAST:-8089}:${GAME_PORT:-8082}"
+      - "${GAME_HOST_PORT:-8090}-${GAME_HOST_PORT_LAST:-8099}:${GAME_PORT:-8082}"
     depends_on:
       game-db:
         condition: service_healthy
@@ -350,7 +351,7 @@ services:
       BASE_SERVICE_URL: http://base:${BASE_PORT:-8087}
       CRAFTING_SERVICE_URL: http://crafting:${CRAFTING_PORT:-8088}
       # handed to browsers by GET /ws/game, so it must be reachable from the host
-      GAME_PUBLIC_WS_URL: ws://localhost:${GAME_PORT:-8082}
+      GAME_PUBLIC_WS_URL: ws://localhost:${GAME_HOST_PORT:-8090}
       INTERNAL_KEY: ${INTERNAL_KEY:-changeme}
       # jwks (Player's GET /auth/jwks, per the contract) | secret (HS256) | off
       AUTH_MODE: ${GATEWAY_AUTH_MODE:-jwks}
