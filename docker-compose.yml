@@ -1,3 +1,6 @@
+# example RS256 key shared by every Player replica, so a token any replica issues verifies against any replica's JWKS; never use in production
+x-jwt-private-key: &jwt-private-key ${JWT_PRIVATE_KEY:------BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC99rl42elYEQDr\nkbctTRpYUYTDl4IjiRWAIUMNexD7Mu93nHb3EU/Rgf2EBIuPm3dPLR74ojx+K33c\n3npCmrKC4u5F6ii+qKLmBJsCpGLsscufki/s3fRqwfvND9+9bPaDyQnuf5rugo9s\nT6tN27EN8epF78bCH8lOCYclskpQgDtNyvVVUqLxSFauQG0H5iCcNC7u2ounerys\ns/AvIKFAGlr3ea7Xgz+1HHhew1AzeepMZC/myABy/P9ehfrCtmTlSZdab4GTBKrs\nDijY3/3TL7Vl/XlPZlM9o8gXCQegCTR96l9Rfrx9cGsNahw+4K8aLJLyza18QU/4\nEzjT6rbbAgMBAAECggEAUNV9vALCTDLEGPnDIDhIhx99JrvAaX2qVAETZteg9LuK\ncfP3HZBUzjqJ1dUXTA8kOGFjZfqnUisQnl1fWhs47gBB0ydemi7pTobULU4lOEI5\n+xd6ZElYeds82lgwZYtJ5O811jKfi3GsNTM7mmBrWZtBDOyIv89F2nqscyqIe/Mw\nSFtn6Yvt88tBQIGpaJ9fRWQbE4mo9UckK0At6m5R+uvdJ391xBgkPsZDIKl2PTVy\nZGPCUA6ly63NgEIRNaxtkgA4qIvZ+BTLK9G4qqvXS4oyAVYU0GfoDgmRELLPhDa2\nOgQhK5RsBYKV0HsGjIDcaPPAgAMny41gU08Gkm6RyQKBgQD1ahA/MXiSFRAafsv8\n1cHIoKopayCbF1mLHpN1ffAyAs4rxVBsJeYXyFjV0J5OKiFgLZyhtadMmXyq7OQA\noeiRYHJQrrrti9ZUWloGiPj+KJNBkD80uK3/8JUaDZkI7Tov034Tsm5S6jSQDf9h\nhfMdRhdMsKZrogz8ouP5FJN7cwKBgQDGKFwk1/NZ+Y03U674FLkQzOqXu5QKitBN\nXJJJxIiIhwRVdoRd9QayaBbfiEl9OPNFtbA/CDf19FsQJDb6cn0Y7XWxp07mEWjP\nj8popyH7wckVfpSv2Xt0dENNP3KXP0ZjNK0CxzcnkZ8tYXU/xMemIGbn3YTekSVX\nOSfVN4jM+QKBgQDvxlvvUgdqOtgL+vyUn8iAm7EFXJxzyyF6kjoiXhRy2FjVXSgR\nMgoYDG/3H6e72N/ZF1dki5XUelXari6qC4atmxy1hbIu6yRSMCCrJ+KWd9BAC44l\nlZazbDxRQx3VIepq1ejll7zAmAEZCgQNJZF9dYDINgOzP5YOs5unPZpGzwKBgQDE\nLJa0fvpTXARa/sTcox9oK4Yf+zsfiLeZrwjAcQo+J3S56yA2KGqd2wCyAanHh8cH\nf0zhyhAkteolO8UWApwoPoXi/+DTUe7ydccL/lJdfEbHuc4XnXZkHum2Ixcd9y2G\n71JMys6mpLryYWaDYBvLMo7OA3cUJJvUEyiFJHqReQKBgEpmolERCmXFsvzC+pmw\nHL1weYIgG+PQ/YlzLeOPDdSjfiAlg5F9nZlTFPW2lQsH6rMjGTRqg5tv0KoeA7Bs\nNYnQCK8s4nuo7X1LZuTw2O1kQPmvYVT6JyvHL5Ap52qAeOU+cYtnbA/zEvFzJjMN\nAWYvr0hQZKe0Q13CruO45ZEx\n-----END PRIVATE KEY-----}
+
 services:
   discovery:
     image: ${DISCOVERY_DOCKERHUB_USERNAME:-inercaso}/service-discovery:${DISCOVERY_SERVICE_TAG:-3}
@@ -49,7 +52,7 @@ services:
       PORT: ${PLAYER_PORT:-8081}
       DATABASE_URL: postgres://${PLAYER_POSTGRES_USER:-postgres}:${PLAYER_POSTGRES_PASSWORD:-qwerty}@player-db:5432/${PLAYER_POSTGRES_DB:-player}?sslmode=disable
       INTERNAL_KEY: ${INTERNAL_KEY:-changeme}
-      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:-supersecret}
+      JWT_PRIVATE_KEY: *jwt-private-key
       KAFKA_BROKERS: ${KAFKA_BROKERS:-localhost:9092}
       TASK_TIMEOUT_MS: ${PLAYER_TASK_TIMEOUT_MS:-10000}
       MAX_CONCURRENT_TASKS: ${PLAYER_MAX_CONCURRENT_TASKS:-100}
@@ -86,7 +89,7 @@ services:
       PORT: ${GAME_PORT:-8082}
       DATABASE_URL: postgres://${GAME_POSTGRES_USER:-postgres}:${GAME_POSTGRES_PASSWORD:-qwerty}@game-db:5432/${GAME_POSTGRES_DB:-game}?sslmode=disable
       INTERNAL_KEY: ${INTERNAL_KEY:-changeme}
-      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:-supersecret}
+      JWT_PRIVATE_KEY: *jwt-private-key
       KAFKA_BROKERS: ${KAFKA_BROKERS:-localhost:9092}
       TASK_TIMEOUT_MS: ${GAME_TASK_TIMEOUT_MS:-10000}
       MAX_CONCURRENT_TASKS: ${GAME_MAX_CONCURRENT_TASKS:-100}
