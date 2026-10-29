@@ -252,8 +252,8 @@ request. Each replica publishes its Socket.IO port on the next free host port fr
 ### Zombie Service
 
 - **Image:** [`nevaletik/kahoot-zombie-service`](https://hub.docker.com/r/nevaletik/kahoot-zombie-service),
-  version set by `ZOMBIE_SERVICE_TAG` (currently `2`, the lab number; each release is also tagged
-  `<lab>.<minor>.<patch>` and `latest`).
+  version set by `ZOMBIE_SERVICE_TAG` (currently `3`, the lab number; each release is also tagged
+  `<lab>.<minor>.<patch>` and `latest`), `ZOMBIE_REPLICAS` (2) replicas.
 - **Needs:** its own Postgres (`zombie-db`, started by compose and seeded from
   [`db/zombie-service/init.sql`](db/zombie-service/init.sql) with ten definitions: ids `5`/`6`/`7`
   are the math/physics/programming professors, `9` and `10` are not, matching Exam's stand-in);
@@ -261,6 +261,10 @@ request. Each replica publishes its Socket.IO port on the next free host port fr
   `INTERNAL_KEY` is the `X-Internal-Key` every route except the health check expects.
 - **Talks to:** nobody. Players reach `GET /zombies/{id}` through the Gateway, which verifies the
   token and forwards the player as `X-Player-Id`; the service never sees the token.
+- **Scaling:** each replica registers with Service Discovery and answers `GET /status` with its load
+  (`503` while its database is down). Definitions live only in `zombie-db`, so any replica answers
+  any request. It calls no other service, so it has no circuit breaker.
+- **Logs:** one JSON line per event in the shared format; `ZOMBIE_LOG_LEVEL` (`info`).
 - **Try it:** the Postman collection in [`docs/postman/zombie-service`](docs/postman/zombie-service)
   (also as a single importable `zombie-service.postman_collection.json`) goes through the Gateway:
   run **Auth (run first)** to register and log in a player. API reference:
@@ -270,8 +274,8 @@ request. Each replica publishes its Socket.IO port on the next free host port fr
 ### Resource Service
 
 - **Image:** [`nevaletik/kahoot-resource-service`](https://hub.docker.com/r/nevaletik/kahoot-resource-service),
-  version set by `RESOURCE_SERVICE_TAG` (currently `2`, the lab number; each release is also tagged
-  `<lab>.<minor>.<patch>` and `latest`).
+  version set by `RESOURCE_SERVICE_TAG` (currently `3`, the lab number; each release is also tagged
+  `<lab>.<minor>.<patch>` and `latest`), `RESOURCE_REPLICAS` (2) replicas.
 - **Needs:** its own Postgres (`resource-db`, started by compose and seeded from
   [`db/resource-service/init.sql`](db/resource-service/init.sql) with balances and ledger history
   for players `1`-`3`); password defaults to `qwerty`, override with `RESOURCE_POSTGRES_PASSWORD`.
@@ -283,6 +287,16 @@ request. Each replica publishes its Socket.IO port on the next free host port fr
   `http://gateway:8080`; empty = built-in copy of the rooms). It publishes `resource.gathered` on
   `ws://resource:8086/events` (`GET /ws/resource` on the Gateway). Players are identified by the
   Gateway's `X-Player-Id`; Base and Crafting reserve/commit through it with `INTERNAL_KEY`.
+- **Scaling:** each replica registers with Service Discovery and answers `GET /status` with its load.
+  Reserve, commit, release, steal and the event handlers run in one transaction holding a
+  per-player advisory lock, so two replicas never spend the same balance; only one replica consumes
+  each of Player's and Game's streams (another takes over within 5 s); any replica serves the whole
+  `/events` stream from the shared outbox; an `Idempotency-Key` is claimed in the database, so a
+  duplicate on another replica gets `409 IDEMPOTENCY_KEY_IN_USE`.
+- **Circuit breaker:** 3 failed calls to World or the Gateway within 35 s (task timeout × 3.5) trip
+  it; the failing instance named by `X-Upstream-Instance` is reported to Discovery, otherwise calls
+  fail fast for 35 s and a single trial call decides whether it closes.
+- **Logs:** one JSON line per event in the shared format; `RESOURCE_LOG_LEVEL` (`info`).
 - **Try it:** the Postman collection in [`docs/postman/resource-service`](docs/postman/resource-service)
   (also as a single importable `resource-service.postman_collection.json`) goes through the Gateway:
   run **Auth (run first)** to register and log in a player, who gets zero balances from
