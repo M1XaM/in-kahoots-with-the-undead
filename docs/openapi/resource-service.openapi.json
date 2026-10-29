@@ -3,7 +3,7 @@
     "paths": {
         "/": {
             "get": {
-                "operationId": "HealthController_getHealth",
+                "operationId": "HealthController_getHealth[0]",
                 "parameters": [],
                 "responses": {
                     "200": {
@@ -11,6 +11,42 @@
                     }
                 },
                 "summary": "Health check",
+                "tags": [
+                    "health"
+                ],
+                "security": []
+            }
+        },
+        "/health": {
+            "get": {
+                "operationId": "HealthController_getHealth[1]",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "summary": "Health check",
+                "tags": [
+                    "health"
+                ],
+                "security": []
+            }
+        },
+        "/status": {
+            "get": {
+                "description": "Polled by Service Discovery. Load = `active_tasks / max_concurrent_tasks`. Answers `503` with `status: \"unavailable\"` while the database is down.",
+                "operationId": "HealthController_getStatus",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": "The instance can serve requests"
+                    },
+                    "503": {
+                        "description": "The database is down"
+                    }
+                },
+                "summary": "Instance status and load",
                 "tags": [
                     "health"
                 ],
@@ -1334,7 +1370,7 @@
     "info": {
         "title": "Resource Service",
         "description": "Kahoot With Undead resource economy: per-player balances, a gather/spend ledger and two-phase reservations. Events: `resource.gathered` is served on the `/events` WebSocket (not shown here).",
-        "version": "2.0.0",
+        "version": "3.0.0",
         "contact": {}
     },
     "tags": [],
@@ -1807,7 +1843,7 @@
                     "encounterId": {
                         "type": "string",
                         "description": "The Game encounter that caused the theft.",
-                        "example": "a5c2\u00e2\u20ac\u00a6"
+                        "example": "a5c2…"
                     }
                 },
                 "required": [
@@ -1847,7 +1883,7 @@
                     "payload": {
                         "type": "object",
                         "additionalProperties": true,
-                        "description": "player.registered: { playerId, username } \u00c2\u00b7 game.action_completed: { actionId, sessionId, playerId, type, roomId, nodeId, completedAt }",
+                        "description": "player.registered: { playerId, username } · game.action_completed: { actionId, sessionId, playerId, type, roomId, nodeId, completedAt }",
                         "example": {
                             "playerId": 42,
                             "username": "razvan"
@@ -1923,7 +1959,7 @@
                         "type": "object",
                         "additionalProperties": true,
                         "example": {
-                            "actionId": "e3f1\u00e2\u20ac\u00a6",
+                            "actionId": "e3f1…",
                             "playerId": 42,
                             "resourceType": "food",
                             "amount": 12,
