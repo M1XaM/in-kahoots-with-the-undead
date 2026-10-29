@@ -84,7 +84,8 @@ docker compose -f docker-compose.client.yml -f docker-compose.dev.yml up
 ```
 
 **Scaling:** Player, Game, Exam, World, Zombie, Resource, Base and Crafting start with
-`<SERVICE>_REPLICAS` (`PLAYER_REPLICAS`, `GAME_REPLICAS`, ...; 2 each) replicas. Every
+`<SERVICE>_REPLICAS` (`PLAYER_REPLICAS`, `EXAM_REPLICAS`, ...; 2 each) replicas, Game with
+`game` plus `GAME_EXTRA_REPLICAS` (1) more. Every
 replica registers with Service Discovery and the gateway balances across them, so replicas can be
 added and removed while everything runs:
 
@@ -96,10 +97,11 @@ curl -H 'X-Internal-Key: changeme' localhost:8089/services   # what Discovery se
 
 Each response from the gateway names the replica that answered in `X-Upstream-Instance`. Game
 replicas keep lobbies, presence and the event stream in `game-db`, so any replica can serve any
-request. Each replica publishes its Socket.IO port on the next free host port from
-`GAME_HOST_PORT` (8090) to `GAME_HOST_PORT_LAST` (8099), but the gateway hands every browser the same
-`GAME_PUBLIC_WS_URL`, so browser sockets all land on one replica; the others serve REST and the
-`/events` stream.
+request. The `game` service publishes its Socket.IO port on `GAME_HOST_PORT` (8090) and
+`game-replica` runs `GAME_EXTRA_REPLICAS` (1) more without a host port, because replicas started
+together race for a port range. The gateway hands every browser the same `GAME_PUBLIC_WS_URL`, so
+browser sockets all land on `game`; the others serve REST and the `/events` stream. Scale Game with
+`--scale game-replica=3`.
 
 ### Gateway
 
@@ -195,7 +197,7 @@ request. Each replica publishes its Socket.IO port on the next free host port fr
 ### Game Service
 
 - **Image:** [`timurcravtov/game-service`](https://hub.docker.com/r/timurcravtov/game-service),
-  version set by `GAME_SERVICE_TAG` (default `3`), `GAME_REPLICAS` (2) replicas.
+  version set by `GAME_SERVICE_TAG` (default `3`), `game` plus `GAME_EXTRA_REPLICAS` (1) `game-replica` replicas.
 - **Needs:** its own Postgres (`game-db`, started by compose); password defaults to `qwerty`, override with `GAME_POSTGRES_PASSWORD`.
 - **Scaling:** instance-agnostic: lobbies, the event outbox and which sockets are joined (so
   `game.presence_changed` fires when a player's first socket anywhere joins and their last one

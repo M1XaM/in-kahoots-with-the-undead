@@ -1,6 +1,25 @@
 # example RS256 key shared by every Player replica, so a token any replica issues verifies against any replica's JWKS; never use in production
 x-jwt-private-key: &jwt-private-key ${JWT_PRIVATE_KEY:------BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC99rl42elYEQDr\nkbctTRpYUYTDl4IjiRWAIUMNexD7Mu93nHb3EU/Rgf2EBIuPm3dPLR74ojx+K33c\n3npCmrKC4u5F6ii+qKLmBJsCpGLsscufki/s3fRqwfvND9+9bPaDyQnuf5rugo9s\nT6tN27EN8epF78bCH8lOCYclskpQgDtNyvVVUqLxSFauQG0H5iCcNC7u2ounerys\ns/AvIKFAGlr3ea7Xgz+1HHhew1AzeepMZC/myABy/P9ehfrCtmTlSZdab4GTBKrs\nDijY3/3TL7Vl/XlPZlM9o8gXCQegCTR96l9Rfrx9cGsNahw+4K8aLJLyza18QU/4\nEzjT6rbbAgMBAAECggEAUNV9vALCTDLEGPnDIDhIhx99JrvAaX2qVAETZteg9LuK\ncfP3HZBUzjqJ1dUXTA8kOGFjZfqnUisQnl1fWhs47gBB0ydemi7pTobULU4lOEI5\n+xd6ZElYeds82lgwZYtJ5O811jKfi3GsNTM7mmBrWZtBDOyIv89F2nqscyqIe/Mw\nSFtn6Yvt88tBQIGpaJ9fRWQbE4mo9UckK0At6m5R+uvdJ391xBgkPsZDIKl2PTVy\nZGPCUA6ly63NgEIRNaxtkgA4qIvZ+BTLK9G4qqvXS4oyAVYU0GfoDgmRELLPhDa2\nOgQhK5RsBYKV0HsGjIDcaPPAgAMny41gU08Gkm6RyQKBgQD1ahA/MXiSFRAafsv8\n1cHIoKopayCbF1mLHpN1ffAyAs4rxVBsJeYXyFjV0J5OKiFgLZyhtadMmXyq7OQA\noeiRYHJQrrrti9ZUWloGiPj+KJNBkD80uK3/8JUaDZkI7Tov034Tsm5S6jSQDf9h\nhfMdRhdMsKZrogz8ouP5FJN7cwKBgQDGKFwk1/NZ+Y03U674FLkQzOqXu5QKitBN\nXJJJxIiIhwRVdoRd9QayaBbfiEl9OPNFtbA/CDf19FsQJDb6cn0Y7XWxp07mEWjP\nj8popyH7wckVfpSv2Xt0dENNP3KXP0ZjNK0CxzcnkZ8tYXU/xMemIGbn3YTekSVX\nOSfVN4jM+QKBgQDvxlvvUgdqOtgL+vyUn8iAm7EFXJxzyyF6kjoiXhRy2FjVXSgR\nMgoYDG/3H6e72N/ZF1dki5XUelXari6qC4atmxy1hbIu6yRSMCCrJ+KWd9BAC44l\nlZazbDxRQx3VIepq1ejll7zAmAEZCgQNJZF9dYDINgOzP5YOs5unPZpGzwKBgQDE\nLJa0fvpTXARa/sTcox9oK4Yf+zsfiLeZrwjAcQo+J3S56yA2KGqd2wCyAanHh8cH\nf0zhyhAkteolO8UWApwoPoXi/+DTUe7ydccL/lJdfEbHuc4XnXZkHum2Ixcd9y2G\n71JMys6mpLryYWaDYBvLMo7OA3cUJJvUEyiFJHqReQKBgEpmolERCmXFsvzC+pmw\nHL1weYIgG+PQ/YlzLeOPDdSjfiAlg5F9nZlTFPW2lQsH6rMjGTRqg5tv0KoeA7Bs\nNYnQCK8s4nuo7X1LZuTw2O1kQPmvYVT6JyvHL5Ap52qAeOU+cYtnbA/zEvFzJjMN\nAWYvr0hQZKe0Q13CruO45ZEx\n-----END PRIVATE KEY-----}
 
+x-game-service: &game-service
+  image: ${DOCKERHUB_USERNAME:-timurcravtov}/game-service:${GAME_SERVICE_TAG:-3}
+  restart: unless-stopped
+  environment:
+    PORT: ${GAME_PORT:-8082}
+    DATABASE_URL: postgres://${GAME_POSTGRES_USER:-postgres}:${GAME_POSTGRES_PASSWORD:-qwerty}@game-db:5432/${GAME_POSTGRES_DB:-game}?sslmode=disable
+    INTERNAL_KEY: ${INTERNAL_KEY:-changeme}
+    JWT_PRIVATE_KEY: *jwt-private-key
+    KAFKA_BROKERS: ${KAFKA_BROKERS:-localhost:9092}
+    TASK_TIMEOUT_MS: ${GAME_TASK_TIMEOUT_MS:-10000}
+    MAX_CONCURRENT_TASKS: ${GAME_MAX_CONCURRENT_TASKS:-100}
+    # signing keys for the Socket.IO handshake and service-to-service REST go through the gateway
+    GATEWAY_URL: http://gateway:8080
+    # registers on startup, heartbeats, deregisters on shutdown
+    DISCOVERY_URL: http://discovery:8089
+  depends_on:
+    game-db:
+      condition: service_healthy
+
 services:
   discovery:
     image: ${DISCOVERY_DOCKERHUB_USERNAME:-inercaso}/service-discovery:${DISCOVERY_SERVICE_TAG:-3}
@@ -79,32 +98,19 @@ services:
       timeout: 5s
       retries: 10
 
+  # Socket.IO clients connect here directly (GET /ws/game); REST goes through the gateway. Replicas
+  # started together race for a host port range, so only this one publishes a port and the extra
+  # replicas run as game-replica. The gateway hands every browser GAME_PUBLIC_WS_URL anyway
   game:
-    image: ${DOCKERHUB_USERNAME:-timurcravtov}/game-service:${GAME_SERVICE_TAG:-3}
-    restart: unless-stopped
-    # instance-agnostic: lobbies, presence and events live in game-db; `docker compose up -d --scale game=3`
-    deploy:
-      replicas: ${GAME_REPLICAS:-2}
-    environment:
-      PORT: ${GAME_PORT:-8082}
-      DATABASE_URL: postgres://${GAME_POSTGRES_USER:-postgres}:${GAME_POSTGRES_PASSWORD:-qwerty}@game-db:5432/${GAME_POSTGRES_DB:-game}?sslmode=disable
-      INTERNAL_KEY: ${INTERNAL_KEY:-changeme}
-      JWT_PRIVATE_KEY: *jwt-private-key
-      KAFKA_BROKERS: ${KAFKA_BROKERS:-localhost:9092}
-      TASK_TIMEOUT_MS: ${GAME_TASK_TIMEOUT_MS:-10000}
-      MAX_CONCURRENT_TASKS: ${GAME_MAX_CONCURRENT_TASKS:-100}
-      # signing keys for the Socket.IO handshake and service-to-service REST go through the gateway
-      GATEWAY_URL: http://gateway:8080
-      # registers on startup, heartbeats, deregisters on shutdown
-      DISCOVERY_URL: http://discovery:8089
-    # Socket.IO clients connect here directly (GET /ws/game); REST goes through the gateway. Replicas
-    # cannot share one host port, so each takes the next free one from GAME_HOST_PORT up to
-    # GAME_HOST_PORT_LAST (a range of its own, clear of the other services' ports)
+    <<: *game-service
     ports:
-      - "${GAME_HOST_PORT:-8090}-${GAME_HOST_PORT_LAST:-8099}:${GAME_PORT:-8082}"
-    depends_on:
-      game-db:
-        condition: service_healthy
+      - "${GAME_HOST_PORT:-8090}:${GAME_PORT:-8082}"
+
+  # instance-agnostic: lobbies, presence and events live in game-db; `docker compose up -d --scale game-replica=3`
+  game-replica:
+    <<: *game-service
+    deploy:
+      replicas: ${GAME_EXTRA_REPLICAS:-1}
 
   base-db:
     image: postgres:16-alpine
