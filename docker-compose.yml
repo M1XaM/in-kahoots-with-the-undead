@@ -1,4 +1,28 @@
 services:
+  discovery:
+    image: ${DISCOVERY_DOCKERHUB_USERNAME:-inercaso}/service-discovery:${DISCOVERY_SERVICE_TAG:-3}
+    restart: unless-stopped
+    environment:
+      PORT: 8089
+      INTERNAL_KEY: ${INTERNAL_KEY:-changeme}
+      LOG_LEVEL: ${DISCOVERY_LOG_LEVEL:-info}
+      # every registered instance's /status is checked this often; 3 failed checks in a row
+      # take it out of rotation, 30 s without any sign of life drop it
+      HEALTH_INTERVAL_S: ${DISCOVERY_HEALTH_INTERVAL_S:-5}
+      HEALTH_TIMEOUT_S: ${DISCOVERY_HEALTH_TIMEOUT_S:-2}
+      FAILURE_THRESHOLD: ${DISCOVERY_FAILURE_THRESHOLD:-3}
+      HEARTBEAT_TTL_S: ${DISCOVERY_HEARTBEAT_TTL_S:-30}
+      # load = active tasks / max concurrent tasks; critical alerts also go to Telegram
+      LOAD_WARN: ${DISCOVERY_LOAD_WARN:-0.7}
+      LOAD_CRITICAL: ${DISCOVERY_LOAD_CRITICAL:-0.9}
+      ALERT_COOLDOWN_S: ${DISCOVERY_ALERT_COOLDOWN_S:-300}
+      # Telegram alerts stay off while the token is empty; send /chatid to the bot for a chat id
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHATS_IDS: ${TELEGRAM_CHATS_IDS:-}
+    # published so the registry can be shown from the host (GET /services needs X-Internal-Key)
+    ports:
+      - "${DISCOVERY_PORT:-8089}:8089"
+
   player-db:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -16,8 +40,11 @@ services:
       retries: 10
 
   player:
-    image: ${DOCKERHUB_USERNAME:-timurcravtov}/player-service:${PLAYER_SERVICE_TAG:-2}
+    image: ${DOCKERHUB_USERNAME:-timurcravtov}/player-service:${PLAYER_SERVICE_TAG:-3}
     restart: unless-stopped
+    # every replica shares player-db; change at runtime with `docker compose up -d --scale player=3`
+    deploy:
+      replicas: ${PLAYER_REPLICAS:-2}
     environment:
       PORT: ${PLAYER_PORT:-8081}
       DATABASE_URL: postgres://${PLAYER_POSTGRES_USER:-postgres}:${PLAYER_POSTGRES_PASSWORD:-qwerty}@player-db:5432/${PLAYER_POSTGRES_DB:-player}?sslmode=disable
@@ -28,6 +55,8 @@ services:
       MAX_CONCURRENT_TASKS: ${PLAYER_MAX_CONCURRENT_TASKS:-100}
       # events and service-to-service REST go through the gateway
       GATEWAY_URL: http://gateway:8080
+      # registers on startup, heartbeats, deregisters on shutdown
+      DISCOVERY_URL: http://discovery:8089
     depends_on:
       player-db:
         condition: service_healthy
@@ -48,8 +77,11 @@ services:
       retries: 10
 
   game:
-    image: ${DOCKERHUB_USERNAME:-timurcravtov}/game-service:${GAME_SERVICE_TAG:-2}
+    image: ${DOCKERHUB_USERNAME:-timurcravtov}/game-service:${GAME_SERVICE_TAG:-3}
     restart: unless-stopped
+    # instance-agnostic: lobbies, presence and events live in game-db; `docker compose up -d --scale game=3`
+    deploy:
+      replicas: ${GAME_REPLICAS:-2}
     environment:
       PORT: ${GAME_PORT:-8082}
       DATABASE_URL: postgres://${GAME_POSTGRES_USER:-postgres}:${GAME_POSTGRES_PASSWORD:-qwerty}@game-db:5432/${GAME_POSTGRES_DB:-game}?sslmode=disable
@@ -60,9 +92,13 @@ services:
       MAX_CONCURRENT_TASKS: ${GAME_MAX_CONCURRENT_TASKS:-100}
       # signing keys for the Socket.IO handshake and service-to-service REST go through the gateway
       GATEWAY_URL: http://gateway:8080
-    # Socket.IO clients connect here directly (GET /ws/game); REST goes through the gateway
+      # registers on startup, heartbeats, deregisters on shutdown
+      DISCOVERY_URL: http://discovery:8089
+    # Socket.IO clients connect here directly (GET /ws/game); REST goes through the gateway. Replicas
+    # cannot share one host port, so each takes the next free one from GAME_HOST_PORT up to
+    # GAME_HOST_PORT_LAST (a range of its own, clear of the other services' ports)
     ports:
-      - "${GAME_PORT:-8082}:${GAME_PORT:-8082}"
+      - "${GAME_HOST_PORT:-8090}-${GAME_HOST_PORT_LAST:-8099}:${GAME_PORT:-8082}"
     depends_on:
       game-db:
         condition: service_healthy
@@ -83,8 +119,12 @@ services:
       retries: 10
 
   base:
-    image: ${BASE_DOCKERHUB_USERNAME:-mixam052}/kahoots-base-service:${BASE_SERVICE_TAG:-2}
+    image: ${BASE_DOCKERHUB_USERNAME:-mixam052}/kahoots-base-service:${BASE_SERVICE_TAG:-3}
     restart: unless-stopped
+    # instance-agnostic: one replica consumes each event stream, Idempotency-Keys are claimed in
+    # the shared database; change at runtime with `docker compose up -d --scale base=3`
+    deploy:
+      replicas: ${BASE_REPLICAS:-2}
     environment:
       PORT: ${BASE_PORT:-8087}
       DATABASE_URL: postgres://${BASE_POSTGRES_USER:-postgres}:${BASE_POSTGRES_PASSWORD:-qwerty}@base-db:5432/${BASE_POSTGRES_DB:-base}?sslmode=disable
@@ -94,6 +134,9 @@ services:
       GATEWAY_URL: http://gateway:8080
       TASK_TIMEOUT_MS: ${BASE_TASK_TIMEOUT_MS:-10000}
       MAX_CONCURRENT_TASKS: ${BASE_MAX_CONCURRENT_TASKS:-100}
+      LOG_LEVEL: ${BASE_LOG_LEVEL:-info}
+      # registers on startup, heartbeats, deregisters on shutdown
+      DISCOVERY_URL: http://discovery:8089
     depends_on:
       base-db:
         condition: service_healthy
@@ -115,8 +158,11 @@ services:
       retries: 10
 
   crafting:
-    image: ${CRAFTING_DOCKERHUB_USERNAME:-mixam052}/kahoots-crafting-service:${CRAFTING_SERVICE_TAG:-2}
+    image: ${CRAFTING_DOCKERHUB_USERNAME:-mixam052}/kahoots-crafting-service:${CRAFTING_SERVICE_TAG:-3}
     restart: unless-stopped
+    # instance-agnostic like Base; `docker compose up -d --scale crafting=3`
+    deploy:
+      replicas: ${CRAFTING_REPLICAS:-2}
     environment:
       PORT: ${CRAFTING_PORT:-8088}
       DATABASE_URL: postgres://${CRAFTING_POSTGRES_USER:-postgres}:${CRAFTING_POSTGRES_PASSWORD:-qwerty}@crafting-db:5432/${CRAFTING_POSTGRES_DB:-crafting}?sslmode=disable
@@ -126,6 +172,9 @@ services:
       GATEWAY_URL: http://gateway:8080
       TASK_TIMEOUT_MS: ${CRAFTING_TASK_TIMEOUT_MS:-10000}
       MAX_CONCURRENT_TASKS: ${CRAFTING_MAX_CONCURRENT_TASKS:-100}
+      LOG_LEVEL: ${CRAFTING_LOG_LEVEL:-info}
+      # registers on startup, heartbeats, deregisters on shutdown
+      DISCOVERY_URL: http://discovery:8089
     depends_on:
       crafting-db:
         condition: service_healthy
@@ -147,8 +196,11 @@ services:
       retries: 10
 
   exam:
-    image: ${EXAM_DOCKERHUB_USERNAME:-inercaso}/exam-service:${EXAM_SERVICE_TAG:-2}
+    image: ${EXAM_DOCKERHUB_USERNAME:-inercaso}/exam-service:${EXAM_SERVICE_TAG:-3}
     restart: unless-stopped
+    # every replica shares exam-db; `docker compose up -d --scale exam=3`
+    deploy:
+      replicas: ${EXAM_REPLICAS:-2}
     environment:
       PORT: ${EXAM_PORT:-8083}
       DATABASE_URL: postgres://${EXAM_POSTGRES_USER:-postgres}:${EXAM_POSTGRES_PASSWORD:-qwerty}@exam-db:5432/${EXAM_POSTGRES_DB:-exam}?sslmode=disable
@@ -159,6 +211,8 @@ services:
       GATEWAY_URL: http://gateway:8080
       PLAYER_CLIENT: ${EXAM_PLAYER_CLIENT:-http}
       ZOMBIE_CLIENT: ${EXAM_ZOMBIE_CLIENT:-http}
+      # registers on startup, heartbeats, deregisters on shutdown
+      DISCOVERY_URL: http://discovery:8089
     depends_on:
       exam-db:
         condition: service_healthy
@@ -180,8 +234,11 @@ services:
       retries: 10
 
   world:
-    image: ${WORLD_DOCKERHUB_USERNAME:-inercaso}/world-service:${WORLD_SERVICE_TAG:-2}
+    image: ${WORLD_DOCKERHUB_USERNAME:-inercaso}/world-service:${WORLD_SERVICE_TAG:-3}
     restart: unless-stopped
+    # every replica shares world-db; `docker compose up -d --scale world=3`
+    deploy:
+      replicas: ${WORLD_REPLICAS:-2}
     environment:
       PORT: ${WORLD_PORT:-8084}
       DATABASE_URL: postgres://${WORLD_POSTGRES_USER:-postgres}:${WORLD_POSTGRES_PASSWORD:-qwerty}@world-db:5432/${WORLD_POSTGRES_DB:-world}?sslmode=disable
@@ -192,6 +249,8 @@ services:
       # `off` = not connected (use POST /world/internal/events)
       EXAM_EVENTS_URL: ${WORLD_EXAM_EVENTS_URL-gateway}
       GATEWAY_URL: http://gateway:8080
+      # registers on startup, heartbeats, deregisters on shutdown
+      DISCOVERY_URL: http://discovery:8089
     depends_on:
       world-db:
         condition: service_healthy
@@ -213,18 +272,24 @@ services:
       retries: 10
 
   zombie:
-    image: ${ZOMBIE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-zombie-service:${ZOMBIE_SERVICE_TAG:-2}
+    image: ${ZOMBIE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-zombie-service:${ZOMBIE_SERVICE_TAG:-3}
     restart: unless-stopped
+    # every replica shares zombie-db; `docker compose up -d --scale zombie=3`
+    deploy:
+      replicas: ${ZOMBIE_REPLICAS:-2}
     environment:
       PORT: ${ZOMBIE_PORT:-8085}
       INTERNAL_API_KEY: ${INTERNAL_KEY:-changeme}
       TASK_TIMEOUT_MS: ${ZOMBIE_TASK_TIMEOUT_MS:-10000}
       MAX_CONCURRENT_TASKS: ${ZOMBIE_MAX_CONCURRENT_TASKS:-100}
+      LOG_LEVEL: ${ZOMBIE_LOG_LEVEL:-info}
       DB_HOST: zombie-db
       DB_PORT: 5432
       DB_USERNAME: ${ZOMBIE_POSTGRES_USER:-postgres}
       DB_PASSWORD: ${ZOMBIE_POSTGRES_PASSWORD:-qwerty}
       DB_NAME: ${ZOMBIE_POSTGRES_DB:-zombie}
+      # registers on startup, heartbeats, deregisters on shutdown
+      DISCOVERY_URL: http://discovery:8089
     depends_on:
       zombie-db:
         condition: service_healthy
@@ -246,13 +311,17 @@ services:
       retries: 10
 
   resource:
-    image: ${RESOURCE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-resource-service:${RESOURCE_SERVICE_TAG:-2}
+    image: ${RESOURCE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-resource-service:${RESOURCE_SERVICE_TAG:-3}
     restart: unless-stopped
+    # every replica shares resource-db; `docker compose up -d --scale resource=3`
+    deploy:
+      replicas: ${RESOURCE_REPLICAS:-2}
     environment:
       PORT: ${RESOURCE_PORT:-8086}
       INTERNAL_API_KEY: ${INTERNAL_KEY:-changeme}
       TASK_TIMEOUT_MS: ${RESOURCE_TASK_TIMEOUT_MS:-10000}
       MAX_CONCURRENT_TASKS: ${RESOURCE_MAX_CONCURRENT_TASKS:-100}
+      LOG_LEVEL: ${RESOURCE_LOG_LEVEL:-info}
       DB_HOST: resource-db
       DB_PORT: 5432
       DB_USERNAME: ${RESOURCE_POSTGRES_USER:-postgres}
@@ -265,12 +334,14 @@ services:
       PLAYER_EVENTS_URL: ${RESOURCE_PLAYER_EVENTS_URL-gateway}
       GAME_EVENTS_URL: ${RESOURCE_GAME_EVENTS_URL-gateway}
       GATEWAY_URL: http://gateway:8080
+      # registers on startup, heartbeats, deregisters on shutdown
+      DISCOVERY_URL: http://discovery:8089
     depends_on:
       resource-db:
         condition: service_healthy
 
   gateway:
-    image: ${GATEWAY_DOCKERHUB_USERNAME:-timurcravtov}/gateway:${GATEWAY_SERVICE_TAG:-2}
+    image: ${GATEWAY_DOCKERHUB_USERNAME:-timurcravtov}/gateway:${GATEWAY_SERVICE_TAG:-3}
     restart: unless-stopped
     environment:
       PLAYER_SERVICE_URL: http://player:${PLAYER_PORT:-8081}
@@ -282,16 +353,20 @@ services:
       BASE_SERVICE_URL: http://base:${BASE_PORT:-8087}
       CRAFTING_SERVICE_URL: http://crafting:${CRAFTING_PORT:-8088}
       # handed to browsers by GET /ws/game, so it must be reachable from the host
-      GAME_PUBLIC_WS_URL: ws://localhost:${GAME_PORT:-8082}
+      GAME_PUBLIC_WS_URL: ws://localhost:${GAME_HOST_PORT:-8090}
       INTERNAL_KEY: ${INTERNAL_KEY:-changeme}
       # jwks (Player's GET /auth/jwks, per the contract) | secret (HS256) | off
       AUTH_MODE: ${GATEWAY_AUTH_MODE:-jwks}
       JWT_SECRET: ${GATEWAY_JWT_SECRET:-}
       TASK_TIMEOUT: ${GATEWAY_TASK_TIMEOUT:-30}
       MAX_CONCURRENT_TASKS: ${GATEWAY_MAX_CONCURRENT_TASKS:-100}
+      # routes to the healthy instances Discovery lists, round-robin; the *_SERVICE_URL above
+      # are only used for services Discovery has not listed (they do not register yet)
+      DISCOVERY_URL: http://discovery:8089
     ports:
       - "${GATEWAY_PORT:-8080}:8080"
     depends_on:
+      - discovery
       - player
       - game
       - exam
@@ -300,20 +375,6 @@ services:
       - resource
       - base
       - crafting
-
-  client:
-    image: ${CLIENT_DOCKERHUB_USERNAME:-mixam052}/kahoots-client:${CLIENT_SERVICE_TAG:-2}
-    restart: unless-stopped
-    environment:
-      # the browser only calls the client's own /api, which nginx proxies to the gateway
-      GATEWAY_URL: http://gateway:8080
-      # lets the app perform service actions (start an exam, grant XP); it reaches the
-      # browser, so leave it empty outside local development
-      DEV_INTERNAL_KEY: ${CLIENT_DEV_INTERNAL_KEY:-}
-    ports:
-      - "${CLIENT_PORT:-3000}:80"
-    depends_on:
-      - gateway
 
 volumes:
   player-db-data:

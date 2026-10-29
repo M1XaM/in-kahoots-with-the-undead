@@ -79,6 +79,16 @@ CREATE TABLE IF NOT EXISTS processed_events (
     CONSTRAINT "PK_6df2a6135cc301de873d3b3948c" PRIMARY KEY ("eventId")
 );
 
+-- Idempotency-Keys shared by every replica: claimed while running, then the response.
+CREATE TABLE IF NOT EXISTS idempotency_keys (
+    key          character varying NOT NULL,
+    status       character varying NOT NULL,
+    response     jsonb,
+    "claimedAt"  timestamp with time zone NOT NULL,
+    "createdAt"  timestamp with time zone NOT NULL DEFAULT now(),
+    CONSTRAINT "PK_0afd83cbf08c9d12089a9bffc5e" PRIMARY KEY (key)
+);
+
 -- ---------------------------------------------------------------------------
 -- Seed data
 -- ---------------------------------------------------------------------------

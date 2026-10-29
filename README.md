@@ -6,6 +6,7 @@ including Professor Zombies, who force a pop quiz before letting you past. Passi
 wings of the university to explore, tying academic progress directly to survival progress.
 
 [![gateway](https://img.shields.io/docker/v/timurcravtov/gateway?sort=date&label=gateway&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/gateway)
+[![service-discovery](https://img.shields.io/docker/v/inercaso/service-discovery?sort=date&label=service-discovery&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/inercaso/service-discovery)
 [![player-service](https://img.shields.io/docker/v/timurcravtov/player-service?sort=date&label=player-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/player-service)
 [![game-service](https://img.shields.io/docker/v/timurcravtov/game-service?sort=date&label=game-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/timurcravtov/game-service)
 [![exam-service](https://img.shields.io/docker/v/inercaso/exam-service?sort=date&label=exam-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/inercaso/exam-service)
@@ -15,6 +16,7 @@ wings of the university to explore, tying academic progress directly to survival
 [![base-service](https://img.shields.io/docker/v/mixam052/kahoots-base-service?sort=date&label=base-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/mixam052/kahoots-base-service)
 [![crafting-service](https://img.shields.io/docker/v/mixam052/kahoots-crafting-service?sort=date&label=crafting-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/mixam052/kahoots-crafting-service)
 
+[![service-discovery postman](https://img.shields.io/badge/service--discovery-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/service-discovery)
 [![player-service postman](https://img.shields.io/badge/player--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/player-service)
 [![game-service postman](https://img.shields.io/badge/game--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/game-service)
 [![exam-service postman](https://img.shields.io/badge/exam--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/exam-service)
@@ -30,6 +32,7 @@ wings of the university to explore, tying academic progress directly to survival
 ![Architecture diagram](docs/architecture.png)
 
 - **Gateway**: the single entry point: routing, authorization, task limits, WebSocket negotiation
+- **Service Discovery**: the registry of running instances: health checks, load alerts, Telegram notifications
 - **Player**: identity, auth, profiles, XP/levels, inventory, trading
 - **Game**: sessions, day/night cycle, timed actions, zombie encounters
 - **Exam**: exam generation, grading, academic history, achievements
@@ -57,29 +60,53 @@ Requirements: Docker with Compose v2, and the service ports below free on your m
 
 ```
 cp .env.example .env   # adjust credentials/tags if needed
-docker compose up
+docker compose -f docker-compose.client.yml up   # every service and the React client
+docker compose up                                # every service, without the client
 ```
+
+`docker-compose.yml` holds the backend; `docker-compose.client.yml` includes it and adds the client.
 
 | Service | URL |
 |---|---|
-| **Client** (React app) | http://localhost:3000 |
+| **Client** (React app, only with `docker-compose.client.yml`) | http://localhost:3000 |
 | **Gateway** (entry point) | http://localhost:8080 |
-| Game (Socket.IO only) | http://localhost:8082 |
+| Game (Socket.IO only) | http://localhost:8090 |
+| Service Discovery (registry, `X-Internal-Key`) | http://localhost:8089 |
 
 Only the gateway and Game's Socket.IO port are published, so every REST call from a client has to pass
 the gateway's authorization. To reach a service directly while debugging (Player 8081, Exam 8083, World
-8084, Zombie 8085, Resource 8086, Base 8087, Crafting 8088), add the override:
+8084, Zombie 8085, Resource 8086; each Base and Crafting replica gets a free host port, see
+`docker compose port --index 1 base 8087`), add the override to either file:
 
 ```
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+docker compose -f docker-compose.client.yml -f docker-compose.dev.yml up
 ```
+
+**Scaling:** Player, Game, Exam, World, Zombie, Resource, Base and Crafting start with
+`<SERVICE>_REPLICAS` (`PLAYER_REPLICAS`, `GAME_REPLICAS`, ...; 2 each) replicas. Every
+replica registers with Service Discovery and the gateway balances across them, so replicas can be
+added and removed while everything runs:
+
+```
+docker compose up -d --scale base=3      # a third replica registers, the gateway sends it requests
+docker compose up -d --scale base=1      # two stop, deregister, and leave the rotation
+curl -H 'X-Internal-Key: changeme' localhost:8089/services   # what Discovery sees
+```
+
+Each response from the gateway names the replica that answered in `X-Upstream-Instance`. Game
+replicas keep lobbies, presence and the event stream in `game-db`, so any replica can serve any
+request. Each replica publishes its Socket.IO port on the next free host port from
+`GAME_HOST_PORT` (8090) to `GAME_HOST_PORT_LAST` (8099), but the gateway hands every browser the same
+`GAME_PUBLIC_WS_URL`, so browser sockets all land on one replica; the others serve REST and the
+`/events` stream.
 
 ### Gateway
 
 - **Repository:** [`services/gateway`](https://github.com/TimurCravtov/KahootWithUndeadGateway),
   Python / FastAPI (the lab's "banned" language).
 - **Image:** [`timurcravtov/gateway`](https://hub.docker.com/r/timurcravtov/gateway), version set
-  by `GATEWAY_SERVICE_TAG` (currently `2`).
+  by `GATEWAY_SERVICE_TAG` (currently `3`).
 - **Routes** by the first path segment to the owning service (prefixes in the
   [Communication Contract](docs/communication.md#conventions)). Base, Crafting, Exam, World and
   Resource are configured to call other services through it, so all REST traffic, client and
@@ -93,14 +120,55 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
   `GATEWAY_MAX_CONCURRENT_TASKS` in flight answer `429`. Zombie, Resource, Base and Crafting enforce
   the same limits themselves (`408` / `429`).
 - **WebSockets:** `GET /ws/game` returns Game's Socket.IO URL for the browser and
-  `GET /ws/{player|game|exam|world|resource}` (internal) a producer's `/events` URL. The gateway
-  never relays the connection.
+  `GET /ws/{player|game|exam|world|resource}` (internal) the `/events` URL of one of the
+  producer's instances. The gateway never relays the connection.
+- **Service Discovery:** with `DISCOVERY_URL` it fetches every service's instances every 2 s and
+  routes only to the healthy ones, **round-robin**, without asking Discovery per request. A service
+  Discovery has never listed (it does not register yet) is reached at its `*_SERVICE_URL`; a listed
+  service without a healthy instance answers `503`. When Discovery is down the last lists are kept.
+  Every response names the instance that answered in `X-Upstream-Instance`.
+- **Circuit breaker:** 3 failed calls (timeout, connection error or `5xx`) to one service within
+  105 s (`GATEWAY_TASK_TIMEOUT` × 3.5) trip it and log `circuit breaker tripped`. A failing instance
+  listed by Discovery leaves the rotation at once and is reported to Discovery; a service at its
+  static URL is answered `503` at once for 105 s, then one trial request decides.
+- **Status:** `GET /status` reports its load like every service, and the gateway registers itself
+  with Discovery, which checks it like any other instance.
 - **Try it:** http://localhost:8080/docs, health check `GET /health`.
+
+### Service Discovery
+
+- **Repository:** [`services/service-discovery`](https://github.com/inercaso/KahootWithUndeadDiscovery),
+  Python / FastAPI (the lab's "banned" language).
+- **Image:** [`inercaso/service-discovery`](https://hub.docker.com/r/inercaso/service-discovery),
+  version set by `DISCOVERY_SERVICE_TAG` (currently `3`).
+- **Registry:** every instance registers itself on startup (`POST /services/register` with its own
+  container address), sends a heartbeat every few seconds and deregisters on shutdown; every service
+  gets `DISCOVERY_URL: http://discovery:8089`. The gateway fetches `GET /services` every 2 s and
+  routes to the healthy instances, round-robin. All registry routes need `X-Internal-Key`.
+- **Health checks:** every `DISCOVERY_HEALTH_INTERVAL_S` (5 s) it calls each instance's `/status`;
+  `DISCOVERY_FAILURE_THRESHOLD` (3) failed checks in a row take the instance out of rotation, and
+  `DISCOVERY_HEARTBEAT_TTL_S` (30 s) without a sign of life drop it. A caller whose circuit breaker
+  trips reports the instance with `POST /services/{service}/instances/{id}/failures`.
+- **Alerts:** load is `active_tasks / max_concurrent_tasks` from `/status`. At
+  `DISCOVERY_LOAD_WARN` (0.7) it logs a warning; at `DISCOVERY_LOAD_CRITICAL` (0.9), and when an
+  instance stops answering, expires or is removed by a breaker, the alert also goes to Telegram,
+  at most once per `DISCOVERY_ALERT_COOLDOWN_S` (300 s) per instance.
+- **Telegram:** create a bot with @BotFather, add it to the team chat and send it `/chatid`; put
+  the token in `TELEGRAM_BOT_TOKEN` and the chat ids, comma-separated, in `TELEGRAM_CHATS_IDS`
+  in `.env` (never commit them). Without a token alerts only go to the log.
+- **Try it:** `curl -H 'X-Internal-Key: changeme' localhost:8089/services` lists every instance with
+  its health and load; `GET /status` and `GET /health` are public. The Postman collection in
+  [`docs/postman/service-discovery`](docs/postman/service-discovery) (also as a single importable
+  `service-discovery.postman_collection.json`) walks the registry (register, heartbeat, report a
+  failure, deregister) and sends requests through the gateway to show `X-Upstream-Instance`
+  changing between replicas. Swagger UI at
+  http://localhost:8089/docs; API reference:
+  [`docs/openapi/service-discovery.openapi.json`](docs/openapi/service-discovery.openapi.json).
 
 ### Client
 
 - **Repository:** [`services/client`](https://github.com/M1XaM/kahoots-client), React / Vite, served
-  by nginx.
+  by nginx. Runs from `docker-compose.client.yml`, which includes the whole backend.
 - **Image:** [`mixam052/kahoots-client`](https://hub.docker.com/r/mixam052/kahoots-client), version
   set by `CLIENT_SERVICE_TAG` (currently `2`).
 - **Talks to:** the Gateway only. The browser calls the client's own `/api`, which nginx proxies
@@ -111,12 +179,12 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
   is all the app needs. Its service actions (starting an exam, granting XP or resources) send
   `X-Internal-Key`, taken from `CLIENT_DEV_INTERNAL_KEY`: the key reaches the browser, so set it
   on a local machine only.
-- **Try it:** http://localhost:3000.
+- **Try it:** `docker compose -f docker-compose.client.yml up`, then http://localhost:3000.
 
 ### Player Service
 
 - **Image:** [`timurcravtov/player-service`](https://hub.docker.com/r/timurcravtov/player-service),
-  version set by `PLAYER_SERVICE_TAG` (default `2`).
+  version set by `PLAYER_SERVICE_TAG` (default `3`).
 - **Needs:** its own Postgres (`player-db`, started by compose); password defaults to `qwerty`, override with `PLAYER_POSTGRES_PASSWORD`.
 - **Talks to:** Game, over its event stream: it asks the gateway for the stream URL (`GATEWAY_URL`) and
   keeps `online` in step with `game.presence_changed`. It issues the login cookie, publishes the JWKS
@@ -127,8 +195,12 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 ### Game Service
 
 - **Image:** [`timurcravtov/game-service`](https://hub.docker.com/r/timurcravtov/game-service),
-  version set by `GAME_SERVICE_TAG` (default `2`).
+  version set by `GAME_SERVICE_TAG` (default `3`), `GAME_REPLICAS` (2) replicas.
 - **Needs:** its own Postgres (`game-db`, started by compose); password defaults to `qwerty`, override with `GAME_POSTGRES_PASSWORD`.
+- **Scaling:** instance-agnostic: lobbies, the event outbox and which sockets are joined (so
+  `game.presence_changed` fires when a player's first socket anywhere joins and their last one
+  anywhere leaves) are all in `game-db`. A replica refreshes its sockets every 10 s, releases them on
+  shutdown, and the survivors drop the ones of a replica that died after 30 s.
 - **Talks to:** Player, World, Zombie, Exam, Resource and Base, always through the gateway
   (`GATEWAY_URL`, with `X-Internal-Key`). Until they run, starting a session or a timed action that
   depends on them will fail; creating lobbies works on its own. Game reads the acting player from
@@ -140,7 +212,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 ### Exam Service
 
 - **Image:** [`inercaso/exam-service`](https://hub.docker.com/r/inercaso/exam-service),
-  version set by `EXAM_SERVICE_TAG` (currently `2`, the lab number; `latest` points at the newest).
+  version set by `EXAM_SERVICE_TAG` (currently `3`, the lab number; `latest` points at the newest).
 - **Needs:** its own Postgres (`exam-db`, started by compose and seeded with the question bank and
   achievements from [`db/exam-service/init.sql`](db/exam-service/init.sql)); password defaults to
   `qwerty`, override with `EXAM_POSTGRES_PASSWORD`.
@@ -160,7 +232,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 ### World Service
 
 - **Image:** [`inercaso/world-service`](https://hub.docker.com/r/inercaso/world-service),
-  version set by `WORLD_SERVICE_TAG` (currently `2`, the lab number; `latest` points at the newest).
+  version set by `WORLD_SERVICE_TAG` (currently `3`, the lab number; `latest` points at the newest).
 - **Needs:** its own Postgres (`world-db`, started by compose and seeded with the campus map from
   [`db/world-service/init.sql`](db/world-service/init.sql)); password defaults to `qwerty`,
   override with `WORLD_POSTGRES_PASSWORD`.
@@ -180,8 +252,8 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 ### Zombie Service
 
 - **Image:** [`nevaletik/kahoot-zombie-service`](https://hub.docker.com/r/nevaletik/kahoot-zombie-service),
-  version set by `ZOMBIE_SERVICE_TAG` (currently `2`, the lab number; each release is also tagged
-  `<lab>.<minor>.<patch>` and `latest`).
+  version set by `ZOMBIE_SERVICE_TAG` (currently `3`, the lab number; each release is also tagged
+  `<lab>.<minor>.<patch>` and `latest`), `ZOMBIE_REPLICAS` (2) replicas.
 - **Needs:** its own Postgres (`zombie-db`, started by compose and seeded from
   [`db/zombie-service/init.sql`](db/zombie-service/init.sql) with ten definitions: ids `5`/`6`/`7`
   are the math/physics/programming professors, `9` and `10` are not, matching Exam's stand-in);
@@ -189,6 +261,10 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
   `INTERNAL_KEY` is the `X-Internal-Key` every route except the health check expects.
 - **Talks to:** nobody. Players reach `GET /zombies/{id}` through the Gateway, which verifies the
   token and forwards the player as `X-Player-Id`; the service never sees the token.
+- **Scaling:** each replica registers with Service Discovery and answers `GET /status` with its load
+  (`503` while its database is down). Definitions live only in `zombie-db`, so any replica answers
+  any request. It calls no other service, so it has no circuit breaker.
+- **Logs:** one JSON line per event in the shared format; `ZOMBIE_LOG_LEVEL` (`info`).
 - **Try it:** the Postman collection in [`docs/postman/zombie-service`](docs/postman/zombie-service)
   (also as a single importable `zombie-service.postman_collection.json`) goes through the Gateway:
   run **Auth (run first)** to register and log in a player. API reference:
@@ -198,8 +274,8 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 ### Resource Service
 
 - **Image:** [`nevaletik/kahoot-resource-service`](https://hub.docker.com/r/nevaletik/kahoot-resource-service),
-  version set by `RESOURCE_SERVICE_TAG` (currently `2`, the lab number; each release is also tagged
-  `<lab>.<minor>.<patch>` and `latest`).
+  version set by `RESOURCE_SERVICE_TAG` (currently `3`, the lab number; each release is also tagged
+  `<lab>.<minor>.<patch>` and `latest`), `RESOURCE_REPLICAS` (2) replicas.
 - **Needs:** its own Postgres (`resource-db`, started by compose and seeded from
   [`db/resource-service/init.sql`](db/resource-service/init.sql) with balances and ledger history
   for players `1`-`3`); password defaults to `qwerty`, override with `RESOURCE_POSTGRES_PASSWORD`.
@@ -211,6 +287,16 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
   `http://gateway:8080`; empty = built-in copy of the rooms). It publishes `resource.gathered` on
   `ws://resource:8086/events` (`GET /ws/resource` on the Gateway). Players are identified by the
   Gateway's `X-Player-Id`; Base and Crafting reserve/commit through it with `INTERNAL_KEY`.
+- **Scaling:** each replica registers with Service Discovery and answers `GET /status` with its load.
+  Reserve, commit, release, steal and the event handlers run in one transaction holding a
+  per-player advisory lock, so two replicas never spend the same balance; only one replica consumes
+  each of Player's and Game's streams (another takes over within 5 s); any replica serves the whole
+  `/events` stream from the shared outbox; an `Idempotency-Key` is claimed in the database, so a
+  duplicate on another replica gets `409 IDEMPOTENCY_KEY_IN_USE`.
+- **Circuit breaker:** 3 failed calls to World or the Gateway within 35 s (task timeout × 3.5) trip
+  it; the failing instance named by `X-Upstream-Instance` is reported to Discovery, otherwise calls
+  fail fast for 35 s and a single trial call decides whether it closes.
+- **Logs:** one JSON line per event in the shared format; `RESOURCE_LOG_LEVEL` (`info`).
 - **Try it:** the Postman collection in [`docs/postman/resource-service`](docs/postman/resource-service)
   (also as a single importable `resource-service.postman_collection.json`) goes through the Gateway:
   run **Auth (run first)** to register and log in a player, who gets zero balances from
@@ -221,19 +307,28 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 ### Base Service
 
 - **Image:** [`mixam052/kahoots-base-service`](https://hub.docker.com/r/mixam052/kahoots-base-service),
-  version set by `BASE_SERVICE_TAG` (currently `2`).
+  version set by `BASE_SERVICE_TAG` (currently `3`), `BASE_REPLICAS` (2) replicas.
 - **Needs:** its own Postgres (`base-db`, started by compose); password defaults to `qwerty`, override with `BASE_POSTGRES_PASSWORD`.
 - **Talks to:** Resource, World and Player over REST through the Gateway (`GATEWAY_URL`). Until
   they run, spending endpoints (upgrades, barricades, Kiki) return `503 SERVICE_UNAVAILABLE`;
   reading and creating bases work on their own. It consumes `player.registered` from Player's
   `/events` stream, negotiated at the Gateway, so a new player gets a base right after registering.
-- **Limits:** `BASE_TASK_TIMEOUT_MS` (`408`) and `BASE_MAX_CONCURRENT_TASKS` (`429`).
+- **Limits:** `BASE_TASK_TIMEOUT_MS` (`408`) and `BASE_MAX_CONCURRENT_TASKS` (`429`), per replica.
+- **Scaling:** each replica registers with Service Discovery and answers `GET /status` with its load.
+  Only one replica consumes Player's event stream at a time (a PostgreSQL advisory lock; another
+  takes over within 5 s), every event is applied once in a transaction, and an `Idempotency-Key` is
+  claimed in the database before the request runs, so a duplicate on another replica gets
+  `409 IDEMPOTENCY_KEY_IN_USE`.
+- **Circuit breaker:** 3 failed calls to one service within 35 s (task timeout × 3.5) trip it; the
+  failing instance named by the gateway's `X-Upstream-Instance` is reported to Discovery, otherwise
+  calls to that service fail fast with `503` for 35 s.
+- **Logs:** one JSON line per event in the shared format; `BASE_LOG_LEVEL` (`info`).
 - **Try it:** Postman collection in [`docs/postman/base-service`](docs/postman/base-service).
 
 ### Crafting Service
 
 - **Image:** [`mixam052/kahoots-crafting-service`](https://hub.docker.com/r/mixam052/kahoots-crafting-service),
-  version set by `CRAFTING_SERVICE_TAG` (currently `2`).
+  version set by `CRAFTING_SERVICE_TAG` (currently `3`), `CRAFTING_REPLICAS` (2) replicas.
 - **Needs:** its own Postgres (`crafting-db`, started by compose); password defaults to `qwerty`, override with `CRAFTING_POSTGRES_PASSWORD`.
   Seeded from [`db/crafting-service/init.sql`](db/crafting-service/init.sql) with five recipes
   (two gated: one by level, one by a passed math exam and the Math Wing); their output items are
@@ -242,7 +337,11 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
   crafting returns `503 SERVICE_UNAVAILABLE`; recipes and availability work on their own. It
   consumes Player's, Exam's and World's `/events` streams, negotiated at the Gateway, to track
   levels, passed subjects and unlocked wings.
-- **Limits:** `CRAFTING_TASK_TIMEOUT_MS` (`408`) and `CRAFTING_MAX_CONCURRENT_TASKS` (`429`).
+- **Limits:** `CRAFTING_TASK_TIMEOUT_MS` (`408`) and `CRAFTING_MAX_CONCURRENT_TASKS` (`429`), per replica.
+- **Scaling:** like Base: registers with Service Discovery, one replica per event stream (Player,
+  Exam, World), events applied once, `Idempotency-Key` claimed before a craft runs.
+- **Circuit breaker:** like Base, for its calls to Resource and Player.
+- **Logs:** shared JSON format; `CRAFTING_LOG_LEVEL` (`info`).
 - **Try it:** Postman collection in [`docs/postman/crafting-service`](docs/postman/crafting-service).
 
 ## GitHub Workflow

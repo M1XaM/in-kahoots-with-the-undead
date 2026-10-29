@@ -1,0 +1,16 @@
+name: Report Failure (circuit breaker)
+$kind: http-request
+method: POST
+url: "http://localhost:8089/services/demo/instances/demo-1/failures"
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+body:
+  type: json
+  content: |
+    {
+      "reporter": "postman",
+      "reason": "circuit breaker tripped"
+    }
