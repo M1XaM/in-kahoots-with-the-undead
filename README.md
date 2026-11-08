@@ -31,8 +31,9 @@ wings of the university to explore, tying academic progress directly to survival
 
 ![Architecture diagram](docs/architecture.png)
 
-- **Gateway**: the single entry point: routing, authorization, task limits, WebSocket negotiation
-- **Service Discovery**: the registry of running instances: health checks, load alerts, Telegram notifications
+- **Gateway**: the single entry point for clients: authorization, task limits, routing by path prefix to the broker, WebSocket negotiation
+- **Camus Message Broker** (Dart, ports 8091 HTTP / 8092 gRPC): carries every call between the Gateway and the services and between services (per-service request queues, load balancing, circuit breakers), and every event (topics with durable queues, retries, dead letter channel). Design: [`architecture.md`](https://github.com/TimurCravtov/CamusMessageBroker/blob/main/docs/architecture.md)
+- **Service Discovery**: the registry of running instances and the topics they consume: health checks, load alerts, Telegram notifications
 - **Player**: identity, auth, profiles, XP/levels, inventory, trading
 - **Game**: sessions, day/night cycle, timed actions, zombie encounters
 - **Exam**: exam generation, grading, academic history, achievements
@@ -42,13 +43,19 @@ wings of the university to explore, tying academic progress directly to survival
 - **Base**: what players have built: base level, facilities, barricades
 - **Crafting**: recipes and crafting, delivering items into Player's inventory
 
-Clients and services reach each other's REST APIs only through the Gateway (services
-authenticate with `X-Internal-Key`); WebSocket URLs are negotiated at the Gateway and the
-connection then goes directly to the service. Game orchestrates a session by calling World, Zombie
-and Exam over REST; Resource, Base and
-Crafting react to what Game reports via async events, and publish their own events (level-ups,
-exam results, wing unlocks) for services that depend on them. See the [Communication
-Contract](docs/communication.md) for the full endpoint and event contract.
+Clients reach the REST APIs through the Gateway, which verifies the login and forwards each
+request to the broker as `/call/{service}/...`; services call each other the same way, with
+`X-Internal-Key`. The broker queues the request, picks a healthy instance, guards it with a circuit
+breaker and returns the response. Events no longer travel over per-producer `/events` WebSockets:
+a producer publishes to a broker topic (`POST /topics/{topic}/events`), and the broker delivers it
+to one instance of every subscribing service (`POST /internal/events`), retrying and finally
+dead-lettering what cannot be delivered. The topics a service consumes are declared in its Discovery
+registration. Only Game's Socket.IO connection still goes directly from the browser to the service.
+Game orchestrates a session by calling World, Zombie and Exam; Resource, Base and Crafting react to
+what Game reports via topics, and publish their own events (level-ups, exam results, wing unlocks)
+for services that depend on them. The diagram's source is [`docs/architecture.drawio`](docs/architecture.drawio).
+See the [Communication Contract](docs/communication.md) for the full endpoint and event contract
+(not yet rewritten for the broker; tracked by the Lab 4 contract tasks).
 
 ## Running
 
@@ -166,6 +173,143 @@ browser sockets all land on `game`; the others serve REST and the `/events` stre
   changing between replicas. Swagger UI at
   http://localhost:8089/docs; API reference:
   [`docs/openapi/service-discovery.openapi.json`](docs/openapi/service-discovery.openapi.json).
+
+### Message Broker
+
+- **Repository:** [`CamusMessageBroker`](https://github.com/TimurCravtov/CamusMessageBroker), Dart (a
+  language no other service uses). Design: [`docs/architecture.md`](https://github.com/TimurCravtov/CamusMessageBroker/blob/main/docs/architecture.md).
+- **Status:** Lab 4 design. The broker is not in `docker-compose.yml` yet, no image is published and
+  the services still talk through the Gateway; the contract below is what they will move to. Ports
+  8091 (HTTP) and 8092 (gRPC) are proposals.
+- **Role:** the only path between the Gateway and the services, between services, and for events.
+  Clients never reach it; every non-public route needs `X-Internal-Key`. It registers with Discovery
+  as `broker` like any service, and polls `GET /services` every 2 s for instances, health, load,
+  `topics` and `grpc_url`.
+- **Stays in the Gateway:** JWT check, task timeout and concurrent task limit for clients, routing by
+  path prefix, `GET /logs`. **Moves to the broker:** choosing an instance, circuit breakers,
+  service-to-service calls, events.
+
+#### Contract: requests (subscriber-based queues)
+
+`ANY /call/{service}/{original path}`, e.g. `GET /call/world/world/rooms/12`. The caller names the
+target service and never picks an instance. Services use `BROKER_URL` where they used the Gateway URL.
+
+| Header | Rule |
+|---|---|
+| `X-Internal-Key` | Required; the broker sets its own key on the upstream call. |
+| `X-Player-Id`, `X-Request-Id`, `Idempotency-Key`, `Content-Type`, `Accept` | Forwarded; a missing `X-Request-Id` is minted. |
+| `X-Timeout-Ms` | The caller's remaining budget; default and maximum `TASK_TIMEOUT_MS` (10 s). |
+| `Authorization`, `Cookie` | Dropped. |
+| `X-Upstream-Instance` (out) | The instance that answered, also on a failed call. |
+| `X-Reroutes` (out) | How many other instances were tried first. |
+
+The upstream's status and body come back unchanged. The broker adds only `429 TOO_MANY_REQUESTS`
+(queue of 200 full, or concurrency limit; with `Retry-After`), `503 SERVICE_UNAVAILABLE` (no healthy
+instance or breaker open) and `504 GATEWAY_TIMEOUT` (deadline passed while queued or in flight).
+
+- **Queue:** one bounded FIFO per target service, in memory. A request is dispatched only when an
+  instance has room (`max_concurrent_tasks` from Discovery minus the broker's own in-flight count).
+- **Load balancing:** round-robin over healthy instances; least load
+  (`(broker_in_flight + discovery_active_tasks) / max_concurrent_tasks`) with `LB_STRATEGY=least_load`.
+- **Circuit breaker:** per instance; 3 failures (timeout, connection error, `5xx`) within
+  `TASK_TIMEOUT_MS` × 3.5 trip it, log `circuit breaker tripped` and report it with
+  `POST /services/{service}/instances/{id}/failures`. Resource commit and release stay allowed while
+  a breaker is open (`CB_BYPASS_PATHS`).
+- **Reroute:** a failed call goes to the next healthy instance within the deadline only if it cannot
+  apply a write twice: the connection failed before sending, the method is `GET`/`HEAD`/`OPTIONS`, or
+  the request has an `Idempotency-Key`.
+
+#### Contract: events (topic-based queues)
+
+A topic is an event type, `<service>.<event>`. Services declare the topics they consume in their
+Discovery registration (`"topics": ["exam.completed"]`). The unit of subscription is the service: each
+subscribing service gets one copy of every event, delivered to one healthy instance, through a durable
+queue per (topic, subscriber).
+
+| Topic | Producer | Subscribers |
+|---|---|---|
+| `player.registered` | Player | Base, Resource |
+| `player.leveled_up` | Player | Crafting |
+| `game.action_completed` | Game | Resource |
+| `game.presence_changed` | Game | Player |
+| `resource.gathered` | Resource | Game |
+| `exam.completed` | Exam | World, Game, Crafting |
+| `world.wing_unlocked` | World | Game, Crafting |
+
+- **Publish:** `POST /topics/{topic}/events` with the existing envelope
+  `{eventId, type, version, occurredAt, payload}`. `202` once the event is in every subscriber's queue
+  and durably stored; `400` for an invalid envelope or a `type` that differs from the topic. A repeated
+  `eventId` within 24 h answers `202` and enqueues nothing. Producers keep their outbox and mark a row
+  sent only after the `202`.
+- **Deliver:** `POST /internal/events` on the consumer, with `X-Internal-Key`, `X-Request-Id` and
+  `X-Delivery-Attempt`. `2xx` acks. `5xx` or a timeout retries with backoff 1 s, 2 s, 4 s … 30 s,
+  preferring another instance. A `4xx` other than 408/429, or more than 5 attempts, dead-letters the
+  event. Delivery is at-least-once, so consumers keep deduplicating on `eventId` and answer `2xx` only
+  after persisting.
+- **Ordering:** one event in flight per queue (`QUEUE_PREFETCH=1`), so a subscriber sees a producer's
+  events in order; a failing event blocks only its own queue.
+- **Dead letters:** `GET /dead-letters?topic=&subscriber=&reason=&limit=&after=` lists them newest
+  first with the full envelope, `reason` (`max_attempts`, `rejected`, `no_subscribers`), attempts and
+  last status/error/instance. An event published to a topic nobody subscribes to is dead-lettered as
+  `no_subscribers` (proposal).
+- **Storage:** `STORAGE=log` appends every event to a log on the `broker-data` volume and fsyncs
+  before the `202`; queues and dead letters are rebuilt on restart. `STORAGE=memory` (default) keeps
+  nothing.
+
+#### Endpoints (port 8091)
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| `GET` | `/health`, `/status` | public | Liveness; `/status` reports `active_tasks / max_concurrent_tasks` like every service |
+| any | `/call/{service}/{path}` | key | Request queues |
+| `POST` | `/topics/{topic}/events` | key | Publish an event |
+| `GET` | `/topics` | key | Topics with producers seen, subscribers, queue depth, in-flight, published total |
+| `GET` | `/dead-letters` | key | Dead letter channel |
+| `GET` | `/metrics` | internal network | Prometheus text (grade 10) |
+
+#### gRPC (grade 8)
+
+One file, `proto/broker/v1/broker.proto`, owned by the broker repository (not written yet):
+
+```proto
+service Broker {                       // served by the broker, port 8092
+  rpc Call(CallRequest) returns (CallResponse);
+  rpc Publish(Event) returns (PublishAck);
+}
+service Endpoint {                     // served by every service
+  rpc Handle(CallRequest) returns (CallResponse);
+  rpc Deliver(Event) returns (DeliveryAck);
+}
+message CallRequest  { string service = 1; string method = 2; string path = 3;
+                       map<string, string> headers = 4; bytes body = 5; }
+message CallResponse { int32 status = 1; map<string, string> headers = 2; bytes body = 3; string instance = 4; }
+message Event        { string event_id = 1; string type = 2; int32 version = 3; string occurred_at = 4; bytes payload = 5; }
+```
+
+- **One envelope, not a proto per service:** each service keeps its handlers. `Endpoint.Handle` feeds
+  the call into the service's own router, and `Deliver` runs the same code as `POST /internal/events`,
+  so the migration is one adapter per service.
+- **Mapping:** the key travels as `x-internal-key` metadata, gRPC deadlines replace `X-Timeout-Ms`, and
+  `RESOURCE_EXHAUSTED` / `UNAVAILABLE` / `DEADLINE_EXCEEDED` mean 429 / 503 / 504.
+- **Migration:** a service adds `grpc_url` to its Discovery registration; the broker calls an instance
+  over gRPC when it has one and over HTTP otherwise, so services move one at a time. The Gateway then
+  calls the broker over gRPC too and drops the routes a player must not reach (`/<prefix>/internal/...`,
+  `/ws/{service}`); `/ws/game` stays.
+
+#### Configuration
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `PORT` / `GRPC_PORT` | `8091` / `8092` | Listen ports |
+| `INTERNAL_KEY` | required | Shared secret; the broker refuses to start without it |
+| `DISCOVERY_URL` | `http://discovery:8089` | Discovery |
+| `TASK_TIMEOUT_MS`, `MAX_CONCURRENT_TASKS`, `REQUEST_QUEUE_MAX` | `10000`, `100`, `200` | Deadline, live tasks before `429`, per-service queue bound |
+| `LB_STRATEGY`, `CB_BYPASS_PATHS` | `round_robin`, Resource commit/release | Balancing and breaker bypass |
+| `CONCURRENCY_MODEL` | `inline` | `inline` or `isolate_per_request` (grade 7) |
+| `QUEUE_PREFETCH`, `MAX_DELIVERY_ATTEMPTS`, `DEDUP_WINDOW_S` | `1`, `5`, `86400` | Event delivery |
+| `STORAGE`, `DATA_DIR` | `memory`, `/data` | Storage |
+
+Defaults are the design's proposals, not confirmed.
 
 ### Client
 
