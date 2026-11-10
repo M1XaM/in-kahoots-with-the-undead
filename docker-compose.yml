@@ -26,6 +26,30 @@ services:
     ports:
       - "${DISCOVERY_PORT:-8089}:8089"
 
+  broker:
+    image: ${BROKER_DOCKERHUB_USERNAME:-timurcravtov}/broker:${BROKER_SERVICE_TAG:-4}
+    restart: unless-stopped
+    environment:
+      PORT: ${BROKER_PORT:-8091}
+      GRPC_PORT: ${BROKER_GRPC_PORT:-8092}
+      INTERNAL_KEY: ${INTERNAL_KEY:-changeme}
+      TASK_TIMEOUT_MS: ${BROKER_TASK_TIMEOUT_MS:-10000}
+      MAX_CONCURRENT_TASKS: ${BROKER_MAX_CONCURRENT_TASKS:-100}
+      LB_STRATEGY: ${BROKER_LB_STRATEGY:-round_robin}
+      # `log` = events survive a restart (kept on the broker-data volume), `memory` = kept nothing
+      STORAGE: ${BROKER_STORAGE:-log}
+      DATA_DIR: /data
+      LOG_LEVEL: ${BROKER_LOG_LEVEL:-info}
+      # polls the registry for instances, health and load; registers itself as `broker`
+      DISCOVERY_URL: http://discovery:8089
+    volumes:
+      - broker-data:/data
+    ports:
+      - "${BROKER_PORT:-8091}:${BROKER_PORT:-8091}"
+      - "${BROKER_GRPC_PORT:-8092}:${BROKER_GRPC_PORT:-8092}"
+    depends_on:
+      - discovery
+
   player-db:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -380,6 +404,7 @@ services:
       - crafting
 
 volumes:
+  broker-data:
   player-db-data:
   game-db-data:
   base-db-data:
