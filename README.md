@@ -79,6 +79,7 @@ docker compose up                                # every service, without the cl
 | **Gateway** (entry point) | http://localhost:8080 |
 | Game (Socket.IO only) | http://localhost:8090 |
 | Service Discovery (registry, `X-Internal-Key`) | http://localhost:8089 |
+| Message Broker (HTTP, `X-Internal-Key`; gRPC on 8092) | http://localhost:8091 |
 
 Only the gateway and Game's Socket.IO port are published, so every REST call from a client has to pass
 the gateway's authorization. To reach a service directly while debugging (Player 8081, Exam 8083, World
@@ -178,9 +179,11 @@ browser sockets all land on `game`; the others serve REST and the `/events` stre
 
 - **Repository:** [`CamusMessageBroker`](https://github.com/TimurCravtov/CamusMessageBroker), Dart (a
   language no other service uses). Design: [`docs/architecture.md`](https://github.com/TimurCravtov/CamusMessageBroker/blob/main/docs/architecture.md).
-- **Status:** Lab 4 design. The broker is not in `docker-compose.yml` yet, no image is published and
-  the services still talk through the Gateway; the contract below is what they will move to. Ports
-  8091 (HTTP) and 8092 (gRPC) are proposals.
+- **Status:** Lab 4. The broker is a submodule (`services/broker`) and runs from `docker-compose.yml`
+  as `timurcravtov/broker:4` (`BROKER_DOCKERHUB_USERNAME`, `BROKER_SERVICE_TAG`), with HTTP on
+  `BROKER_PORT` (8091) and gRPC on `BROKER_GRPC_PORT` (8092), both published on the host. Events are
+  kept on the `broker-data` volume (`BROKER_STORAGE=log`). The services still talk through the
+  Gateway; the contract below is what they will move to.
 - **Role:** the only path between the Gateway and the services, between services, and for events.
   Clients never reach it; every non-public route needs `X-Internal-Key`. It registers with Discovery
   as `broker` like any service, and polls `GET /services` every 2 s for instances, health, load,

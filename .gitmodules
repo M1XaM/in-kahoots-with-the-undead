@@ -31,3 +31,6 @@
 [submodule "services/service-discovery"]
 	path = services/service-discovery
 	url = https://github.com/inercaso/KahootWithUndeadDiscovery.git
+[submodule "services/broker"]
+	path = services/broker
+	url = https://github.com/TimurCravtov/CamusMessageBroker.git
