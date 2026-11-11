@@ -543,8 +543,8 @@ curl -H 'X-Internal-Key: changeme' 'localhost:8080/logs?service=base,broker&sinc
 
 `X-Logs-Sources` names the instances that answered and `X-Logs-Missing` the ones that did not, with
 the reason (`404` until a service implements the endpoint). The endpoint every service implements
-is in the [contract](docs/communication.md#log-collection-get-internallogs-and-get-logs) and, step by
-step per language, in [`TODO_per_service.md`](TODO_per_service.md).
+is in the [contract](docs/communication.md#log-collection-get-internallogs-and-get-logs); what the
+other services still need is in [`TODO_per_service.md`](TODO_per_service.md).
 
 ## GitHub Workflow
 
