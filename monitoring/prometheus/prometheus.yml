@@ -1,0 +1,32 @@
+# Prometheus for Kahoot With Undead. Every target is scraped on the compose network.
+global:
+  scrape_interval: 5s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # the broker sees every call and every event between the services, so it describes the whole
+  # system: calls by service and outcome, queues, circuit breakers, instance load, dead letters
+  - job_name: broker
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["broker:8091"]
+
+  # Base and Crafting run several replicas: the compose service name resolves to all of them,
+  # so every replica is scraped on its own (instance = its IP)
+  - job_name: base
+    dns_sd_configs:
+      - names: ["base"]
+        type: A
+        port: 8087
+        refresh_interval: 15s
+
+  - job_name: crafting
+    dns_sd_configs:
+      - names: ["crafting"]
+        type: A
+        port: 8088
+        refresh_interval: 15s
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
