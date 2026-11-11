@@ -152,27 +152,32 @@ services:
       retries: 10
 
   base:
-    image: ${BASE_DOCKERHUB_USERNAME:-mixam052}/kahoots-base-service:${BASE_SERVICE_TAG:-3}
+    image: ${BASE_DOCKERHUB_USERNAME:-mixam052}/kahoots-base-service:${BASE_SERVICE_TAG:-4}
     restart: unless-stopped
-    # instance-agnostic: one replica consumes each event stream, Idempotency-Keys are claimed in
-    # the shared database; change at runtime with `docker compose up -d --scale base=3`
+    # instance-agnostic: the broker delivers each event to one replica, events and Idempotency-Keys
+    # are deduplicated in the shared database; `docker compose up -d --scale base=3`
     deploy:
       replicas: ${BASE_REPLICAS:-2}
     environment:
       PORT: ${BASE_PORT:-8087}
       DATABASE_URL: postgres://${BASE_POSTGRES_USER:-postgres}:${BASE_POSTGRES_PASSWORD:-qwerty}@base-db:5432/${BASE_POSTGRES_DB:-base}?sslmode=disable
       INTERNAL_KEY: ${INTERNAL_KEY:-changeme}
-      # REST to Resource, World and Player goes through the gateway, which also
-      # negotiates the URL of Player's event stream
-      GATEWAY_URL: http://gateway:8080
+      # calls to Resource, World and Player go through the broker over gRPC (Broker.Call); the
+      # broker calls Base back on its gRPC port and delivers the `player.registered` topic
+      BROKER_TRANSPORT: ${BASE_BROKER_TRANSPORT:-grpc}
+      BROKER_GRPC_URL: broker:${BROKER_GRPC_PORT:-8092}
+      BROKER_URL: http://broker:${BROKER_PORT:-8091}
+      GRPC_PORT: 9087
       TASK_TIMEOUT_MS: ${BASE_TASK_TIMEOUT_MS:-10000}
       MAX_CONCURRENT_TASKS: ${BASE_MAX_CONCURRENT_TASKS:-100}
       LOG_LEVEL: ${BASE_LOG_LEVEL:-info}
-      # registers on startup, heartbeats, deregisters on shutdown
+      # registers with its grpc_url and topics on startup, heartbeats, deregisters on shutdown
       DISCOVERY_URL: http://discovery:8089
     depends_on:
       base-db:
         condition: service_healthy
+      broker:
+        condition: service_started
 
   crafting-db:
     image: postgres:16-alpine
@@ -191,7 +196,7 @@ services:
       retries: 10
 
   crafting:
-    image: ${CRAFTING_DOCKERHUB_USERNAME:-mixam052}/kahoots-crafting-service:${CRAFTING_SERVICE_TAG:-3}
+    image: ${CRAFTING_DOCKERHUB_USERNAME:-mixam052}/kahoots-crafting-service:${CRAFTING_SERVICE_TAG:-4}
     restart: unless-stopped
     # instance-agnostic like Base; `docker compose up -d --scale crafting=3`
     deploy:
@@ -200,17 +205,23 @@ services:
       PORT: ${CRAFTING_PORT:-8088}
       DATABASE_URL: postgres://${CRAFTING_POSTGRES_USER:-postgres}:${CRAFTING_POSTGRES_PASSWORD:-qwerty}@crafting-db:5432/${CRAFTING_POSTGRES_DB:-crafting}?sslmode=disable
       INTERNAL_KEY: ${INTERNAL_KEY:-changeme}
-      # REST to Resource and Player goes through the gateway, which also negotiates
-      # the URLs of Player's, Exam's and World's event streams
-      GATEWAY_URL: http://gateway:8080
+      # calls to Resource and Player go through the broker over gRPC (Broker.Call); the broker
+      # calls Crafting back on its gRPC port and delivers `player.leveled_up`, `exam.completed`
+      # and `world.wing_unlocked`
+      BROKER_TRANSPORT: ${CRAFTING_BROKER_TRANSPORT:-grpc}
+      BROKER_GRPC_URL: broker:${BROKER_GRPC_PORT:-8092}
+      BROKER_URL: http://broker:${BROKER_PORT:-8091}
+      GRPC_PORT: 9088
       TASK_TIMEOUT_MS: ${CRAFTING_TASK_TIMEOUT_MS:-10000}
       MAX_CONCURRENT_TASKS: ${CRAFTING_MAX_CONCURRENT_TASKS:-100}
       LOG_LEVEL: ${CRAFTING_LOG_LEVEL:-info}
-      # registers on startup, heartbeats, deregisters on shutdown
+      # registers with its grpc_url and topics on startup, heartbeats, deregisters on shutdown
       DISCOVERY_URL: http://discovery:8089
     depends_on:
       crafting-db:
         condition: service_healthy
+      broker:
+        condition: service_started
 
   exam-db:
     image: postgres:16-alpine
@@ -377,6 +388,10 @@ services:
     image: ${GATEWAY_DOCKERHUB_USERNAME:-timurcravtov}/gateway:${GATEWAY_SERVICE_TAG:-3}
     restart: unless-stopped
     environment:
+      # from the Lab 4 gateway on, every request goes to the broker as /call/{service}/...; the
+      # broker balances the instances and runs the circuit breakers. The *_SERVICE_URL below and
+      # DISCOVERY_URL routing are only read by the Lab 3 image.
+      BROKER_URL: http://broker:${BROKER_PORT:-8091}
       PLAYER_SERVICE_URL: http://player:${PLAYER_PORT:-8081}
       GAME_SERVICE_URL: http://game:${GAME_PORT:-8082}
       EXAM_SERVICE_URL: http://exam:${EXAM_PORT:-8083}
@@ -400,6 +415,7 @@ services:
       - "${GATEWAY_PORT:-8080}:8080"
     depends_on:
       - discovery
+      - broker
       - player
       - game
       - exam
