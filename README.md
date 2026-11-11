@@ -511,12 +511,12 @@ Defaults are the design's proposals, not confirmed.
 (http://localhost:3001), configured from [`monitoring/`](monitoring):
 
 - **Prometheus** ([`monitoring/prometheus/prometheus.yml`](monitoring/prometheus/prometheus.yml))
-  scrapes every 5 s the gateway, Discovery, the broker's `GET /metrics` and every Base and Crafting replica (found through the
+  scrapes every 5 s the gateway, Discovery, the broker's `GET /metrics` and every Player, Game, Base and Crafting replica (found through the
   compose DNS name, so `--scale base=3` is picked up). The broker sees every call and every event, so
   one target describes the whole system: calls by service and outcome, latency, request queues,
   reroutes, open circuit breakers, instance health and load, events published / delivered /
-  dead-lettered and queue depth. Base and Crafting add their own requests by route and status,
-  events consumed by outcome, calls to other services and active tasks. Data is kept for
+  dead-lettered and queue depth. Player, Game, Base and Crafting add their own requests by route and status,
+  events consumed by outcome (Player, Base, Crafting), calls to other services and active tasks. Data is kept for
   `PROMETHEUS_RETENTION` (7 days) on the `prometheus-data` volume.
 - **Grafana** is provisioned with the Prometheus data source and the **Kahoot With Undead** dashboard
   ([`monitoring/grafana/dashboards/kahoot-overview.json`](monitoring/grafana/dashboards/kahoot-overview.json)),
