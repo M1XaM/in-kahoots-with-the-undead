@@ -1,8 +1,8 @@
 # Lab 4 – Breaking and Brokering: what is implemented, how and where
 
 Every requirement of the Lab 4 grading table, with the repository, branch or PR, and the files that
-implement it. What the other team services still have to do is in
-[`TODO_per_service.md`](TODO_per_service.md).
+implement it. The `/internal/logs` and `/metrics` endpoints the other team services still have to
+add are described in [`TODO_per_service.md`](TODO_per_service.md).
 
 **Where the code is**
 
@@ -120,7 +120,7 @@ other services from their `:3` images. 31 checks, all passing:
 3. Release Discovery (version `4.0.0` publishes `:4`) and the gateway (`lab4` tag publishes `:4`),
    then set `DISCOVERY_SERVICE_TAG=4` and `GATEWAY_SERVICE_TAG=4` in `docker-compose.yml`
    (still `3`, the only images published today).
-4. As the other services move to the broker ([`TODO_per_service.md`](TODO_per_service.md)), turn
+4. Once the other services call each other and publish their events through the broker, turn
    `GATEWAY_LEGACY_SERVICE_ROUTES` off.
 
 ## Known limits
@@ -129,7 +129,7 @@ other services from their `:3` images. 31 checks, all passing:
   and call each other through the gateway; Base and Crafting take events only from broker topics, so
   until the producers publish to the broker, Base and Crafting do not receive their events (the
   end-to-end test published them to the broker directly). They also do not serve `/internal/logs`
-  or `/metrics` yet and do not honour `X-Caller` (see [`TODO_per_service.md`](TODO_per_service.md)).
+  or `/metrics` yet ([`TODO_per_service.md`](TODO_per_service.md)) and do not honour `X-Caller`.
 - A replica that disappears without closing its connections (a hard kill) costs a few `504`s until
   its breaker trips (3 failures); a graceful stop costs none.
 - Over gRPC, `CallResponse.headers` is a map, so a response carries one value per header name (two
