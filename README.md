@@ -80,6 +80,8 @@ docker compose up                                # every service, without the cl
 | Game (Socket.IO only) | http://localhost:8090 |
 | Service Discovery (registry, `X-Internal-Key`) | http://localhost:8089 |
 | Message Broker (HTTP, `X-Internal-Key`; gRPC on 8092) | http://localhost:8091 |
+| Grafana (dashboard "Kahoot With Undead"; anonymous view, `admin`/`admin` to edit) | http://localhost:3001 |
+| Prometheus | http://localhost:9090 |
 
 Only the gateway and Game's Socket.IO port are published, so every REST call from a client has to pass
 the gateway's authorization. To reach a service directly while debugging (Player 8081, Exam 8083, World
@@ -132,6 +134,9 @@ browser sockets all land on `game`; the others serve REST and the `/events` stre
 - **WebSockets:** `GET /ws/game` returns Game's Socket.IO URL for the browser and
   `GET /ws/{player|game|exam|world|resource}` (internal) the `/events` URL of one of the
   producer's instances. The gateway never relays the connection.
+- **Lab 4 (next gateway image):** every request goes to the broker as `/call/{service}/...` with
+  `X-Caller: client` for requests from outside; the round-robin and the circuit breaker below move
+  to the broker and are removed from the gateway. Until that image is released, `3` behaves as below.
 - **Service Discovery:** with `DISCOVERY_URL` it fetches every service's instances every 2 s and
   routes only to the healthy ones, **round-robin**, without asking Discovery per request. A service
   Discovery has never listed (it does not register yet) is reached at its `*_SERVICE_URL`; a listed
@@ -182,8 +187,9 @@ browser sockets all land on `game`; the others serve REST and the `/events` stre
 - **Status:** Lab 4. The broker is a submodule (`services/broker`) and runs from `docker-compose.yml`
   as `timurcravtov/broker:4` (`BROKER_DOCKERHUB_USERNAME`, `BROKER_SERVICE_TAG`), with HTTP on
   `BROKER_PORT` (8091) and gRPC on `BROKER_GRPC_PORT` (8092), both published on the host. Events are
-  kept on the `broker-data` volume (`BROKER_STORAGE=log`). The services still talk through the
-  Gateway; the contract below is what they will move to.
+  kept on the `broker-data` volume (`BROKER_STORAGE=log`). Base and Crafting (`:4`) already
+  call other services through it over gRPC, are called back over gRPC and consume their topics; the
+  other services still talk through the Gateway until they move to the contract below.
 - **Role:** the only path between the Gateway and the services, between services, and for events.
   Clients never reach it; every non-public route needs `X-Internal-Key`. It registers with Discovery
   as `broker` like any service, and polls `GET /services` every 2 s for instances, health, load,
@@ -272,7 +278,8 @@ queue per (topic, subscriber).
 
 #### gRPC (grade 8)
 
-One file, `proto/broker/v1/broker.proto`, owned by the broker repository (not written yet):
+One file, `proto/broker/v1/broker.proto`, owned by the broker repository; Base and Crafting keep a
+copy and generate their Go stubs from it:
 
 ```proto
 service Broker {                       // served by the broker, port 8092
@@ -456,42 +463,65 @@ Defaults are the design's proposals, not confirmed.
 ### Base Service
 
 - **Image:** [`mixam052/kahoots-base-service`](https://hub.docker.com/r/mixam052/kahoots-base-service),
-  version set by `BASE_SERVICE_TAG` (currently `3`), `BASE_REPLICAS` (2) replicas.
+  version set by `BASE_SERVICE_TAG` (currently `4`), `BASE_REPLICAS` (2) replicas.
 - **Needs:** its own Postgres (`base-db`, started by compose); password defaults to `qwerty`, override with `BASE_POSTGRES_PASSWORD`.
-- **Talks to:** Resource, World and Player over REST through the Gateway (`GATEWAY_URL`). Until
-  they run, spending endpoints (upgrades, barricades, Kiki) return `503 SERVICE_UNAVAILABLE`;
-  reading and creating bases work on their own. It consumes `player.registered` from Player's
-  `/events` stream, negotiated at the Gateway, so a new player gets a base right after registering.
+- **Talks to:** Resource, World and Player through the message broker over gRPC (`Broker.Call` on
+  `broker:8092`; `BASE_BROKER_TRANSPORT=http` uses `/call/{service}/...`). Until they run, spending
+  endpoints (upgrades, barricades, Kiki) return `503 SERVICE_UNAVAILABLE`; reading and creating bases
+  work on their own. The broker calls Base back over gRPC (`broker.v1.Endpoint` on port 9087,
+  registered as `grpc_url`) and delivers the `player.registered` topic, declared in its Discovery
+  registration, so a new player gets a base right after registering (once Player publishes the
+  topic to the broker).
 - **Limits:** `BASE_TASK_TIMEOUT_MS` (`408`) and `BASE_MAX_CONCURRENT_TASKS` (`429`), per replica.
 - **Scaling:** each replica registers with Service Discovery and answers `GET /status` with its load.
-  Only one replica consumes Player's event stream at a time (a PostgreSQL advisory lock; another
-  takes over within 5 s), every event is applied once in a transaction, and an `Idempotency-Key` is
+  The broker delivers each event to one replica, every event is applied once in a transaction
+  (deduplicated on `eventId`; a `4xx` answer dead-letters it, a `5xx` has it retried), and an `Idempotency-Key` is
   claimed in the database before the request runs, so a duplicate on another replica gets
   `409 IDEMPOTENCY_KEY_IN_USE`.
-- **Circuit breaker:** 3 failed calls to one service within 35 s (task timeout × 3.5) trip it; the
-  failing instance named by the gateway's `X-Upstream-Instance` is reported to Discovery, otherwise
-  calls to that service fail fast with `503` for 35 s.
+- **Circuit breaker / load balancing:** none of its own any more, the broker does both.
 - **Logs:** one JSON line per event in the shared format; `BASE_LOG_LEVEL` (`info`).
+- **Metrics:** `GET /metrics`, scraped by Prometheus (see [Monitoring](#monitoring)).
 - **Try it:** Postman collection in [`docs/postman/base-service`](docs/postman/base-service).
 
 ### Crafting Service
 
 - **Image:** [`mixam052/kahoots-crafting-service`](https://hub.docker.com/r/mixam052/kahoots-crafting-service),
-  version set by `CRAFTING_SERVICE_TAG` (currently `3`), `CRAFTING_REPLICAS` (2) replicas.
+  version set by `CRAFTING_SERVICE_TAG` (currently `4`), `CRAFTING_REPLICAS` (2) replicas.
 - **Needs:** its own Postgres (`crafting-db`, started by compose); password defaults to `qwerty`, override with `CRAFTING_POSTGRES_PASSWORD`.
   Seeded from [`db/crafting-service/init.sql`](db/crafting-service/init.sql) with five recipes
   (two gated: one by level, one by a passed math exam and the Math Wing); their output items are
   seeded into Player's catalogue by [`db/player-service/init.sql`](db/player-service/init.sql).
-- **Talks to:** Resource and Player over REST through the Gateway (`GATEWAY_URL`). Until they run,
-  crafting returns `503 SERVICE_UNAVAILABLE`; recipes and availability work on their own. It
-  consumes Player's, Exam's and World's `/events` streams, negotiated at the Gateway, to track
-  levels, passed subjects and unlocked wings.
+- **Talks to:** Resource and Player through the message broker over gRPC, like Base. Until they run,
+  crafting returns `503 SERVICE_UNAVAILABLE`; recipes and availability work on their own. The broker
+  calls it back over gRPC (port 9088) and delivers the `player.leveled_up`, `exam.completed` and
+  `world.wing_unlocked` topics to track levels, passed subjects and unlocked wings.
 - **Limits:** `CRAFTING_TASK_TIMEOUT_MS` (`408`) and `CRAFTING_MAX_CONCURRENT_TASKS` (`429`), per replica.
-- **Scaling:** like Base: registers with Service Discovery, one replica per event stream (Player,
-  Exam, World), events applied once, `Idempotency-Key` claimed before a craft runs.
-- **Circuit breaker:** like Base, for its calls to Resource and Player.
-- **Logs:** shared JSON format; `CRAFTING_LOG_LEVEL` (`info`).
+- **Scaling:** like Base: registers with Service Discovery, the broker delivers each event to one
+  replica, events applied once, `Idempotency-Key` claimed before a craft runs.
+- **Circuit breaker / load balancing:** none of its own, the broker does both.
+- **Logs:** shared JSON format; `CRAFTING_LOG_LEVEL` (`info`). **Metrics:** `GET /metrics`.
 - **Try it:** Postman collection in [`docs/postman/crafting-service`](docs/postman/crafting-service).
+
+## Monitoring
+
+`docker compose up` also starts **Prometheus** (http://localhost:9090) and **Grafana**
+(http://localhost:3001), configured from [`monitoring/`](monitoring):
+
+- **Prometheus** ([`monitoring/prometheus/prometheus.yml`](monitoring/prometheus/prometheus.yml))
+  scrapes every 5 s the broker's `GET /metrics` and every Base and Crafting replica (found through the
+  compose DNS name, so `--scale base=3` is picked up). The broker sees every call and every event, so
+  one target describes the whole system: calls by service and outcome, latency, request queues,
+  reroutes, open circuit breakers, instance health and load, events published / delivered /
+  dead-lettered and queue depth. Base and Crafting add their own requests by route and status,
+  events consumed by outcome, calls to other services and active tasks. Data is kept for
+  `PROMETHEUS_RETENTION` (7 days) on the `prometheus-data` volume.
+- **Grafana** is provisioned with the Prometheus data source and the **Kahoot With Undead** dashboard
+  ([`monitoring/grafana/dashboards/kahoot-overview.json`](monitoring/grafana/dashboards/kahoot-overview.json)),
+  also its home page: an overview row (calls/s, failed calls, open breakers, unhealthy instances,
+  dead letters, broker load), then requests through the broker, instances, events, and Base and
+  Crafting. Anyone can view it; log in with `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD`
+  (`admin` / `admin`) to edit. The provisioned dashboard is read-only: change the JSON file to keep a
+  change.
 
 ## GitHub Workflow
 
