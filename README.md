@@ -29,8 +29,8 @@ wings of the university to explore, tying academic progress directly to survival
 [![operations postman](https://img.shields.io/badge/logs%20%26%20metrics-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/operations)
 [![all services postman](https://img.shields.io/badge/all%20services-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/all-services)
 
-Lab 4: what is implemented and where is in [`DONE.md`](DONE.md); what each team service still
-has to do is in [`TODO_per_service.md`](TODO_per_service.md).
+Lab 4: what is implemented and where is in [`DONE.md`](DONE.md); the `/internal/logs` and
+`/metrics` endpoints the other team services still have to add are in [`TODO_per_service.md`](TODO_per_service.md).
 
 
 ## Architecture
@@ -194,7 +194,7 @@ browser sockets all land on `game`; the others serve REST and the `/events` stre
   kept on the `broker-data` volume (`BROKER_STORAGE=log`). Base and Crafting (`:4`) call other
   services through it over gRPC, are called back over gRPC and consume their topics; the other
   services still talk through the Gateway (`GATEWAY_LEGACY_SERVICE_ROUTES=true`) until they move to
-  the contract below ([`TODO_per_service.md`](TODO_per_service.md)). A subscriber with no running
+  the contract below. A subscriber with no running
   instance keeps its subscriptions, and its events wait in its durable queue until it is back.
 - **Role:** the only path between the Gateway and the services, between services, and for events.
   Clients never reach it; every non-public route needs `X-Internal-Key`. It registers with Discovery
@@ -543,8 +543,8 @@ curl -H 'X-Internal-Key: changeme' 'localhost:8080/logs?service=base,broker&sinc
 
 `X-Logs-Sources` names the instances that answered and `X-Logs-Missing` the ones that did not, with
 the reason (`404` until a service implements the endpoint). The endpoint every service implements
-is in the [contract](docs/communication.md#log-collection-get-internallogs-and-get-logs); what the
-other services still need is in [`TODO_per_service.md`](TODO_per_service.md).
+is in the [contract](docs/communication.md#log-collection-get-internallogs-and-get-logs); the services that
+do not serve it yet are listed in [`TODO_per_service.md`](TODO_per_service.md).
 
 ## GitHub Workflow
 
