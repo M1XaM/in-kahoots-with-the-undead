@@ -54,7 +54,8 @@ services:
       INTERNAL_KEY: ${INTERNAL_KEY:-changeme}
       TASK_TIMEOUT_MS: ${BROKER_TASK_TIMEOUT_MS:-10000}
       MAX_CONCURRENT_TASKS: ${BROKER_MAX_CONCURRENT_TASKS:-100}
-      LB_STRATEGY: ${BROKER_LB_STRATEGY:-round_robin}
+      # least_load: the instance with the lowest (broker in-flight + Discovery active tasks) / max tasks
+      LB_STRATEGY: ${BROKER_LB_STRATEGY:-least_load}
       # `log` = events survive a restart (kept on the broker-data volume), `memory` = kept nothing
       STORAGE: ${BROKER_STORAGE:-log}
       DATA_DIR: /data
@@ -391,7 +392,12 @@ services:
       # from the Lab 4 gateway on, every request goes to the broker as /call/{service}/...; the
       # broker balances the instances and runs the circuit breakers. The *_SERVICE_URL below and
       # DISCOVERY_URL routing are only read by the Lab 3 image.
+      BROKER_TRANSPORT: ${GATEWAY_BROKER_TRANSPORT:-grpc}
+      BROKER_GRPC_URL: broker:${BROKER_GRPC_PORT:-8092}
       BROKER_URL: http://broker:${BROKER_PORT:-8091}
+      # /<prefix>/internal/... and the /ws/{producer} event streams, for services that still call
+      # each other through the gateway; set to false once every service uses the broker
+      LEGACY_SERVICE_ROUTES: ${GATEWAY_LEGACY_SERVICE_ROUTES:-true}
       PLAYER_SERVICE_URL: http://player:${PLAYER_PORT:-8081}
       GAME_SERVICE_URL: http://game:${GAME_PORT:-8082}
       EXAM_SERVICE_URL: http://exam:${EXAM_PORT:-8083}
