@@ -1,7 +1,7 @@
 name: Call Crafting Recipes
 $kind: http-request
 method: GET
-url: "http://localhost:8091/call/crafting/recipes"
+url: "http://localhost:8091/call/crafting/crafting/recipes"
 headers:
   - key: X-Internal-Key
     value: "changeme"

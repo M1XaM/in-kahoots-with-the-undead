@@ -1,0 +1,7 @@
+name: Gateway Own Lines (internal)
+$kind: http-request
+method: GET
+url: "{{baseUrl}}/internal/logs?level=info&limit=100"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"

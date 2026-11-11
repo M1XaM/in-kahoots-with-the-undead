@@ -1,0 +1,7 @@
+name: List Services With Topics
+$kind: http-request
+method: GET
+url: "{{discoveryUrl}}/services"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"

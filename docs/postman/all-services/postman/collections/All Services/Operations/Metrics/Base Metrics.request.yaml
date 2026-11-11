@@ -1,0 +1,4 @@
+name: Base Metrics
+$kind: http-request
+method: GET
+url: "{{baseServiceUrl}}/metrics"

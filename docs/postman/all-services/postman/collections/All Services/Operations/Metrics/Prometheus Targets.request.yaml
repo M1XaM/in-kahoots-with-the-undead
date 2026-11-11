@@ -1,0 +1,9 @@
+name: Prometheus Targets
+$kind: http-request
+method: GET
+url: "{{prometheusUrl}}/api/v1/targets"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.response.json().data.activeTargets.forEach(t => console.log(t.labels.job, t.labels.instance, t.health));

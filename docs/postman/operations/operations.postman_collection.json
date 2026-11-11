@@ -1,0 +1,329 @@
+{
+  "info": {
+    "name": "Operations (logs and metrics)",
+    "description": "Lab 4 operations: GET /logs on the gateway (X-Internal-Key) collects the recent log lines of every instance (each serves GET /internal/logs) and merges them; GET /metrics on the gateway, Discovery, the broker, Base and Crafting is scraped by Prometheus (http://localhost:9090) and shown in Grafana (http://localhost:3001). Base and Crafting are not published in the team compose: use docker-compose.dev.yml and point baseServiceUrl and craftingUrl at the ports `docker compose port base 8087` shows.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Logs",
+      "item": [
+        {
+          "name": "Download Logs (last 15 min)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/logs",
+            "description": "Every instance's recent lines, merged by time, as an NDJSON attachment. X-Logs-Sources lists who answered, X-Logs-Missing who did not (and why)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "console.log('sources', pm.response.headers.get('X-Logs-Sources'));",
+                  "console.log('missing', pm.response.headers.get('X-Logs-Missing'));",
+                  "pm.test('NDJSON', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/x-ndjson'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Warnings and Errors of Base (last hour)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/logs?service=base&level=warn&since=1h"
+          }
+        },
+        {
+          "name": "One Request Through Every Service",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/logs?request_id={{requestId}}&since=1h",
+            "description": "Set requestId to the X-Request-Id of any response: the lines of the gateway, the broker and every service it reached."
+          }
+        },
+        {
+          "name": "Time Window and Limit",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/logs?since=2h&until=1h&limit=200"
+          }
+        },
+        {
+          "name": "Logs Without Key (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/logs"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('not public', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Gateway Own Lines (internal)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/internal/logs?level=info&limit=100"
+          }
+        },
+        {
+          "name": "Broker Own Lines (internal)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/internal/logs?level=info&limit=100"
+          }
+        },
+        {
+          "name": "Discovery Own Lines (internal)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{discoveryUrl}}/internal/logs?limit=100"
+          }
+        },
+        {
+          "name": "Base Own Lines (internal)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseServiceUrl}}/internal/logs?limit=100"
+          }
+        },
+        {
+          "name": "Crafting Own Lines (internal)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{craftingUrl}}/internal/logs?limit=100"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Metrics",
+      "item": [
+        {
+          "name": "Gateway Metrics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/metrics"
+          }
+        },
+        {
+          "name": "Discovery Metrics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{discoveryUrl}}/metrics"
+          }
+        },
+        {
+          "name": "Base Metrics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseServiceUrl}}/metrics"
+          }
+        },
+        {
+          "name": "Crafting Metrics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{craftingUrl}}/metrics"
+          }
+        },
+        {
+          "name": "Prometheus Targets",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{prometheusUrl}}/api/v1/targets"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.response.json().data.activeTargets.forEach(t => console.log(t.labels.job, t.labels.instance, t.health));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Prometheus Calls per Second",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{prometheusUrl}}/api/v1/query?query=sum by (service, result) (rate(broker_calls_total[1m]))"
+          }
+        },
+        {
+          "name": "Grafana Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{grafanaUrl}}/api/health"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Discovery (Lab 4)",
+      "item": [
+        {
+          "name": "Register With Topics and gRPC URL",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{discoveryUrl}}/services/register",
+            "description": "The broker reads grpc_url (calls the instance over gRPC) and topics (subscribes the service) from GET /services.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"service\": \"demo\",\n  \"instance_id\": \"demo-1\",\n  \"url\": \"http://10.0.0.99:9999\",\n  \"grpc_url\": \"10.0.0.99:9998\",\n  \"topics\": [\n    \"exam.completed\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "List Services With Topics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{discoveryUrl}}/services"
+          }
+        },
+        {
+          "name": "Deregister Demo",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{discoveryUrl}}/services/demo/instances/demo-1"
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "brokerUrl",
+      "value": "http://localhost:8091"
+    },
+    {
+      "key": "discoveryUrl",
+      "value": "http://localhost:8089"
+    },
+    {
+      "key": "baseServiceUrl",
+      "value": "http://localhost:8087"
+    },
+    {
+      "key": "craftingUrl",
+      "value": "http://localhost:8088"
+    },
+    {
+      "key": "prometheusUrl",
+      "value": "http://localhost:9090"
+    },
+    {
+      "key": "grafanaUrl",
+      "value": "http://localhost:3001"
+    },
+    {
+      "key": "requestId",
+      "value": ""
+    }
+  ]
+}

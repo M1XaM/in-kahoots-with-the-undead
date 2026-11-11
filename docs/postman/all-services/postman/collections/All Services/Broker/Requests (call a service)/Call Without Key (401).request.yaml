@@ -1,5 +1,5 @@
 name: Call Without Key (401)
 $kind: http-request
 method: GET
-url: "{{brokerUrl}}/call/base/players"
+url: "{{brokerUrl}}/call/base/base/players"
 order: 7000

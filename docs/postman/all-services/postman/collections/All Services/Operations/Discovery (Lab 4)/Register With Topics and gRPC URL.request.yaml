@@ -1,0 +1,22 @@
+name: Register With Topics and gRPC URL
+$kind: http-request
+method: POST
+url: "{{discoveryUrl}}/services/register"
+description: "The broker reads grpc_url (calls the instance over gRPC) and topics (subscribes the service) from GET /services."
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+  - key: Content-Type
+    value: "application/json"
+body:
+  type: json
+  content: |-
+    {
+      "service": "demo",
+      "instance_id": "demo-1",
+      "url": "http://10.0.0.99:9999",
+      "grpc_url": "10.0.0.99:9998",
+      "topics": [
+        "exam.completed"
+      ]
+    }

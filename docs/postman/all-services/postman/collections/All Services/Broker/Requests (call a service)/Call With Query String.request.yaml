@@ -1,7 +1,7 @@
 name: Call With Query String
 $kind: http-request
 method: GET
-url: "{{brokerUrl}}/call/crafting/recipes?limit=5"
+url: "{{brokerUrl}}/call/crafting/crafting/recipes?limit=5"
 headers:
   - key: X-Internal-Key
     value: "changeme"

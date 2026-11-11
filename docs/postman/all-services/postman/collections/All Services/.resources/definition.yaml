@@ -1,5 +1,7 @@
 $kind: collection
 description: |-
+  Lab 4 operations: GET /logs on the gateway (X-Internal-Key) collects the recent log lines of every instance (each serves GET /internal/logs) and merges them; GET /metrics on the gateway, Discovery, the broker, Base and Crafting is scraped by Prometheus (http://localhost:9090) and shown in Grafana (http://localhost:3001). Base and Crafting are not published in the team compose: use docker-compose.dev.yml and point baseServiceUrl and craftingUrl at the ports `docker compose port base 8087` shows.
+
   Every request of the system in one collection, one folder per service. Gateway requests use {{baseUrl}} (http://localhost:8080, the only port published in the team compose); Discovery, the Broker, Player, Game, Base and Crafting use their own variables (discoveryUrl, brokerUrl, playerUrl, gameUrl, baseServiceUrl, craftingUrl), which you can point at the dev compose ports. Internal requests send X-Internal-Key (INTERNAL_KEY in the team .env, default changeme). Services behind the gateway have their own 'Auth (run first)' folder: run it once, the accessToken, playerId and username collection variables are shared by all folders.
 
   Service Discovery: Service Discovery is published on http://localhost:8089 in the team compose; every registry route needs X-Internal-Key (INTERNAL_KEY in the team .env, default changeme). Registry: register, heartbeat, report a failure and deregister a demo instance. Load Balancing: send the same request through the gateway several times and watch X-Upstream-Instance change between the replicas.
@@ -62,3 +64,9 @@ variables:
     value: "http://localhost:8087"
   - key: craftingUrl
     value: "http://localhost:8088"
+  - key: prometheusUrl
+    value: "http://localhost:9090"
+  - key: grafanaUrl
+    value: "http://localhost:3001"
+  - key: requestId
+    value: ""
