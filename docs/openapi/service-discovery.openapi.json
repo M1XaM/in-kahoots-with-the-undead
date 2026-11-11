@@ -2,7 +2,7 @@
     "openapi": "3.1.0",
     "info": {
         "title": "Kahoot Service Discovery",
-        "version": "3.0.0"
+        "version": "4.0.0"
     },
     "paths": {
         "/health": {
@@ -46,6 +46,108 @@
                                     "additionalProperties": true,
                                     "type": "object",
                                     "title": "Response Status Status Get"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/metrics": {
+            "get": {
+                "tags": [
+                    "operations"
+                ],
+                "summary": "Metrics",
+                "description": "Prometheus metrics, public for the internal network like /status.",
+                "operationId": "metrics_metrics_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/logs": {
+            "get": {
+                "tags": [
+                    "operations"
+                ],
+                "summary": "Internal Logs",
+                "description": "The newest log lines of this instance as NDJSON, oldest first; collected by the gateway's GET /logs.",
+                "operationId": "internal_logs_internal_logs_get",
+                "parameters": [
+                    {
+                        "name": "since",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "",
+                            "title": "Since"
+                        }
+                    },
+                    {
+                        "name": "until",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "",
+                            "title": "Until"
+                        }
+                    },
+                    {
+                        "name": "level",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "",
+                            "title": "Level"
+                        }
+                    },
+                    {
+                        "name": "request_id",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "",
+                            "title": "Request Id"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "",
+                            "title": "Limit"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
                                 }
                             }
                         }
@@ -406,6 +508,35 @@
                         "title": "Url",
                         "examples": [
                             "http://exam-3f2a:8083"
+                        ]
+                    },
+                    "grpc_url": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "pattern": "^(grpc://)?[A-Za-z0-9._-]+:[0-9]{1,5}$"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Grpc Url",
+                        "examples": [
+                            "10.0.0.7:9083"
+                        ]
+                    },
+                    "topics": {
+                        "items": {
+                            "type": "string",
+                            "pattern": "^[a-z][a-z0-9-]*\\.[a-z][a-z0-9_.-]*$"
+                        },
+                        "type": "array",
+                        "maxItems": 50,
+                        "title": "Topics",
+                        "examples": [
+                            [
+                                "player.registered"
+                            ]
                         ]
                     }
                 },
