@@ -11,6 +11,16 @@ scrape_configs:
     static_configs:
       - targets: ["broker:8091"]
 
+  # the entry point: requests by service prefix and status, calls through the broker, load
+  - job_name: gateway
+    static_configs:
+      - targets: ["gateway:8080"]
+
+  # the registry: instances by health, their load and failed checks, topic subscribers
+  - job_name: discovery
+    static_configs:
+      - targets: ["discovery:8089"]
+
   # Base and Crafting run several replicas: the compose service name resolves to all of them,
   # so every replica is scraped on its own (instance = its IP)
   - job_name: base
