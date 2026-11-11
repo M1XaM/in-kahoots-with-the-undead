@@ -7,7 +7,8 @@
 
 | Service | Port | Path prefix |
 |---|---|---|
-| **Gateway** | 8080 | all of the below, plus `/ws/{service}`, `/health` and `/status` |
+| **Gateway** | 8080 | all of the below, plus `/ws/game`, `/logs`, `/health`, `/status`, `/metrics` |
+| Message Broker | 8091 HTTP, 8092 gRPC | `/call/{service}/…`, `/topics`, `/dead-letters` (see [Message broker](#message-broker)) |
 | Service Discovery | 8089 | `/services` (see [Scaling](#scaling)) |
 | Player | 8081 | `/auth`, `/players`, `/trades` |
 | Game | 8082 | `/game` |
@@ -15,8 +16,11 @@
 | World | 8084 | `/world` |
 | Zombie | 8085 | `/zombies` |
 | Resource | 8086 | `/resources` |
-| Base | 8087 | `/base` |
-| Crafting | 8088 | `/crafting` |
+| Base | 8087 (gRPC 9087) | `/base` |
+| Crafting | 8088 (gRPC 9088) | `/crafting` |
+
+Every service also serves `GET /health`, `GET /status`, `GET /metrics` and `GET /internal/logs`
+(see [Operations](#operations)).
 
 **Caller:** `client` = the game client acting as a logged-in player; `internal` = another service.
 
@@ -36,9 +40,10 @@ A repeated key returns the original response and performs no second write. Keys 
 
 ## Gateway
 
-Every REST call enters through the API Gateway (`http://gateway:8080` inside compose,
-http://localhost:8080 from the host), which forwards it unchanged to the service owning the path
-prefix above. Services call each other through the gateway too, sending `X-Internal-Key`.
+Every client request enters through the API Gateway (`http://gateway:8080` inside compose,
+http://localhost:8080 from the host). The gateway decides who is calling and hands the request to
+the [message broker](#message-broker), which delivers it to an instance of the service owning the
+path prefix above. It never picks an instance itself and has no load balancer or circuit breaker.
 
 - **Authorization:** the gateway verifies the player JWT (`Authorization: Bearer <jwt>` or the
   `access_token` cookie) before forwarding; `401 UNAUTHENTICATED` if it is missing or invalid.
@@ -49,19 +54,118 @@ prefix above. Services call each other through the gateway too, sending `X-Inter
   the gateway removes it from the `Cookie` header (other cookies are kept). Access is decided only
   at the gateway; every service reads the acting player from `X-Player-Id` and never sees or
   verifies the token.
-- **Internal endpoints** (`/<prefix>/internal/...`) answer `404` at the gateway without a valid
-  `X-Internal-Key`.
+- **`X-Caller: client`:** the broker sets its own `X-Internal-Key` on every call it delivers, so the
+  key alone no longer tells a service from a player. The gateway marks every request from outside
+  with `X-Caller: client` (a client cannot set it; it is always replaced). A service must treat such
+  a request as the player's: owner checks apply, internal-only routes answer `403`.
+- **Transport:** `Broker.Call` over gRPC by default (`BROKER_TRANSPORT=grpc`), or
+  `ANY /call/{service}/{path}` over HTTP.
+- **Only client routes:** service-to-service endpoints (`/<prefix>/internal/...`) and the old
+  event stream negotiation (`GET /ws/{producer}`) are not served (`404`). While a service still
+  calls others through the gateway, `LEGACY_SERVICE_ROUTES=true` lets callers holding a valid
+  `X-Internal-Key` reach them again; clients never.
 - **Limits:** `504 GATEWAY_TIMEOUT` past the task timeout, `429 TOO_MANY_REQUESTS` (with
-  `Retry-After`) over the concurrent task limit, `503 SERVICE_UNAVAILABLE` if the service is down,
-  has no healthy instance, or its circuit breaker is open.
-- **Instances:** requests go round-robin to the healthy instances Service Discovery lists, and
-  every response names the one that answered in `X-Upstream-Instance` (see [Scaling](#scaling)).
-  Services apply their own limits and answer `408 REQUEST_TIMEOUT` / `429 TOO_MANY_REQUESTS`.
+  `Retry-After`) over the concurrent task limit. The broker's own refusals pass through: `429`
+  (queue full), `503 SERVICE_UNAVAILABLE` (no healthy instance, every breaker open, broker down),
+  `504`. Every response names the instance that answered in `X-Upstream-Instance`. Services apply
+  their own limits and answer `408 REQUEST_TIMEOUT` / `429 TOO_MANY_REQUESTS`.
 - **WebSockets** are negotiated, not relayed: `GET /ws/game` returns
-  `{ "url": "ws://localhost:8082/game", "protocol": "socket.io", "path": "/socket.io" }` for the
-  client; with `X-Internal-Key`, `GET /ws/{player|game|exam|world|resource}` returns
-  `{ "url": "ws://<instance>/events", "instance": "<instance_id>", "protocol": "websocket" }` for
-  one of the producer's instances. The socket is then opened directly on that instance.
+  `{ "url": "ws://localhost:8090/game", "protocol": "socket.io", "path": "/socket.io" }` for the
+  client. The socket is then opened directly on Game.
+- **`GET /logs`** collects the logs of every instance (see [Operations](#operations)).
+
+## Message broker
+
+The Camus Message Broker (`http://broker:8091` and `broker:8092` for gRPC, inside compose) carries
+every request between the gateway and the services and between services, and every event.
+`X-Internal-Key` is required on every route except `/health`, `/status` and `/metrics`.
+
+### Requests (subscriber-based queues)
+
+`ANY /call/{service}/{original path}` (e.g. `GET /call/world/world/rooms/12`), or `Broker.Call`
+over gRPC. The caller names the service, never an instance. The broker:
+
+1. queues the call in a bounded FIFO per target service (`429` with `Retry-After` when full);
+2. picks a healthy instance with room, **least load** first:
+   `(broker in-flight + Discovery active_tasks) / max_concurrent_tasks` (`LB_STRATEGY`);
+3. guards every instance with a circuit breaker: 3 failures (timeout, connection error, `5xx`) within
+   `TASK_TIMEOUT_MS` × 3.5 trip it, and the instance is reported to Discovery;
+4. **reroutes** a failed call to another instance within the deadline when repeating it cannot write
+   twice (the connection failed before sending, a `GET`/`HEAD`/`OPTIONS`, or an `Idempotency-Key`);
+5. answers with the instance's status and body unchanged, plus `X-Upstream-Instance` and
+   `X-Reroutes`; its own refusals are `429`, `503` and `504`.
+
+Forwarded to the instance: `X-Player-Id`, `X-Caller`, `Idempotency-Key`, `Content-Type`, `Accept`.
+The broker sets its own `X-Internal-Key`, `X-Request-Id` and `X-Timeout-Ms` (the caller's remaining
+budget, capped at 10 s; over gRPC the deadline). `Authorization` and `Cookie` are dropped.
+
+An instance that registered a `grpc_url` is called over gRPC (`broker.v1.Endpoint/Handle`), the
+others over HTTP. The contract is `proto/broker/v1/broker.proto` in the broker repository:
+
+```proto
+service Broker   { rpc Call(CallRequest) returns (CallResponse);  rpc Publish(Event) returns (PublishAck); }
+service Endpoint { rpc Handle(CallRequest) returns (CallResponse); rpc Deliver(Event) returns (DeliveryAck); }
+```
+
+`Handle` runs the request through the service's own router; `Deliver` runs `POST /internal/events`.
+Metadata `x-internal-key` and `x-request-id` replace the headers. gRPC refusals map back as
+`RESOURCE_EXHAUSTED` 429, `UNAVAILABLE` 503, `DEADLINE_EXCEEDED` 504.
+
+### Events (topic-based queues)
+
+A producer publishes without knowing who consumes: `POST /topics/{topic}/events` (or
+`Broker.Publish`), where the topic is the event name `<service>.<event>`. A service subscribes by
+listing the topics in its [Discovery registration](#service-discovery) (`"topics": [...]`). The
+broker keeps one **durable queue** per (topic, subscriber service) and delivers each event to one
+healthy instance of every subscriber as `POST /internal/events` (or `Endpoint.Deliver`).
+
+| Topic | Producer | Subscribers |
+|---|---|---|
+| `player.registered` | Player | Base, Resource |
+| `player.leveled_up` | Player | Crafting |
+| `game.action_completed` | Game | Resource |
+| `game.presence_changed` | Game | Player |
+| `resource.gathered` | Resource | Game |
+| `exam.completed` | Exam | World, Game, Crafting |
+| `world.wing_unlocked` | World | Game, Crafting |
+
+- **Publish:** `202` once the event is in every subscriber's queue and on disk (`STORAGE=log`,
+  fsynced). A repeated `eventId` within 24 h answers `202` and enqueues nothing. `400` for an
+  invalid envelope or a `type` other than the topic. Producers keep their outbox and mark a row
+  sent only after the `202`.
+- **Deliver:** `2xx` acks. `5xx` or a timeout retries after 1 s, 2 s, 4 s … 30 s on another
+  instance; a `4xx` other than `408`/`429`, or more than 5 attempts, moves the event to the **dead
+  letter channel** (`GET /dead-letters`). Delivery is at least once: consumers deduplicate on
+  `eventId` and answer `2xx` only after persisting.
+- **Durability:** queues, pending deliveries, dead letters and subscriptions survive a broker
+  restart. While a subscriber has no usable instance (stopped, redeployed, every breaker open) its
+  events wait in its queue without using up attempts, and its subscriptions stay until one of its
+  instances registers without the topic.
+- **Ordering:** one event in flight per queue, so a subscriber sees a producer's events in order;
+  a failing event blocks only its own queue.
+- **Operations:** `GET /topics` (subscribers, queue depth, in flight, totals),
+  `GET /dead-letters?topic=&subscriber=&reason=&limit=&after=`.
+
+### Envelope
+
+Every event carries the same envelope. `type` is the event name, `<service>.<event>`:
+
+```json
+{
+  "eventId": "6f1c0c3e-…",
+  "type": "exam.completed",
+  "version": 1,
+  "occurredAt": "2026-09-09T18:04:11Z",
+  "payload": { }
+}
+```
+
+### Lab 3 event streams (until every producer publishes to the broker)
+
+Before the broker every producer served its events on a `GET /events` WebSocket (`subscribe` /
+`event` / `ack` frames with a per-producer `seq`), negotiated at the gateway with
+`GET /ws/{producer}`. Services that have not moved yet still use it, with the gateway's
+`LEGACY_SERVICE_ROUTES=true`. New code publishes to and consumes from broker topics.
 
 ## Authentication
 
@@ -79,121 +183,42 @@ The cookie is a JWT signed by Player Service with RS256:
 { "sub": 42, "username": "razvan", "iat": 1757440000, "exp": 1757526400 }
 ```
 
-The gateway verifies the signature with Player Service's public key from `GET /auth/jwks` (cached,
-refreshed hourly, `kid` selects the key) and rejects a missing or invalid token with
-`401 UNAUTHENTICATED`. Neither the cookie nor the `Authorization` header is forwarded: the service
-receives the verified `sub` as `X-Player-Id` and trusts it, because only the gateway reaches it with
-a player request. No service calls Player Service to validate a request. Endpoints taking a `{id}`
-for a player return `403 FORBIDDEN` if it differs from `X-Player-Id`, unless the caller is internal.
-Wherever an endpoint below says **Auth: cookie**, read it as "a logged-in player, identified by
-`X-Player-Id`". A WebSocket opened directly on a service does not pass the gateway; it still sends
-the cookie in its handshake (see [Service events](#service-events) and the Game Socket.IO namespace).
+The gateway verifies the signature with Player Service's public key from `GET /auth/jwks` (fetched
+through the broker, cached, refreshed hourly, `kid` selects the key) and rejects a missing or
+invalid token with `401 UNAUTHENTICATED`. Neither the cookie nor the `Authorization` header is
+forwarded: the service receives the verified `sub` as `X-Player-Id`, with `X-Caller: client`, and
+trusts it. Endpoints taking a `{id}` for a player return `403 FORBIDDEN` if it differs from
+`X-Player-Id`, unless the caller is internal (a request with `X-Caller: client` never is). Wherever
+an endpoint below says **Auth: cookie**, read it as "a logged-in player, identified by
+`X-Player-Id`".
 
 ### Service-to-service
 
-Internal endpoints require `X-Internal-Key: <shared secret>` (from environment, never committed).
-A service acting for a player also sends `X-Player-Id: <int>` so the callee can attribute the write.
-The same `X-Internal-Key` header authenticates the handshake of a service event connection (see
-[Service events](#service-events)).
+Internal endpoints require `X-Internal-Key: <shared secret>` (from environment, never committed)
+and no `X-Caller: client`. Services call each other only through the broker, which sends its own
+key. A service acting for a player also sends `X-Player-Id: <int>` so the callee can attribute the
+write.
 
 ---
 
 ## Data ownership
 
 Each service owns its own database instance. No shared tables, no cross-service joins, no reading
-another service's DB. Data owned elsewhere is fetched over REST or received via [service
-events](#service-events).
+another service's DB. Data owned elsewhere is fetched through the broker or received as broker
+events.
 
 | Service | Store |
 |---|---|
 | Player, Exam, World, Zombie, Base, Crafting, Resource | PostgreSQL, one database per service |
 | Game | Redis (live session and timer state), PostgreSQL (session history) |
-
----
-
-## Service events
-
-Sync REST when the caller needs the answer to continue. WebSocket events when something happened
-that other services react to. There is no message broker: every producing service serves its own
-events over a WebSocket and consumers connect to it.
-
-### Connection
-
-A producer exposes `GET /events`, upgraded to a WebSocket, on its normal port (e.g.
-`ws://exam:8083/events`). The consumer is the client: it opens the connection, authenticates the
-handshake with `X-Internal-Key`, and keeps it open. A producer never connects to a consumer.
-
-Game serves `/events` as a plain WebSocket next to the client-facing `/game` Socket.IO namespace;
-the two are unrelated.
-
-| Consumer | Connects to |
-|---|---|
-| Player | Game |
-| Game | Exam, World, Resource |
-| Exam | — |
-| World | Exam |
-| Resource | Player, Game |
-| Base | Player |
-| Crafting | Player, Exam, World |
-| Zombie | — |
-
-### Envelope
-
-Every event carries the same envelope. `type` is the event name, `<service>.<event>`, e.g.
-`exam.completed`:
-
-```json
-{
-  "eventId": "6f1c0c3e-…",
-  "type": "exam.completed",
-  "version": 1,
-  "occurredAt": "2026-09-09T18:04:11Z",
-  "payload": { }
-}
-```
-
-### Frames
-
-Messages on the socket are JSON text frames. The consumer sends:
-
-```json
-{ "op": "subscribe", "types": ["exam.completed"], "since": 1041 }
-```
-
-```json
-{ "op": "ack", "seq": 1042 }
-```
-
-`types` lists the event names wanted. `since` is the `seq` of the last event the consumer has
-processed (`0` on first connect); the producer replays everything after it, then streams live. The
-producer sends:
-
-```json
-{ "op": "event", "seq": 1042, "event": { "eventId": "6f1c0c3e-…", "type": "exam.completed", "version": 1, "occurredAt": "2026-09-09T18:04:11Z", "payload": { } } }
-```
-
-`seq` is a per-producer counter that only increases. A consumer acks after it has handled the event
-and persisted its own effect; it reconnects from its last acked `seq`.
-
-### Delivery
-
-- **At least once.** A producer writes the event to an outbox table in the same database
-  transaction as the state change that caused it, so a crash never loses one. Events are pushed
-  from the outbox and kept for 7 days. A consumer that has been down longer than that must
-  resynchronise over REST.
-- **Consumers deduplicate on `eventId`.** Replay after a reconnect can redeliver events that were
-  handled but not yet acked; handling one twice must be a no-op.
-- **Ordering** holds per producer (`seq`) and not across producers. Where it matters the consumer
-  compares `occurredAt`.
-- **Liveness.** Both sides send WebSocket pings every 30 s and drop the connection after two
-  missed pongs. A consumer reconnects with exponential backoff, 1 s doubling to 30 s.
+| Broker | `events.log` on the `broker-data` volume (queues, dead letters, subscriptions) |
 
 ---
 
 ## Scaling
 
-Every service runs as one or more instances that register with Service Discovery; the gateway
-balances requests across them. These rules apply to every service, whatever its language.
+Every service runs as one or more instances that register with Service Discovery; the broker
+balances requests and events across them. These rules apply to every service, whatever its language.
 
 ### Instances
 
@@ -201,10 +226,9 @@ balances requests across them. These rules apply to every service, whatever its 
   `base`, …) and a unique `instance_id`, by default `<service>-<hostname>` (under Docker the
   hostname is the container id, e.g. `base-3f2a9c41d0e2`). Set by `SERVICE_NAME` / `INSTANCE_ID`.
 - **Instance-agnostic.** All state lives in the service's database; nothing another replica needs
-  is kept in memory. Game is the exception and runs as a single replica (live sessions).
-  - Producers serve the whole `/events` stream from their outbox, so any instance can serve it.
-  - Consumers let one replica consume each stream at a time, and mark an event processed in the
-    same transaction as its effect.
+  is kept in memory. Game keeps live sessions in Redis.
+  - The broker delivers each event to one instance; marking it processed happens in the same
+    transaction as its effect.
   - An `Idempotency-Key` is claimed in the database before the request runs. A duplicate that
     arrives while the first is still running (on any instance) gets
     `409 IDEMPOTENCY_KEY_IN_USE` with `Retry-After: 1`.
@@ -214,22 +238,26 @@ balances requests across them. These rules apply to every service, whatever its 
 ### Service Discovery
 
 `http://discovery:8089` inside compose (`DISCOVERY_URL`), http://localhost:8089 from the host.
-Every route except `/health` and `/status` needs `X-Internal-Key`.
+Every route except `/health`, `/status` and `/metrics` needs `X-Internal-Key`.
 
 | Method | Path | Body / answer |
 |---|---|---|
-| `POST` | `/services/register` | `{ "service", "instance_id", "url" }` → `201` new, `200` refreshed |
+| `POST` | `/services/register` | `{ "service", "instance_id", "url", "grpc_url"?, "topics"? }` → `201` new, `200` refreshed |
 | `PUT` | `/services/{service}/instances/{id}/heartbeat` | `204`; `404` = not registered, register again |
 | `DELETE` | `/services/{service}/instances/{id}` | `204` |
-| `GET` | `/services` | every service with its instances (`healthy`, `load`, `consecutive_failures`, …) |
-| `GET` | `/services/{service}/instances?healthy=true` | the instances to send requests to |
-| `POST` | `/services/{service}/instances/{id}/failures` | `{ "reporter", "reason" }` → `202`: a caller's circuit breaker tripped |
-| `GET` | `/health`, `/status` | public |
+| `GET` | `/services` | every service with its instances (`healthy`, `load`, `grpc_url`, `topics`, …) |
+| `GET` | `/services/{service}/instances?healthy=true` | the healthy instances |
+| `POST` | `/services/{service}/instances/{id}/failures` | `{ "reporter", "reason" }` → `202`: a circuit breaker tripped |
+| `GET` | `/health`, `/status`, `/metrics` | public |
+| `GET` | `/internal/logs` | recent log lines (see [Operations](#operations)) |
+
+- `grpc_url` (`host:port`): where the broker calls the instance over gRPC; without it, over HTTP.
+- `topics` (`["player.registered"]`): the events the broker delivers to the service.
 
 **What every instance does:**
-1. **On startup:** register with its own address, `http://<container IP>:<port>`. Not the compose
-   service name, which resolves to every replica. Retry with a backoff of 1 s doubling to 30 s
-   until Discovery answers.
+1. **On startup:** register with its own address, `http://<container IP>:<port>` (not the compose
+   service name, which resolves to every replica), its `grpc_url` and its `topics`. Retry with a
+   backoff of 1 s doubling to 30 s until Discovery answers.
 2. **While running:** send a heartbeat about every 10 s (Discovery drops an instance after 30 s
    without any sign of life). A `404` means Discovery restarted or expired it: register again.
 3. **On `SIGTERM`:** deregister first, then stop accepting requests and finish the ones in flight.
@@ -258,38 +286,18 @@ Public, outside the task limits, answered by every service in the same shape:
 `200` when the instance can serve requests; anything else (for example `503` with
 `"status": "unavailable"` when its database is down) counts as a failed health check.
 
-### Routing and load balancing
+### Routing, load balancing and circuit breakers
 
-- The gateway fetches `GET /services` every 2 s and routes each service only to its healthy
-  instances, **round-robin** in the order Discovery lists them. It never asks Discovery per
-  request.
-- A listed service without a healthy instance answers `503 SERVICE_UNAVAILABLE`. A service
-  Discovery never listed (it does not register yet) is reached at its static URL. When Discovery
-  is down, the last lists are kept.
-- Every response carries `X-Upstream-Instance: <instance_id>`, the instance that answered, also on
-  a failed call.
-- `GET /ws/{service}` returns the `/events` URL of one instance, chosen the same way, with its
-  `instance` id.
+All in the broker (see [Requests](#requests-subscriber-based-queues)): the broker polls
+`GET /services` every 2 s, sends each call to a healthy instance with room (least load), trips a
+per-instance breaker after 3 failures in `TASK_TIMEOUT_MS` × 3.5, reports the instance to
+Discovery, and reroutes the call to another instance when that is safe. A request that finishes or
+undoes a spend (Resource commit and release) is let through even while every breaker is open.
+Services and the gateway keep no breaker or balancer of their own.
 
-### Circuit breaker
+---
 
-Every service that calls another one (the gateway included) guards its calls with a circuit
-breaker per target service.
-
-- **Failure:** a timeout, a connection error or a `5xx` answer. A `4xx` is not a failure: the
-  target worked and refused.
-- **Trip:** 3 failures within the caller's task timeout × 3.5, counted over all endpoints of the
-  target: 35 s for the services (10 s timeout), 105 s for the gateway (30 s). Logged as
-  `circuit breaker tripped` (`ERROR`, with `target`, `target_instance`, `failures`, `window_s`).
-- **After a trip:**
-  - **The failing instance is known** (from `X-Upstream-Instance`, or because the caller chose
-    it): report it with `POST /services/{service}/instances/{id}/failures`. Discovery takes it
-    out of rotation and alerts the developers; the gateway also stops routing to it at once for
-    one window.
-  - **Otherwise:** the breaker opens. Calls to the target fail at once with `503` for one window,
-    then a single trial call decides whether it closes or stays open for another window.
-- Calls that finish or undo a spend (Resource commit and release) are still sent while the breaker
-  is open. Refusing them would leave a spend half done.
+## Operations
 
 ### Logs
 
@@ -308,10 +316,11 @@ Every service logs the same way: one JSON object per line on stdout, at `LOG_LEV
   response and send it on every call to another service.
 - **Message names:**
   - `request finished`, once per request: `method`, `path`, `status`, `duration_ms`, `caller`,
-    `player_id`. `INFO`, `WARN` for 4xx, `ERROR` for 5xx, `DEBUG` for `/health` and `/status`.
+    `player_id`. `INFO`, `WARN` for 4xx, `ERROR` for 5xx, `DEBUG` for `/health`, `/status`,
+    `/metrics` and `/internal/logs`.
   - `upstream call finished` / `upstream call failed`: `target`, `target_instance`, `status`,
     `duration_ms`, `error`.
-  - `event consumed`: `producer`, `event_type`, `event_id`, `seq`, `outcome`.
+  - `event consumed`: `producer`, `event_type`, `event_id`, `outcome`.
   - `event published`, `concurrency limit reached`, `task timeout exceeded`, `auth rejected`
     (`reason`), `circuit breaker tripped`.
   - Startup and shutdown: `service starting` (non-secret configuration), `service ready`,
@@ -326,8 +335,41 @@ Every service logs the same way: one JSON object per line on stdout, at `LOG_LEV
 
 ```json
 {"time":"2026-10-27T15:04:05.123Z","level":"INFO","service":"base","instance":"base-3f2a9c41d0e2","msg":"request finished","request_id":"9b1e0c3a4f5d4e6b","method":"POST","path":"/base/players/17/upgrades","status":201,"duration_ms":42,"caller":"player","player_id":"17"}
-{"time":"2026-10-27T15:04:09.000Z","level":"ERROR","service":"gateway","instance":"gateway-a1b2c3d4e5f6","msg":"circuit breaker tripped","target":"crafting","target_instance":"crafting-77de01aa9b3c","failures":3,"window_s":105}
+{"time":"2026-10-27T15:04:09.000Z","level":"ERROR","service":"broker","instance":"broker-a1b2c3d4e5f6","msg":"circuit breaker tripped","target":"crafting","target_instance":"crafting-77de01aa9b3c","failures":3}
 ```
+
+### Log collection: `GET /internal/logs` and `GET /logs`
+
+Every instance keeps its last `LOG_BUFFER_LINES` (5000) lines in memory, exactly as written to
+stdout, and serves them:
+
+`GET /internal/logs?since=&until=&level=&request_id=&limit=` — `X-Internal-Key` required, `403`
+with `X-Caller: client`, outside the task limits.
+
+| Query | Meaning |
+|---|---|
+| `since`, `until` | RFC 3339, inclusive |
+| `level` | minimum level: `debug` (default), `info`, `warn`, `error` |
+| `request_id` | only the lines of that request |
+| `limit` | default 1000, max 5000; the newest matching lines are kept |
+
+`200`, `Content-Type: application/x-ndjson`, one line per log line, oldest first; `X-Log-Oldest`
+(time of the oldest line kept) and `X-Log-Buffered` (lines kept). `400 VALIDATION_ERROR` for a bad
+query.
+
+The gateway's `GET /logs` (`X-Internal-Key`) asks every instance Discovery lists, Discovery itself
+and its own buffer, merges the lines by time and returns the newest `limit` (max 10000) as an NDJSON
+attachment. `since` / `until` also take durations (`15m`, `2h`; default the last 15 minutes) and
+`service` / `instance` filter the sources. `X-Logs-Sources` names the instances that answered,
+`X-Logs-Missing` the others with the reason (`404`, `not_ndjson`, `timeout`).
+
+### Metrics
+
+`GET /metrics` (public, Prometheus text format) on the gateway, Discovery, the broker and every
+service. Prometheus (`:9090`) scrapes them every 5 s and Grafana (`:3001`) shows the
+"Kahoot With Undead" dashboard. Shared names: `http_requests_total{method,route,status}`,
+`http_request_duration_seconds{method,route}`, `upstream_calls_total{target,status}`,
+`events_consumed_total{type,outcome}`, `active_tasks`, `max_concurrent_tasks`.
 
 ---
 
@@ -2017,8 +2059,9 @@ Base `level` is its highest facility level; `storageCapacity` is 100 per storage
 has only `storage` at level 1.
 
 **Auth:** Base reads the acting player from the `X-Player-Id` header set by the gateway, not from
-the cookie. It consumes Player's WebSocket stream (URL negotiated with `GET /ws/player` at the
-gateway), and also accepts events over HTTP at `POST /base/internal/events`.
+the cookie, and treats a request marked `X-Caller: client` as the player's. It calls Resource,
+World and Player through the broker over gRPC, and receives the `player.registered` topic from the
+broker at `POST /internal/events` (or `Endpoint.Deliver` on gRPC port 9087).
 
 ### Endpoints
 
@@ -2190,12 +2233,12 @@ Body: the `Base`.
 </details>
 
 <details>
-<summary><b>POST</b> <code>/base/internal/events</code> — Receive a service event</summary>
+<summary><b>POST</b> <code>/internal/events</code> (also <code>/base/internal/events</code>) — Receive a broker event</summary>
 
 **Caller:** internal · **Auth:** `X-Internal-Key` · **Idempotent:** yes (deduplicated on `eventId`)
 
-Takes one event in the standard [envelope](#envelope). Stands in for the WebSocket consumer until
-it is built; both apply events the same way.
+Takes one event in the standard [envelope](#envelope), delivered by the broker from the topics Base
+subscribes to. `200` acks it, a `4xx` dead-letters it, a `5xx` has it retried.
 
 **Responses**
 
@@ -2239,9 +2282,10 @@ A player's level for `available` is the higher of Player's `GET /players/{id}` a
 `player.leveled_up` seen. Unlocked wings are global: once World reports a wing, every player has it.
 
 **Auth:** Crafting reads the acting player from the `X-Player-Id` header set by the gateway, not
-from the cookie (internal callers must send it too). It consumes Player's, Exam's and World's
-WebSocket streams (URLs negotiated with `GET /ws/{service}` at the gateway), and also accepts events
-over HTTP at `POST /crafting/internal/events`.
+the cookie, and treats a request marked `X-Caller: client` as the player's. It calls Resource and
+Player through the broker over gRPC, and receives the `player.leveled_up`, `exam.completed` and
+`world.wing_unlocked` topics from the broker at `POST /internal/events` (or `Endpoint.Deliver` on
+gRPC port 9088).
 
 ### Endpoints
 
@@ -2409,12 +2453,12 @@ Newest first.
 </details>
 
 <details>
-<summary><b>POST</b> <code>/crafting/internal/events</code> — Receive a service event</summary>
+<summary><b>POST</b> <code>/internal/events</code> (also <code>/crafting/internal/events</code>) — Receive a broker event</summary>
 
 **Caller:** internal · **Auth:** `X-Internal-Key` · **Idempotent:** yes (deduplicated on `eventId`)
 
-Takes one event in the standard [envelope](#envelope). Stands in for the WebSocket consumers until
-they are built; both apply events the same way.
+Takes one event in the standard [envelope](#envelope), delivered by the broker from the topics
+Crafting subscribes to. `200` acks it, a `4xx` dead-letters it, a `5xx` has it retried.
 
 **Responses**
 
