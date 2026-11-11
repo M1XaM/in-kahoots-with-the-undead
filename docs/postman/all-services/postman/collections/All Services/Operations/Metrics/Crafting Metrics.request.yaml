@@ -1,0 +1,4 @@
+name: Crafting Metrics
+$kind: http-request
+method: GET
+url: "{{craftingUrl}}/metrics"

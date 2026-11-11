@@ -1,0 +1,15 @@
+name: Download Logs (last 15 min)
+$kind: http-request
+method: GET
+url: "{{baseUrl}}/logs"
+description: "Every instance's recent lines, merged by time, as an NDJSON attachment. X-Logs-Sources lists who answered, X-Logs-Missing who did not (and why)."
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      console.log('sources', pm.response.headers.get('X-Logs-Sources'));
+      console.log('missing', pm.response.headers.get('X-Logs-Missing'));
+      pm.test('NDJSON', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/x-ndjson'));

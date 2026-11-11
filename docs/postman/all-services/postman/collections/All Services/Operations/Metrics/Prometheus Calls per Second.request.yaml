@@ -1,0 +1,4 @@
+name: Prometheus Calls per Second
+$kind: http-request
+method: GET
+url: "{{prometheusUrl}}/api/v1/query?query=sum by (service, result) (rate(broker_calls_total[1m]))"

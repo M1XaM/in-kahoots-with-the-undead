@@ -1,0 +1,7 @@
+name: Base Own Lines (internal)
+$kind: http-request
+method: GET
+url: "{{baseServiceUrl}}/internal/logs?limit=100"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"

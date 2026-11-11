@@ -1,7 +1,7 @@
 name: Call With Query String
 $kind: http-request
 method: GET
-url: "http://localhost:8091/call/crafting/recipes?limit=5"
+url: "http://localhost:8091/call/crafting/crafting/recipes?limit=5"
 headers:
   - key: X-Internal-Key
     value: "changeme"

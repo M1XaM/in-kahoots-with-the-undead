@@ -1,7 +1,7 @@
 name: Call Base Players (send several times)
 $kind: http-request
 method: GET
-url: "{{brokerUrl}}/call/base/players"
+url: "{{brokerUrl}}/call/base/base/players"
 headers:
   - key: X-Internal-Key
     value: "changeme"

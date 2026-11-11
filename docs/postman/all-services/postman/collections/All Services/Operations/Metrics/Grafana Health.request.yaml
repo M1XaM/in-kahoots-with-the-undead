@@ -1,0 +1,4 @@
+name: Grafana Health
+$kind: http-request
+method: GET
+url: "{{grafanaUrl}}/api/health"

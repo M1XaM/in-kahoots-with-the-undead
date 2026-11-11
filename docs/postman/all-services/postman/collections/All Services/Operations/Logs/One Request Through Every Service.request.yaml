@@ -1,0 +1,8 @@
+name: One Request Through Every Service
+$kind: http-request
+method: GET
+url: "{{baseUrl}}/logs?request_id={{requestId}}&since=1h"
+description: "Set requestId to the X-Request-Id of any response: the lines of the gateway, the broker and every service it reached."
+headers:
+  - key: X-Internal-Key
+    value: "changeme"

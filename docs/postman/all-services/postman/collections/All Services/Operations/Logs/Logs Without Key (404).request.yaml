@@ -1,0 +1,9 @@
+name: Logs Without Key (404)
+$kind: http-request
+method: GET
+url: "{{baseUrl}}/logs"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('not public', () => pm.response.to.have.status(404));
