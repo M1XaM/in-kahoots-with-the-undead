@@ -1,0 +1,8 @@
+name: Get Balance
+$kind: http-request
+method: GET
+url: "{{baseUrl}}/resources/balances/{{balanceId}}"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+order: 3000

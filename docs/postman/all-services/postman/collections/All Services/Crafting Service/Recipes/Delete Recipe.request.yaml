@@ -1,0 +1,8 @@
+name: Delete Recipe
+$kind: http-request
+method: DELETE
+url: "{{craftingUrl}}/crafting/recipes/1"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+order: 2000

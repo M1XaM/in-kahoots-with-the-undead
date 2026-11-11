@@ -1,0 +1,5 @@
+name: Broker Status
+$kind: http-request
+method: GET
+url: "{{brokerUrl}}/status"
+order: 2000

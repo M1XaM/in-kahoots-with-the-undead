@@ -1,0 +1,14 @@
+name: Update Inventory Item
+$kind: http-request
+method: PUT
+url: "{{playerUrl}}/players/1/inventory/coffee"
+headers:
+  - key: Content-Type
+    value: "application/json"
+body:
+  type: json
+  content: |-
+    {
+      "quantity": 5
+    }
+order: 5000

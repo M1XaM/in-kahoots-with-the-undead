@@ -1,0 +1,30 @@
+name: Action Completed - scavenge
+$kind: http-request
+description: |-
+  Room 3 (Lab 204) / node 1 is metal, as in World Service's seed.
+method: POST
+url: "{{baseUrl}}/resources/internal/events"
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+body:
+  type: json
+  content: |-
+    {
+      "eventId": "{{$guid}}",
+      "type": "game.action_completed",
+      "version": 1,
+      "occurredAt": "2026-09-25T10:00:00Z",
+      "payload": {
+        "actionId": "{{$guid}}",
+        "sessionId": "7a90",
+        "playerId": 42,
+        "type": "scavenge",
+        "roomId": 3,
+        "nodeId": 1,
+        "completedAt": "2026-09-25T10:00:00Z"
+      }
+    }
+order: 3000

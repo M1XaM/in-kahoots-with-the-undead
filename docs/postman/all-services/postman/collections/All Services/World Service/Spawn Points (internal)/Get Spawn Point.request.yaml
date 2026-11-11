@@ -1,0 +1,8 @@
+name: Get Spawn Point
+$kind: http-request
+method: GET
+url: "{{baseUrl}}/world/spawn-points/2"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+order: 2000

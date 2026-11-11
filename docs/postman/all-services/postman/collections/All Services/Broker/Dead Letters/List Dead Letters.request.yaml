@@ -1,0 +1,8 @@
+name: List Dead Letters
+$kind: http-request
+method: GET
+url: "{{brokerUrl}}/dead-letters"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+order: 1000

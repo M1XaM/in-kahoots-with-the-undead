@@ -1,0 +1,8 @@
+name: Heartbeat
+$kind: http-request
+method: PUT
+url: "{{discoveryUrl}}/services/demo/instances/demo-1/heartbeat"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+order: 4000

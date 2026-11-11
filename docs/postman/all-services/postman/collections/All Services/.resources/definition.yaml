@@ -1,0 +1,64 @@
+$kind: collection
+description: |-
+  Every request of the system in one collection, one folder per service. Gateway requests use {{baseUrl}} (http://localhost:8080, the only port published in the team compose); Discovery, the Broker, Player, Game, Base and Crafting use their own variables (discoveryUrl, brokerUrl, playerUrl, gameUrl, baseServiceUrl, craftingUrl), which you can point at the dev compose ports. Internal requests send X-Internal-Key (INTERNAL_KEY in the team .env, default changeme). Services behind the gateway have their own 'Auth (run first)' folder: run it once, the accessToken, playerId and username collection variables are shared by all folders.
+
+  Service Discovery: Service Discovery is published on http://localhost:8089 in the team compose; every registry route needs X-Internal-Key (INTERNAL_KEY in the team .env, default changeme). Registry: register, heartbeat, report a failure and deregister a demo instance. Load Balancing: send the same request through the gateway several times and watch X-Upstream-Instance change between the replicas.
+
+  Broker: The Camus message broker is published on http://localhost:8091 (HTTP) and 8092 (gRPC) in the team compose. Every route except /health, /status and /metrics needs X-Internal-Key (INTERNAL_KEY in the team .env, default changeme). Requests: forward a call to one healthy instance of a service through its queue; watch X-Upstream-Instance and X-Reroutes. Events: publish to a topic named <service>.<event>, list topics, read the dead letter channel.
+
+  Exam Service: Exam Service through the API Gateway (http://localhost:8080); only the gateway is published in the team compose. Run 'Auth (run first)' to register and log in a player: the gateway verifies the token, strips it and forwards the player as X-Player-Id. Internal requests (what Game sends) use X-Internal-Key (INTERNAL_KEY in the team .env, default changeme). Run the Exams folder in order: it creates an exam for the logged-in player against the math professor, answers it correctly and passes, which unlocks the Math Wing in World.
+
+  World Service: World Service through the API Gateway (http://localhost:8080); only the gateway is published in the team compose. Run 'Auth (run first)' to register and log in a player: the gateway verifies the token, strips it and forwards the player as X-Player-Id. Internal requests (Game, Base, Resource and admin) use X-Internal-Key (INTERNAL_KEY in the team .env, default changeme). Pass an exam through the Exam collection and the matching wing shows unlocked: true.
+
+  Zombie Service: Zombie Service through the API Gateway (http://localhost:8080); only the gateway is published in the team compose. Run 'Auth (run first)' to register and log in a player: the gateway verifies the token, strips it and forwards the player as X-Player-Id. Internal requests use X-Internal-Key (INTERNAL_KEY in the team .env, default changeme).
+
+  Resource Service: Resource Service through the API Gateway (http://localhost:8080); only the gateway is published in the team compose. Run 'Auth (run first)' to register and log in a player: the gateway verifies the token, strips it and forwards the player as X-Player-Id. Internal requests use X-Internal-Key (INTERNAL_KEY in the team .env, default changeme).
+variables:
+  - key: discoveryUrl
+    value: "http://localhost:8089"
+  - key: baseUrl
+    value: "http://localhost:8080"
+  - key: brokerUrl
+    value: "http://localhost:8091"
+  - key: eventId
+    value: "6f1c0c3e-0001"
+  - key: playerUrl
+    value: "http://localhost:8081"
+  - key: gameUrl
+    value: "http://localhost:8082"
+  - key: accessToken
+    value: ""
+  - key: playerId
+    value: ""
+  - key: username
+    value: ""
+  - key: examId
+    value: ""
+  - key: examSubject
+    value: ""
+  - key: examQuestions
+    value: ""
+  - key: answers
+    value: ""
+  - key: questionId
+    value: ""
+  - key: roomId
+    value: ""
+  - key: wingId
+    value: ""
+  - key: wingName
+    value: ""
+  - key: pointId
+    value: ""
+  - key: zombieId
+    value: ""
+  - key: reservationId
+    value: ""
+  - key: balanceId
+    value: ""
+  - key: ledgerEntryId
+    value: ""
+  - key: baseServiceUrl
+    value: "http://localhost:8087"
+  - key: craftingUrl
+    value: "http://localhost:8088"

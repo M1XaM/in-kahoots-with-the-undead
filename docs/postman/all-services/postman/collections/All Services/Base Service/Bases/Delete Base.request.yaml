@@ -1,0 +1,8 @@
+name: Delete Base
+$kind: http-request
+method: DELETE
+url: "{{baseServiceUrl}}/base/players/1"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+order: 2000

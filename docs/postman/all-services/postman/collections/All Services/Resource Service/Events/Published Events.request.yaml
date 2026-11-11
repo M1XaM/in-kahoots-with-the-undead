@@ -1,0 +1,10 @@
+name: Published Events
+$kind: http-request
+description: |-
+  Outbox: the events /events subscribers receive (resource.gathered).
+method: GET
+url: "{{baseUrl}}/resources/internal/events?since=0"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+order: 4000

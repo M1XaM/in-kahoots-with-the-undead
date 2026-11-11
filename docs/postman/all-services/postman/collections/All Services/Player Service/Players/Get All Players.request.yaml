@@ -1,0 +1,5 @@
+name: Get All Players
+$kind: http-request
+method: GET
+url: "{{playerUrl}}/players"
+order: 3000

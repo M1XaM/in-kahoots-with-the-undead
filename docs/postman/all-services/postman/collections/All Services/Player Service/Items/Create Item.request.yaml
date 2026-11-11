@@ -1,0 +1,16 @@
+name: Create Item
+$kind: http-request
+method: POST
+url: "{{playerUrl}}/items"
+headers:
+  - key: Content-Type
+    value: "application/json"
+body:
+  type: json
+  content: |-
+    {
+      "itemId": "coffee",
+      "name": "Coffee",
+      "type": "consumable"
+    }
+order: 1000

@@ -1,0 +1,5 @@
+name: Gateway Status
+$kind: http-request
+method: GET
+url: "{{baseUrl}}/status"
+order: 3000

@@ -1,0 +1,14 @@
+name: Call With Short Deadline (X-Timeout-Ms)
+$kind: http-request
+method: GET
+url: "http://localhost:8091/call/base/players"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+  - key: X-Timeout-Ms
+    value: "50"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      console.log('answered by', pm.response.headers.get('X-Upstream-Instance'), 'reroutes', pm.response.headers.get('X-Reroutes') || 0);

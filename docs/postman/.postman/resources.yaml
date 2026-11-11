@@ -1,0 +1,13 @@
+# Use this workspace to collaborate
+workspace:
+  id: db0c011e-e45b-4c3b-b772-4acf15b66e44
+
+localResources:
+  collections:
+    - ../all-services.postman_collection.json
+    - ../broker/broker.postman_collection.json
+    - ../exam-service/exam-service.postman_collection.json
+    - ../resource-service/resource-service.postman_collection.json
+    - ../world-service/world-service.postman_collection.json
+    - ../service-discovery/service-discovery.postman_collection.json
+    - ../zombie-service/zombie-service.postman_collection.json

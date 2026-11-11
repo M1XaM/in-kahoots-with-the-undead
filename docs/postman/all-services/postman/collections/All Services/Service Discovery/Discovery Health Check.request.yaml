@@ -1,0 +1,5 @@
+name: Discovery Health Check
+$kind: http-request
+method: GET
+url: "{{discoveryUrl}}/health"
+order: 1000

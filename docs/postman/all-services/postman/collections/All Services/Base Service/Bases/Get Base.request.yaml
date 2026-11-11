@@ -1,0 +1,8 @@
+name: Get Base
+$kind: http-request
+method: GET
+url: "{{baseServiceUrl}}/base/players/1"
+headers:
+  - key: X-Player-Id
+    value: "1"
+order: 4000

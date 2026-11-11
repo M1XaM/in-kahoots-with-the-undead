@@ -1,0 +1,16 @@
+name: Update Ledger Entry
+$kind: http-request
+method: PATCH
+url: "{{baseUrl}}/resources/ledger/{{ledgerEntryId}}"
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+body:
+  type: json
+  content: |-
+    {
+      "amount": 8
+    }
+order: 4000

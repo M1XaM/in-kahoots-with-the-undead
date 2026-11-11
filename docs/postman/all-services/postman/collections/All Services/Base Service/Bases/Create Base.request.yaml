@@ -1,0 +1,16 @@
+name: Create Base
+$kind: http-request
+method: POST
+url: "{{baseServiceUrl}}/base/players"
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+body:
+  type: json
+  content: |-
+    {
+      "playerId": 1
+    }
+order: 1000

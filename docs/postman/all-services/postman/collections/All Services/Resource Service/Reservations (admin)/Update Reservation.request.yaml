@@ -1,0 +1,16 @@
+name: Update Reservation
+$kind: http-request
+method: PATCH
+url: "{{baseUrl}}/resources/reservations/{{reservationId}}"
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+body:
+  type: json
+  content: |-
+    {
+      "status": "released"
+    }
+order: 4000

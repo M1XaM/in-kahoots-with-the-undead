@@ -1,0 +1,5 @@
+name: Get Inventory Item
+$kind: http-request
+method: GET
+url: "{{playerUrl}}/players/1/inventory/coffee"
+order: 3000
