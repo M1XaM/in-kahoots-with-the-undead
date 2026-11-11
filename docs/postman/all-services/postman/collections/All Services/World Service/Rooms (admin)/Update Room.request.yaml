@@ -1,0 +1,19 @@
+name: Update Room
+$kind: http-request
+method: PUT
+url: "{{baseUrl}}/world/rooms/{{roomId}}"
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+body:
+  type: json
+  content: |-
+    {
+      "name": "Chem Lab 2",
+      "type": "laboratory",
+      "wingId": 2,
+      "resourceNode": null
+    }
+order: 2000

@@ -1,0 +1,8 @@
+name: Get All Crafts
+$kind: http-request
+method: GET
+url: "{{craftingUrl}}/crafting/crafts"
+headers:
+  - key: X-Player-Id
+    value: "1"
+order: 2000

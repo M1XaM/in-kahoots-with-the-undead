@@ -1,0 +1,8 @@
+name: Exam Event Stream URL
+$kind: http-request
+method: GET
+url: "{{baseUrl}}/ws/exam"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+order: 3000

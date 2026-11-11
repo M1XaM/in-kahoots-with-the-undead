@@ -1,0 +1,4 @@
+name: Broker Status
+$kind: http-request
+method: GET
+url: "http://localhost:8091/status"

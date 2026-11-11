@@ -1,0 +1,30 @@
+name: Action Completed - chop_benches
+$kind: http-request
+description: |-
+  Credits 5-15 wood and publishes resource.gathered on ws://resource:8086/events (negotiate it with GET /ws/resource on the gateway).
+method: POST
+url: "{{baseUrl}}/resources/internal/events"
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+body:
+  type: json
+  content: |-
+    {
+      "eventId": "{{$guid}}",
+      "type": "game.action_completed",
+      "version": 1,
+      "occurredAt": "2026-09-25T10:00:00Z",
+      "payload": {
+        "actionId": "{{$guid}}",
+        "sessionId": "7a90",
+        "playerId": 42,
+        "type": "chop_benches",
+        "roomId": 1,
+        "nodeId": null,
+        "completedAt": "2026-09-25T10:00:00Z"
+      }
+    }
+order: 2000

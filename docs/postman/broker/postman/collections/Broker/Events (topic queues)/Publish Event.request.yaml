@@ -1,0 +1,26 @@
+name: Publish Event
+$kind: http-request
+method: POST
+url: "http://localhost:8091/topics/exam.completed/events"
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+body:
+  type: json
+  content: |
+    {
+      "eventId": "{{eventId}}",
+      "type": "exam.completed",
+      "version": 1,
+      "occurredAt": "2026-09-09T18:04:11Z",
+      "payload": {
+        "score": 9
+      }
+    }
+scripts:
+  - type: beforeRequest
+    language: text/javascript
+    code: |-
+      pm.collectionVariables.set('eventId', pm.variables.replaceIn('{{$guid}}'));

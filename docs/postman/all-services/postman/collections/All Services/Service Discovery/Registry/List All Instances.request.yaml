@@ -1,0 +1,8 @@
+name: List All Instances
+$kind: http-request
+method: GET
+url: "{{discoveryUrl}}/services"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+order: 1000

@@ -1,0 +1,8 @@
+name: Get Recipe
+$kind: http-request
+method: GET
+url: "{{craftingUrl}}/crafting/recipes/1"
+headers:
+  - key: X-Player-Id
+    value: "1"
+order: 4000

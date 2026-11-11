@@ -1,0 +1,8 @@
+name: Get Room (player via gateway)
+$kind: http-request
+method: GET
+url: "{{baseUrl}}/world/rooms/3"
+headers:
+  - key: Authorization
+    value: "Bearer {{accessToken}}"
+order: 2000

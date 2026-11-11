@@ -1,0 +1,5 @@
+name: Get All Items
+$kind: http-request
+method: GET
+url: "{{playerUrl}}/items"
+order: 2000

@@ -1,0 +1,10 @@
+name: Negotiate Event Stream URL (internal)
+$kind: http-request
+description: |-
+  Where consumers (World, Game, Crafting) open Exam's /events WebSocket. They then connect to the returned URL directly with X-Internal-Key; the gateway never relays.
+method: GET
+url: "{{baseUrl}}/ws/exam"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+order: 1000

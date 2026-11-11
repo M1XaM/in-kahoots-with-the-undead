@@ -1,0 +1,5 @@
+name: Get Action
+$kind: http-request
+method: GET
+url: "{{gameUrl}}/game/sessions/7a90e5f6-0000-4000-8000-000000000001/actions/e3f1e5f6-0000-4000-8000-000000000001"
+order: 1000

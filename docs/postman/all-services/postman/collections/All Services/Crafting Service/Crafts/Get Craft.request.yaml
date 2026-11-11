@@ -1,0 +1,8 @@
+name: Get Craft
+$kind: http-request
+method: GET
+url: "{{craftingUrl}}/crafting/crafts/00000000-0000-0000-0000-000000000000"
+headers:
+  - key: X-Player-Id
+    value: "1"
+order: 3000

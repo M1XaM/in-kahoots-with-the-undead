@@ -1,0 +1,8 @@
+name: Get Rooms by Wing (internal)
+$kind: http-request
+method: GET
+url: "{{baseUrl}}/world/rooms?wingId=1"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+order: 3000

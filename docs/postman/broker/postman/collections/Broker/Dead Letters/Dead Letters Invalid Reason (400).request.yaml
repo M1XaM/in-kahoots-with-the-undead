@@ -1,0 +1,7 @@
+name: Dead Letters Invalid Reason (400)
+$kind: http-request
+method: GET
+url: "http://localhost:8091/dead-letters?reason=oops"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"

@@ -1,0 +1,19 @@
+name: Create Recipe
+$kind: http-request
+method: POST
+url: "{{craftingUrl}}/crafting/recipes"
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+body:
+  type: json
+  content: |-
+    {
+      "name": "Barricade Kit",
+      "inputs": { "wood": 4, "metal": 2 },
+      "output": { "itemId": "barricade_kit", "name": "Barricade Kit", "quantity": 1 },
+      "requires": {}
+    }
+order: 1000

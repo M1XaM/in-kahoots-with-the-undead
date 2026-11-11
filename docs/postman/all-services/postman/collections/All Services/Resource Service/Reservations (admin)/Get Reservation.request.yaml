@@ -1,0 +1,8 @@
+name: Get Reservation
+$kind: http-request
+method: GET
+url: "{{baseUrl}}/resources/reservations/{{reservationId}}"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+order: 3000

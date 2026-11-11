@@ -1,0 +1,8 @@
+name: List Topics
+$kind: http-request
+method: GET
+url: "{{brokerUrl}}/topics"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+order: 5000

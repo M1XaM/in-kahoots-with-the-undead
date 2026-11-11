@@ -1,0 +1,7 @@
+name: Call Unregistered Service (503)
+$kind: http-request
+method: GET
+url: "http://localhost:8091/call/ghost/anything"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"

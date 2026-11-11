@@ -1,0 +1,17 @@
+name: Update Spawn Point
+$kind: http-request
+method: PUT
+url: "{{baseUrl}}/world/spawn-points/{{pointId}}"
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+body:
+  type: json
+  content: |-
+    {
+      "roomId": 3,
+      "zombieTypes": ["dean", "janitor"]
+    }
+order: 4000

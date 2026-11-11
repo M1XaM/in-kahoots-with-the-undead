@@ -1,0 +1,10 @@
+name: Release Reservation
+$kind: http-request
+description: |-
+  409 ALREADY_COMMITTED after a commit; reserve again to see 204.
+method: DELETE
+url: "{{baseUrl}}/resources/reservations/{{reservationId}}"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+order: 6000

@@ -1,0 +1,8 @@
+name: Delete Spawn Point
+$kind: http-request
+method: DELETE
+url: "{{baseUrl}}/world/spawn-points/{{pointId}}"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+order: 5000

@@ -1,0 +1,5 @@
+name: Metrics (Prometheus)
+$kind: http-request
+method: GET
+url: "{{brokerUrl}}/metrics"
+order: 3000

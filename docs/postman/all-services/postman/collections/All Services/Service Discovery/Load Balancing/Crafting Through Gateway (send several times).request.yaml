@@ -1,0 +1,13 @@
+name: Crafting Through Gateway (send several times)
+$kind: http-request
+method: GET
+url: "{{baseUrl}}/crafting/recipes"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      console.log('answered by', pm.response.headers.get('X-Upstream-Instance'));
+order: 2000

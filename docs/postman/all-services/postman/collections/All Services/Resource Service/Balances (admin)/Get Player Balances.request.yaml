@@ -1,0 +1,8 @@
+name: Get Player Balances
+$kind: http-request
+method: GET
+url: "{{baseUrl}}/resources/players/43/balances"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+order: 4000
