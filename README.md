@@ -25,6 +25,12 @@ wings of the university to explore, tying academic progress directly to survival
 [![resource-service postman](https://img.shields.io/badge/resource--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/resource-service)
 [![base-service postman](https://img.shields.io/badge/base--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/base-service)
 [![crafting-service postman](https://img.shields.io/badge/crafting--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/crafting-service)
+[![broker postman](https://img.shields.io/badge/broker-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/broker)
+[![operations postman](https://img.shields.io/badge/logs%20%26%20metrics-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/operations)
+[![all services postman](https://img.shields.io/badge/all%20services-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/all-services)
+
+Lab 4: what is implemented and where is in [`DONE.md`](DONE.md); what each team service still
+has to do is in [`TODO_per_service.md`](TODO_per_service.md).
 
 
 ## Architecture
@@ -118,36 +124,31 @@ browser sockets all land on `game`; the others serve REST and the `/events` stre
 - **Repository:** [`services/gateway`](https://github.com/TimurCravtov/KahootWithUndeadGateway),
   Python / FastAPI (the lab's "banned" language).
 - **Image:** [`timurcravtov/gateway`](https://hub.docker.com/r/timurcravtov/gateway), version set
-  by `GATEWAY_SERVICE_TAG` (currently `3`).
+  by `GATEWAY_SERVICE_TAG` (currently `3`; the Lab 4 behaviour below needs the image released from
+  the gateway's Lab 4 branch, see [`DONE.md`](DONE.md)).
 - **Routes** by the first path segment to the owning service (prefixes in the
-  [Communication Contract](docs/communication.md#conventions)). Base, Crafting, Exam, World and
-  Resource are configured to call other services through it, so all REST traffic, client and
-  service-to-service, passes the gateway.
+  [Communication Contract](docs/communication.md#conventions)) **through the message broker**:
+  `Broker.Call` over gRPC (`GATEWAY_BROKER_TRANSPORT=grpc`, or `http` for `/call/{service}/...`).
+  The broker picks the instance (least load), runs the circuit breakers and reroutes; the gateway
+  has no balancer or breaker of its own. Every response names the instance in `X-Upstream-Instance`.
 - **Authorizes** every client request: the login JWT (`Authorization: Bearer` or the
-  `access_token` cookie) is verified with Player's JWKS (`GATEWAY_AUTH_MODE=jwks`; `secret` for
-  HS256 with `GATEWAY_JWT_SECRET`, `off` to disable). The `Authorization` header is never forwarded;
-  services receive the verified player as `X-Player-Id`. The `access_token` cookie is stripped
-  too, so no service sees the token. Services authenticate with `X-Internal-Key`.
+  `access_token` cookie) is verified with Player's JWKS, fetched through the broker
+  (`GATEWAY_AUTH_MODE=jwks`; `secret` for HS256 with `GATEWAY_JWT_SECRET`, `off` to disable). The
+  `Authorization` header and the cookie are never forwarded; services receive the verified player as
+  `X-Player-Id` and **`X-Caller: client`**, so they treat it as the player's request even though the
+  broker sends its own `X-Internal-Key`.
+- **Only client routes:** `/<prefix>/internal/...` and the old event stream negotiation
+  `GET /ws/{producer}` answer `404`. `GATEWAY_LEGACY_SERVICE_ROUTES=true` (the compose default until
+  every service uses the broker) lets services holding `X-Internal-Key` reach them again.
 - **Limits:** requests past `GATEWAY_TASK_TIMEOUT` seconds answer `504`, requests beyond
-  `GATEWAY_MAX_CONCURRENT_TASKS` in flight answer `429`. Zombie, Resource, Base and Crafting enforce
-  the same limits themselves (`408` / `429`).
-- **WebSockets:** `GET /ws/game` returns Game's Socket.IO URL for the browser and
-  `GET /ws/{player|game|exam|world|resource}` (internal) the `/events` URL of one of the
-  producer's instances. The gateway never relays the connection.
-- **Lab 4 (next gateway image):** every request goes to the broker as `/call/{service}/...` with
-  `X-Caller: client` for requests from outside; the round-robin and the circuit breaker below move
-  to the broker and are removed from the gateway. Until that image is released, `3` behaves as below.
-- **Service Discovery:** with `DISCOVERY_URL` it fetches every service's instances every 2 s and
-  routes only to the healthy ones, **round-robin**, without asking Discovery per request. A service
-  Discovery has never listed (it does not register yet) is reached at its `*_SERVICE_URL`; a listed
-  service without a healthy instance answers `503`. When Discovery is down the last lists are kept.
-  Every response names the instance that answered in `X-Upstream-Instance`.
-- **Circuit breaker:** 3 failed calls (timeout, connection error or `5xx`) to one service within
-  105 s (`GATEWAY_TASK_TIMEOUT` × 3.5) trip it and log `circuit breaker tripped`. A failing instance
-  listed by Discovery leaves the rotation at once and is reported to Discovery; a service at its
-  static URL is answered `503` at once for 105 s, then one trial request decides.
-- **Status:** `GET /status` reports its load like every service, and the gateway registers itself
-  with Discovery, which checks it like any other instance.
+  `GATEWAY_MAX_CONCURRENT_TASKS` in flight answer `429`. Every service enforces the same limits
+  itself (`408` / `429`).
+- **WebSockets:** `GET /ws/game` returns Game's Socket.IO URL for the browser. The gateway never
+  relays the connection.
+- **Logs:** `GET /logs` (`X-Internal-Key`) downloads the logs of the whole system, see
+  [Logs](#logs).
+- **Status and metrics:** `GET /status` reports its load like every service, `GET /metrics` feeds
+  Prometheus, and the gateway registers itself with Discovery.
 - **Try it:** http://localhost:8080/docs, health check `GET /health`.
 
 ### Service Discovery
@@ -171,6 +172,9 @@ browser sockets all land on `game`; the others serve REST and the `/events` stre
 - **Telegram:** create a bot with @BotFather, add it to the team chat and send it `/chatid`; put
   the token in `TELEGRAM_BOT_TOKEN` and the chat ids, comma-separated, in `TELEGRAM_CHATS_IDS`
   in `.env` (never commit them). Without a token alerts only go to the log.
+- **Lab 4:** an instance registers its `grpc_url` (the broker then calls it over gRPC) and the
+  `topics` it consumes (the broker subscribes the service). It also serves `GET /metrics` and
+  `GET /internal/logs` like every service.
 - **Try it:** `curl -H 'X-Internal-Key: changeme' localhost:8089/services` lists every instance with
   its health and load; `GET /status` and `GET /health` are public. The Postman collection in
   [`docs/postman/service-discovery`](docs/postman/service-discovery) (also as a single importable
@@ -187,9 +191,11 @@ browser sockets all land on `game`; the others serve REST and the `/events` stre
 - **Status:** Lab 4. The broker is a submodule (`services/broker`) and runs from `docker-compose.yml`
   as `timurcravtov/broker:4` (`BROKER_DOCKERHUB_USERNAME`, `BROKER_SERVICE_TAG`), with HTTP on
   `BROKER_PORT` (8091) and gRPC on `BROKER_GRPC_PORT` (8092), both published on the host. Events are
-  kept on the `broker-data` volume (`BROKER_STORAGE=log`). Base and Crafting (`:4`) already
-  call other services through it over gRPC, are called back over gRPC and consume their topics; the
-  other services still talk through the Gateway until they move to the contract below.
+  kept on the `broker-data` volume (`BROKER_STORAGE=log`). Base and Crafting (`:4`) call other
+  services through it over gRPC, are called back over gRPC and consume their topics; the other
+  services still talk through the Gateway (`GATEWAY_LEGACY_SERVICE_ROUTES=true`) until they move to
+  the contract below ([`TODO_per_service.md`](TODO_per_service.md)). A subscriber with no running
+  instance keeps its subscriptions, and its events wait in its durable queue until it is back.
 - **Role:** the only path between the Gateway and the services, between services, and for events.
   Clients never reach it; every non-public route needs `X-Internal-Key`. It registers with Discovery
   as `broker` like any service, and polls `GET /services` every 2 s for instances, health, load,
@@ -508,7 +514,7 @@ Defaults are the design's proposals, not confirmed.
 (http://localhost:3001), configured from [`monitoring/`](monitoring):
 
 - **Prometheus** ([`monitoring/prometheus/prometheus.yml`](monitoring/prometheus/prometheus.yml))
-  scrapes every 5 s the broker's `GET /metrics` and every Base and Crafting replica (found through the
+  scrapes every 5 s the gateway, Discovery, the broker's `GET /metrics` and every Base and Crafting replica (found through the
   compose DNS name, so `--scale base=3` is picked up). The broker sees every call and every event, so
   one target describes the whole system: calls by service and outcome, latency, request queues,
   reroutes, open circuit breakers, instance health and load, events published / delivered /
@@ -522,6 +528,23 @@ Defaults are the design's proposals, not confirmed.
   Crafting. Anyone can view it; log in with `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD`
   (`admin` / `admin`) to edit. The provisioned dashboard is read-only: change the JSON file to keep a
   change.
+
+### Logs
+
+Every instance keeps its last log lines in memory and serves them on `GET /internal/logs`; the
+gateway's `GET /logs` asks every instance Discovery lists (and Discovery), merges the lines by time
+and returns them as one NDJSON download. No extra container is involved.
+
+```
+curl -H 'X-Internal-Key: changeme' 'localhost:8080/logs?since=1h&level=warn' -o logs.ndjson
+curl -H 'X-Internal-Key: changeme' 'localhost:8080/logs?request_id=<X-Request-Id of a response>'
+curl -H 'X-Internal-Key: changeme' 'localhost:8080/logs?service=base,broker&since=15m'
+```
+
+`X-Logs-Sources` names the instances that answered and `X-Logs-Missing` the ones that did not, with
+the reason (`404` until a service implements the endpoint). The endpoint every service implements
+is in the [contract](docs/communication.md#log-collection-get-internallogs-and-get-logs) and, step by
+step per language, in [`TODO_per_service.md`](TODO_per_service.md).
 
 ## GitHub Workflow
 
