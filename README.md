@@ -29,9 +29,6 @@ wings of the university to explore, tying academic progress directly to survival
 [![operations postman](https://img.shields.io/badge/logs%20%26%20metrics-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/operations)
 [![all services postman](https://img.shields.io/badge/all%20services-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/all-services)
 
-Lab 4: what is implemented and where is in [`DONE.md`](DONE.md); the `/internal/logs` and
-`/metrics` endpoints the other team services still have to add are in [`TODO_per_service.md`](TODO_per_service.md).
-
 
 ## Architecture
 
@@ -125,7 +122,7 @@ browser sockets all land on `game`; the others serve REST and the `/events` stre
   Python / FastAPI (the lab's "banned" language).
 - **Image:** [`timurcravtov/gateway`](https://hub.docker.com/r/timurcravtov/gateway), version set
   by `GATEWAY_SERVICE_TAG` (currently `3`; the Lab 4 behaviour below needs the image released from
-  the gateway's Lab 4 branch, see [`DONE.md`](DONE.md)).
+  the gateway's Lab 4 branch).
 - **Routes** by the first path segment to the owning service (prefixes in the
   [Communication Contract](docs/communication.md#conventions)) **through the message broker**:
   `Broker.Call` over gRPC (`GATEWAY_BROKER_TRANSPORT=grpc`, or `http` for `/call/{service}/...`).
@@ -543,8 +540,7 @@ curl -H 'X-Internal-Key: changeme' 'localhost:8080/logs?service=base,broker&sinc
 
 `X-Logs-Sources` names the instances that answered and `X-Logs-Missing` the ones that did not, with
 the reason (`404` until a service implements the endpoint). The endpoint every service implements
-is in the [contract](docs/communication.md#log-collection-get-internallogs-and-get-logs); the services that
-do not serve it yet are listed in [`TODO_per_service.md`](TODO_per_service.md).
+is in the [contract](docs/communication.md#log-collection-get-internallogs-and-get-logs).
 
 ## GitHub Workflow
 
