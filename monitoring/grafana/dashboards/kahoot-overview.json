@@ -738,7 +738,7 @@
     {
       "id": 18,
       "type": "timeseries",
-      "title": "Active tasks per Base / Crafting replica",
+      "title": "Active tasks per replica",
       "description": "",
       "datasource": {
         "type": "prometheus",
@@ -904,7 +904,7 @@
     {
       "id": 22,
       "type": "timeseries",
-      "title": "Events consumed by Base and Crafting",
+      "title": "Events consumed by the services",
       "description": "",
       "datasource": {
         "type": "prometheus",
@@ -996,7 +996,7 @@
     {
       "id": 24,
       "type": "row",
-      "title": "Base and Crafting",
+      "title": "Services (Base, Crafting, Resource, Zombie)",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -1191,6 +1191,103 @@
       ]
     },
     {
+      "id": 35,
+      "type": "timeseries",
+      "title": "Node.js memory in use (Resource, Zombie)",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 73
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "process_resident_memory_bytes{job=~\"resource|zombie\"}",
+          "legendFormat": "{{job}} {{instance}}"
+        }
+      ]
+    },
+    {
+      "id": 36,
+      "type": "timeseries",
+      "title": "Resource outbox relay to the broker",
+      "description": "Events the broker accepted from the outbox, and refused attempts (retried with a backoff).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 73
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (type) (rate(events_published_total{job=\"resource\"}[1m]))",
+          "legendFormat": "published {{type}}"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (type) (rate(event_publish_failures_total{job=\"resource\"}[1m]))",
+          "legendFormat": "failed {{type}}"
+        }
+      ]
+    },
+    {
       "id": 29,
       "type": "row",
       "title": "Gateway and Discovery",
@@ -1199,7 +1296,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 73
+        "y": 81
       },
       "panels": []
     },
@@ -1216,7 +1313,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 74
+        "y": 82
       },
       "fieldConfig": {
         "defaults": {
@@ -1259,7 +1356,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 74
+        "y": 82
       },
       "fieldConfig": {
         "defaults": {
@@ -1302,7 +1399,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 82
+        "y": 90
       },
       "fieldConfig": {
         "defaults": {
@@ -1345,7 +1442,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 82
+        "y": 90
       },
       "fieldConfig": {
         "defaults": {
@@ -1388,7 +1485,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 82
+        "y": 90
       },
       "fieldConfig": {
         "defaults": {

@@ -52,6 +52,21 @@ scrape_configs:
         port: 8082
         refresh_interval: 15s
 
+  # Resource and Zombie run several replicas too
+  - job_name: resource
+    dns_sd_configs:
+      - names: ["resource"]
+        type: A
+        port: 8086
+        refresh_interval: 15s
+
+  - job_name: zombie
+    dns_sd_configs:
+      - names: ["zombie"]
+        type: A
+        port: 8085
+        refresh_interval: 15s
+
   - job_name: prometheus
     static_configs:
       - targets: ["localhost:9090"]
