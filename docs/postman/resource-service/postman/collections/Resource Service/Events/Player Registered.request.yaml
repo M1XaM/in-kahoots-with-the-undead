@@ -1,8 +1,8 @@
 name: Player Registered
 $kind: http-request
 method: POST
-url: "http://localhost:8080/resources/internal/events"
-description: "HTTP delivery of player.registered (same handler as the WebSocket consumer): creates zero balances for player 42."
+url: "http://localhost:8091/topics/player.registered/events"
+description: "Publishes player.registered to the broker, which delivers it to every subscriber (Resource and Base) at POST /internal/events, over gRPC (Endpoint.Deliver) when the instance registered a grpc_url. Resource creates zero balances for player 42; a repeated eventId is a no-op."
 headers:
   - key: Content-Type
     value: "application/json"

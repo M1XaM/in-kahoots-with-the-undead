@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Zombie Service",
-    "description": "Zombie Service through the API Gateway (http://localhost:8080); only the gateway is published in the team compose. Run 'Auth (run first)' to register and log in a player: the gateway verifies the token, strips it and forwards the player as X-Player-Id. Internal requests use X-Internal-Key (INTERNAL_KEY in the team .env, default changeme).",
+    "description": "Zombie Service (lab 4). Player requests go through the API Gateway ({{baseUrl}}, http://localhost:8080): run 'Auth (run first)' to register and log in; the gateway verifies the token and forwards the player as X-Player-Id with X-Caller: client. Service-to-service requests go through the Camus message broker ({{brokerUrl}}, http://localhost:8091) as /call/{service}/..., with X-Internal-Key (INTERNAL_KEY in the team .env, default changeme): the broker picks the least loaded healthy instance and calls it over gRPC (broker.v1.Endpoint). Operations: logs, metrics and the X-Caller rule.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -104,7 +104,7 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/zombies",
+            "url": "{{brokerUrl}}/call/zombie/zombies",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"type\": \"professor\",\n  \"name\": \"Prof. Grosu\",\n  \"subject\": \"math\",\n  \"spriteUrl\": \"/sprites/prof_grosu.png\",\n  \"stats\": {\n    \"health\": 120,\n    \"speed\": 1,\n    \"attack\": 8,\n    \"perception\": 3\n  },\n  \"abilities\": [\n    \"administer_exam\"\n  ]\n}",
@@ -141,7 +141,7 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/zombies",
+            "url": "{{brokerUrl}}/call/zombie/zombies",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"type\": \"tourist\",\n  \"name\": \"Lost Erasmus\",\n  \"subject\": null,\n  \"spriteUrl\": \"/sprites/tourist.png\",\n  \"stats\": {\n    \"health\": 60,\n    \"speed\": 3,\n    \"attack\": 5,\n    \"perception\": 5\n  },\n  \"abilities\": [\n    \"steal_xp\",\n    \"steal_resources\",\n    \"sprint\"\n  ]\n}",
@@ -163,7 +163,7 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/zombies"
+            "url": "{{brokerUrl}}/call/zombie/zombies"
           }
         },
         {
@@ -176,7 +176,7 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/zombies?type=professor"
+            "url": "{{brokerUrl}}/call/zombie/zombies?type=professor"
           }
         },
         {
@@ -189,7 +189,7 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/zombies/{{zombieId}}"
+            "url": "{{brokerUrl}}/call/zombie/zombies/{{zombieId}}"
           }
         },
         {
@@ -219,7 +219,7 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/zombies/{{zombieId}}",
+            "url": "{{brokerUrl}}/call/zombie/zombies/{{zombieId}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"stats\": {\n    \"health\": 150,\n    \"speed\": 1,\n    \"attack\": 9,\n    \"perception\": 3\n  }\n}",
@@ -241,7 +241,173 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/zombies/{{zombieId}}"
+            "url": "{{brokerUrl}}/call/zombie/zombies/{{zombieId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Operations",
+      "item": [
+        {
+          "name": "Internal Route Called by a Client (403)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              },
+              {
+                "key": "X-Caller",
+                "value": "client"
+              },
+              {
+                "key": "X-Player-Id",
+                "value": "42"
+              }
+            ],
+            "url": "{{brokerUrl}}/call/zombie/zombies",
+            "description": "The broker sends its own key on every call, so the gateway marks a player's request with X-Caller: client. The service then treats it as the player's: internal-only routes answer 403 FORBIDDEN."
+          }
+        },
+        {
+          "name": "Internal Route Not Served by the Gateway (404)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/zombies",
+            "description": "Only client routes are reachable from outside: the gateway does not serve service-to-service endpoints."
+          }
+        },
+        {
+          "name": "Metrics of One Instance (Prometheus)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/call/zombie/metrics",
+            "description": "What Prometheus scrapes from every Zombie replica on :8085/metrics: http_requests_total, http_request_duration_seconds, active_tasks, max_concurrent_tasks and the Node.js process metrics."
+          }
+        },
+        {
+          "name": "Recent Logs of One Instance (internal)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/call/zombie/internal/logs?level=info&limit=100",
+            "description": "NDJSON, oldest first, from the instance the broker picked (X-Upstream-Instance); X-Log-Oldest and X-Log-Buffered describe its buffer."
+          }
+        },
+        {
+          "name": "Zombie Logs (gateway, every instance)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/logs?service=zombie&since=15m&level=info",
+            "description": "The gateway asks every Zombie instance Discovery lists for GET /internal/logs and merges the lines by time; X-Logs-Sources names the instances that answered."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Operations",
+      "item": [
+        {
+          "name": "Internal Route Called by a Client (403)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              },
+              {
+                "key": "X-Caller",
+                "value": "client"
+              },
+              {
+                "key": "X-Player-Id",
+                "value": "42"
+              }
+            ],
+            "url": "{{brokerUrl}}/call/zombie/zombies",
+            "description": "The broker sends its own key on every call, so the gateway marks a player's request with X-Caller: client. The service then treats it as the player's: internal-only routes answer 403 FORBIDDEN."
+          }
+        },
+        {
+          "name": "Internal Route Not Served by the Gateway (404)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/zombies",
+            "description": "Only client routes are reachable from outside: the gateway does not serve service-to-service endpoints."
+          }
+        },
+        {
+          "name": "Metrics of One Instance (Prometheus)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/call/zombie/metrics",
+            "description": "What Prometheus scrapes from every Zombie replica on :8085/metrics: http_requests_total, http_request_duration_seconds, active_tasks, max_concurrent_tasks and the Node.js process metrics."
+          }
+        },
+        {
+          "name": "Recent Logs of One Instance (internal)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/call/zombie/internal/logs?level=info&limit=100",
+            "description": "NDJSON, oldest first, from the instance the broker picked (X-Upstream-Instance); X-Log-Oldest and X-Log-Buffered describe its buffer."
+          }
+        },
+        {
+          "name": "Zombie Logs (gateway, every instance)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/logs?service=zombie&since=15m&level=info",
+            "description": "The gateway asks every Zombie instance Discovery lists for GET /internal/logs and merges the lines by time; X-Logs-Sources names the instances that answered."
           }
         }
       ]
@@ -251,6 +417,10 @@
     {
       "key": "baseUrl",
       "value": "http://localhost:8080"
+    },
+    {
+      "key": "brokerUrl",
+      "value": "http://localhost:8091"
     },
     {
       "key": "zombieId",

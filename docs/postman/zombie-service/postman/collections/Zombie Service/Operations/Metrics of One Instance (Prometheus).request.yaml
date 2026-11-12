@@ -1,0 +1,8 @@
+name: Metrics of One Instance (Prometheus)
+$kind: http-request
+method: GET
+url: "http://localhost:8091/call/zombie/metrics"
+description: "What Prometheus scrapes from every Zombie replica on :8085/metrics: http_requests_total, http_request_duration_seconds, active_tasks, max_concurrent_tasks and the Node.js process metrics."
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
