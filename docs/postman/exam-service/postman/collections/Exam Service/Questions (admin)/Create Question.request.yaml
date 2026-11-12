@@ -1,7 +1,8 @@
 name: Create Question
 $kind: http-request
 method: POST
-url: "http://localhost:8080/exams/questions"
+url: "http://localhost:8091/call/exam/exams/questions"
+description: "Admin, service to service: through the broker with X-Internal-Key."
 headers:
   - key: Content-Type
     value: "application/json"

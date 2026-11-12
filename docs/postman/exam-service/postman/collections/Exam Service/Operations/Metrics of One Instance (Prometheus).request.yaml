@@ -1,0 +1,8 @@
+name: Metrics of One Instance (Prometheus)
+$kind: http-request
+method: GET
+url: "http://localhost:8091/call/exam/metrics"
+description: "What Prometheus scrapes from every Exam replica: http_requests_total, http_request_duration_seconds, active_tasks, max_concurrent_tasks, upstream_calls_total, events_published_total and the Node.js process metrics."
+headers:
+  - key: X-Internal-Key
+    value: "changeme"

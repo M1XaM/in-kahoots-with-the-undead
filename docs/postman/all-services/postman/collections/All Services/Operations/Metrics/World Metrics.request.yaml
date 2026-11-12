@@ -1,0 +1,9 @@
+name: World Metrics
+$kind: http-request
+description: |-
+  GET /metrics of the World instance the broker picks; Prometheus scrapes every replica directly (job world).
+method: GET
+url: "{{brokerUrl}}/call/world/metrics"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"

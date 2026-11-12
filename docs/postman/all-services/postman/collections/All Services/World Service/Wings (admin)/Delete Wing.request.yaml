@@ -1,7 +1,9 @@
 name: Delete Wing
 $kind: http-request
+description: |-
+  Service to service: through the broker with X-Internal-Key.
 method: DELETE
-url: "{{baseUrl}}/world/wings/{{wingId}}"
+url: "{{brokerUrl}}/call/world/world/wings/{{wingId}}"
 headers:
   - key: X-Internal-Key
     value: "changeme"

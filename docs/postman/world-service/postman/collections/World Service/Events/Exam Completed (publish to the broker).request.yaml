@@ -1,0 +1,20 @@
+name: Exam Completed (publish to the broker)
+$kind: http-request
+method: POST
+url: "http://localhost:8091/topics/exam.completed/events"
+description: "Publishes exam.completed to the broker, which delivers it to every subscriber (World, Game, Crafting), to World over gRPC (Endpoint.Deliver) since it registered a grpc_url. A pass in math unlocks the Math Wing and World publishes world.wing_unlocked; a repeated eventId is ignored by the broker."
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+body:
+  type: json
+  content: |
+    {
+      "eventId": "{{$guid}}",
+      "type": "exam.completed",
+      "version": 1,
+      "occurredAt": "2026-11-12T12:00:00Z",
+      "payload": { "examId": 17, "playerId": 1, "subject": "math", "passed": true, "grade": 8 }
+    }

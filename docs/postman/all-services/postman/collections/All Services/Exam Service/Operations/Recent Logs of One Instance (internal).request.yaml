@@ -1,0 +1,10 @@
+name: Recent Logs of One Instance (internal)
+$kind: http-request
+description: |-
+  NDJSON, oldest first, from the instance the broker picked (X-Upstream-Instance); X-Log-Oldest and X-Log-Buffered describe its buffer.
+method: GET
+url: "{{brokerUrl}}/call/exam/internal/logs?level=info&limit=100"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+order: 4000

@@ -1,0 +1,20 @@
+name: Deliver to World Directly (processed, then duplicate)
+$kind: http-request
+method: POST
+url: "http://localhost:8091/call/world/internal/events"
+description: "What the broker does for each event: POST /internal/events on one World replica. Send it twice: the first answers outcome processed, the second duplicate (processed_events, whichever replica gets it)."
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+body:
+  type: json
+  content: |
+    {
+      "eventId": "6f1c0c3e-0000-4000-8000-000000000001",
+      "type": "exam.completed",
+      "version": 1,
+      "occurredAt": "2026-11-12T12:00:00Z",
+      "payload": { "examId": 18, "playerId": 1, "subject": "physics", "passed": false, "grade": 3 }
+    }

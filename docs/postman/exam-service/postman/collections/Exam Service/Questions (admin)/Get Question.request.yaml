@@ -1,7 +1,8 @@
 name: Get Question
 $kind: http-request
 method: GET
-url: "http://localhost:8080/exams/questions/1"
+url: "http://localhost:8091/call/exam/exams/questions/1"
+description: "Admin, service to service: through the broker with X-Internal-Key."
 headers:
   - key: X-Internal-Key
     value: "changeme"

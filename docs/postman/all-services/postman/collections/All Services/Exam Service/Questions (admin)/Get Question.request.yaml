@@ -1,7 +1,9 @@
 name: Get Question
 $kind: http-request
+description: |-
+  Admin, service to service: through the broker with X-Internal-Key.
 method: GET
-url: "{{baseUrl}}/exams/questions/1"
+url: "{{brokerUrl}}/call/exam/exams/questions/1"
 headers:
   - key: X-Internal-Key
     value: "changeme"

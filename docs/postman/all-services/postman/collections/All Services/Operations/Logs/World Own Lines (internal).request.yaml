@@ -1,0 +1,9 @@
+name: World Own Lines (internal)
+$kind: http-request
+description: |-
+  World is not published in the team compose: GET /internal/logs of the World instance the broker picks (X-Upstream-Instance).
+method: GET
+url: "{{brokerUrl}}/call/world/internal/logs?limit=100"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
