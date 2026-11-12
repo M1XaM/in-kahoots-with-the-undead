@@ -1,0 +1,8 @@
+name: Resource Logs (gateway, every instance)
+$kind: http-request
+method: GET
+url: "http://localhost:8080/logs?service=resource&since=15m&level=info"
+description: "The gateway asks every Resource instance Discovery lists for GET /internal/logs and merges the lines by time; X-Logs-Sources names the instances that answered."
+headers:
+  - key: X-Internal-Key
+    value: "changeme"

@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Resource Service",
-    "description": "Resource Service through the API Gateway (http://localhost:8080); only the gateway is published in the team compose. Run 'Auth (run first)' to register and log in a player: the gateway verifies the token, strips it and forwards the player as X-Player-Id. Internal requests use X-Internal-Key (INTERNAL_KEY in the team .env, default changeme).",
+    "description": "Resource Service (lab 4). Player requests go through the API Gateway ({{baseUrl}}, http://localhost:8080): run 'Auth (run first)' to register and log in; the gateway verifies the token and forwards the player as X-Player-Id with X-Caller: client. Service-to-service requests go through the Camus message broker ({{brokerUrl}}, http://localhost:8091) as /call/{service}/..., with X-Internal-Key (INTERNAL_KEY in the team .env, default changeme): the broker picks the least loaded healthy instance and calls it over gRPC (broker.v1.Endpoint). Operations: logs, metrics and the X-Caller rule. Events: published to broker topics, which deliver them to Resource at POST /internal/events (Endpoint.Deliver over gRPC).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -104,8 +104,8 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/resources/internal/events",
-            "description": "HTTP delivery of player.registered (same handler as the WebSocket consumer): creates zero balances for player 42.",
+            "url": "{{brokerUrl}}/topics/player.registered/events",
+            "description": "Publishes player.registered to the broker, which delivers it to every subscriber (Resource and Base) at POST /internal/events, over gRPC (Endpoint.Deliver) when the instance registered a grpc_url. Resource creates zero balances for player 42; a repeated eventId is a no-op.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"eventId\": \"{{$guid}}\",\n  \"type\": \"player.registered\",\n  \"version\": 1,\n  \"occurredAt\": \"2026-09-25T10:00:00Z\",\n  \"payload\": {\n    \"playerId\": 42,\n    \"username\": \"razvan\"\n  }\n}",
@@ -131,11 +131,11 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/resources/internal/events",
-            "description": "Credits 5-15 wood and publishes resource.gathered on ws://resource:8086/events (negotiate it with GET /ws/resource on the gateway).",
+            "url": "{{brokerUrl}}/topics/game.action_completed/events",
+            "description": "Publishes game.action_completed; the broker delivers it to Resource, which credits wood, then relays resource.gathered from its outbox back to the broker (Broker.Publish).",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"eventId\": \"{{$guid}}\",\n  \"type\": \"game.action_completed\",\n  \"version\": 1,\n  \"occurredAt\": \"2026-09-25T10:00:00Z\",\n  \"payload\": {\n    \"actionId\": \"{{$guid}}\",\n    \"sessionId\": \"7a90\",\n    \"playerId\": 42,\n    \"type\": \"chop_benches\",\n    \"roomId\": 1,\n    \"nodeId\": null,\n    \"completedAt\": \"2026-09-25T10:00:00Z\"\n  }\n}",
+              "raw": "{\n  \"eventId\": \"{{$guid}}\",\n  \"type\": \"game.action_completed\",\n  \"version\": 1,\n  \"occurredAt\": \"2026-09-25T10:00:00Z\",\n  \"payload\": {\n    \"actionId\": \"{{$guid}}\",\n    \"sessionId\": \"7a90\",\n    \"playerId\": 42,\n    \"type\": \"chop_benches\",\n    \"roomId\": 3,\n    \"nodeId\": null,\n    \"completedAt\": \"2026-09-25T10:00:00Z\"\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -158,8 +158,8 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/resources/internal/events",
-            "description": "Room 3 (Lab 204) / node 1 is metal, as in World Service's seed.",
+            "url": "{{brokerUrl}}/topics/game.action_completed/events",
+            "description": "Room 3 (Lab 204) / node 1 is metal, as in World Service's seed. Resource asks World for the room through the broker (Broker.Call), credits metal and publishes resource.gathered.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"eventId\": \"{{$guid}}\",\n  \"type\": \"game.action_completed\",\n  \"version\": 1,\n  \"occurredAt\": \"2026-09-25T10:00:00Z\",\n  \"payload\": {\n    \"actionId\": \"{{$guid}}\",\n    \"sessionId\": \"7a90\",\n    \"playerId\": 42,\n    \"type\": \"scavenge\",\n    \"roomId\": 3,\n    \"nodeId\": 1,\n    \"completedAt\": \"2026-09-25T10:00:00Z\"\n  }\n}",
@@ -172,7 +172,7 @@
           }
         },
         {
-          "name": "Published Events",
+          "name": "Resource Topics (broker)",
           "request": {
             "method": "GET",
             "header": [
@@ -181,8 +181,104 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/resources/internal/events?since=0",
-            "description": "Outbox: the events /events subscribers receive (resource.gathered)."
+            "url": "{{brokerUrl}}/topics",
+            "description": "Resource subscribes to player.registered and game.action_completed (its Discovery registration lists them) and produces resource.gathered: see their queue depth, deliveries and dead letters."
+          }
+        },
+        {
+          "name": "Resource Dead Letters (broker)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/dead-letters?subscriber=resource",
+            "description": "Events Resource refused with a 4xx (a malformed envelope) or that ran out of attempts."
+          }
+        },
+        {
+          "name": "Malformed Event (dead-lettered)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/topics/player.registered/events",
+            "description": "playerId is not a number: Resource answers 400 (INVALID_ARGUMENT over gRPC) and the broker moves the event to the dead letter channel at once instead of retrying.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"{{$guid}}\",\n  \"type\": \"player.registered\",\n  \"version\": 1,\n  \"occurredAt\": \"2026-09-25T10:00:00Z\",\n  \"payload\": {\n    \"playerId\": \"not-a-number\",\n    \"username\": \"razvan\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Resource Topics (broker)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/topics",
+            "description": "Resource subscribes to player.registered and game.action_completed (its Discovery registration lists them) and produces resource.gathered: see their queue depth, deliveries and dead letters."
+          }
+        },
+        {
+          "name": "Resource Dead Letters (broker)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/dead-letters?subscriber=resource",
+            "description": "Events Resource refused with a 4xx (a malformed envelope) or that ran out of attempts."
+          }
+        },
+        {
+          "name": "Malformed Event (dead-lettered)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/topics/player.registered/events",
+            "description": "playerId is not a number: Resource answers 400 (INVALID_ARGUMENT over gRPC) and the broker moves the event to the dead letter channel at once instead of retrying.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"{{$guid}}\",\n  \"type\": \"player.registered\",\n  \"version\": 1,\n  \"occurredAt\": \"2026-09-25T10:00:00Z\",\n  \"payload\": {\n    \"playerId\": \"not-a-number\",\n    \"username\": \"razvan\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
           }
         }
       ]
@@ -200,7 +296,7 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/resources/players/42"
+            "url": "{{brokerUrl}}/call/resource/resources/players/42"
           }
         },
         {
@@ -247,7 +343,7 @@
                 "value": "{{$guid}}"
               }
             ],
-            "url": "{{baseUrl}}/resources/players/42/reservations",
+            "url": "{{brokerUrl}}/call/resource/resources/players/42/reservations",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"resources\": {\n    \"wood\": 3\n  }\n}",
@@ -280,7 +376,7 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/resources/reservations/{{reservationId}}/commit"
+            "url": "{{brokerUrl}}/call/resource/resources/reservations/{{reservationId}}/commit"
           }
         },
         {
@@ -293,7 +389,7 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/resources/reservations/{{reservationId}}",
+            "url": "{{brokerUrl}}/call/resource/resources/reservations/{{reservationId}}",
             "description": "409 ALREADY_COMMITTED after a commit; reserve again to see 204."
           }
         },
@@ -315,7 +411,7 @@
                 "value": "{{$guid}}"
               }
             ],
-            "url": "{{baseUrl}}/resources/players/42/steal",
+            "url": "{{brokerUrl}}/call/resource/resources/players/42/steal",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"resources\": {\n    \"food\": 5,\n    \"wood\": 3\n  },\n  \"encounterId\": \"{{$guid}}\"\n}",
@@ -346,7 +442,7 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/resources/balances",
+            "url": "{{brokerUrl}}/call/resource/resources/balances",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"playerId\": 43,\n  \"resourceType\": \"wood\",\n  \"amount\": 10\n}",
@@ -379,7 +475,7 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/resources/balances"
+            "url": "{{brokerUrl}}/call/resource/resources/balances"
           }
         },
         {
@@ -392,7 +488,7 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/resources/balances/{{balanceId}}"
+            "url": "{{brokerUrl}}/call/resource/resources/balances/{{balanceId}}"
           }
         },
         {
@@ -405,7 +501,7 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/resources/players/43/balances"
+            "url": "{{brokerUrl}}/call/resource/resources/players/43/balances"
           }
         },
         {
@@ -422,7 +518,7 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/resources/balances/{{balanceId}}",
+            "url": "{{brokerUrl}}/call/resource/resources/balances/{{balanceId}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"amount\": 25\n}",
@@ -444,7 +540,7 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/resources/balances/{{balanceId}}"
+            "url": "{{brokerUrl}}/call/resource/resources/balances/{{balanceId}}"
           }
         }
       ]
@@ -466,7 +562,7 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/resources/ledger",
+            "url": "{{brokerUrl}}/call/resource/resources/ledger",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"playerId\": 43,\n  \"kind\": \"gathered\",\n  \"resourceType\": \"food\",\n  \"amount\": 12,\n  \"nodeId\": 11\n}",
@@ -499,7 +595,7 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/resources/ledger"
+            "url": "{{brokerUrl}}/call/resource/resources/ledger"
           }
         },
         {
@@ -512,7 +608,7 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/resources/ledger/{{ledgerEntryId}}"
+            "url": "{{brokerUrl}}/call/resource/resources/ledger/{{ledgerEntryId}}"
           }
         },
         {
@@ -529,7 +625,7 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/resources/ledger/{{ledgerEntryId}}",
+            "url": "{{brokerUrl}}/call/resource/resources/ledger/{{ledgerEntryId}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"amount\": 8\n}",
@@ -551,7 +647,7 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/resources/ledger/{{ledgerEntryId}}"
+            "url": "{{brokerUrl}}/call/resource/resources/ledger/{{ledgerEntryId}}"
           }
         }
       ]
@@ -569,7 +665,7 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/resources/reservations"
+            "url": "{{brokerUrl}}/call/resource/resources/reservations"
           }
         },
         {
@@ -582,7 +678,7 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/resources/players/42/reservations"
+            "url": "{{brokerUrl}}/call/resource/resources/players/42/reservations"
           }
         },
         {
@@ -595,7 +691,7 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/resources/reservations/{{reservationId}}"
+            "url": "{{brokerUrl}}/call/resource/resources/reservations/{{reservationId}}"
           }
         },
         {
@@ -612,7 +708,7 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/resources/reservations/{{reservationId}}",
+            "url": "{{brokerUrl}}/call/resource/resources/reservations/{{reservationId}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"status\": \"released\"\n}",
@@ -625,12 +721,182 @@
           }
         }
       ]
+    },
+    {
+      "name": "Operations",
+      "item": [
+        {
+          "name": "Internal Route Called by a Client (403)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              },
+              {
+                "key": "X-Caller",
+                "value": "client"
+              },
+              {
+                "key": "X-Player-Id",
+                "value": "42"
+              }
+            ],
+            "url": "{{brokerUrl}}/call/resource/resources/balances",
+            "description": "The broker sends its own key on every call, so the gateway marks a player's request with X-Caller: client. The service then treats it as the player's: internal-only routes answer 403 FORBIDDEN."
+          }
+        },
+        {
+          "name": "Internal Route Not Served by the Gateway (404)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/resources/balances",
+            "description": "Only client routes are reachable from outside: the gateway does not serve service-to-service endpoints."
+          }
+        },
+        {
+          "name": "Metrics of One Instance (Prometheus)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/call/resource/metrics",
+            "description": "What Prometheus scrapes from every Resource replica on :8086/metrics: http_requests_total, http_request_duration_seconds, active_tasks, max_concurrent_tasks, upstream_calls_total, events_consumed_total, events_published_total and the Node.js process metrics."
+          }
+        },
+        {
+          "name": "Recent Logs of One Instance (internal)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/call/resource/internal/logs?level=info&limit=100",
+            "description": "NDJSON, oldest first, from the instance the broker picked (X-Upstream-Instance); X-Log-Oldest and X-Log-Buffered describe its buffer."
+          }
+        },
+        {
+          "name": "Resource Logs (gateway, every instance)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/logs?service=resource&since=15m&level=info",
+            "description": "The gateway asks every Resource instance Discovery lists for GET /internal/logs and merges the lines by time; X-Logs-Sources names the instances that answered."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Operations",
+      "item": [
+        {
+          "name": "Internal Route Called by a Client (403)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              },
+              {
+                "key": "X-Caller",
+                "value": "client"
+              },
+              {
+                "key": "X-Player-Id",
+                "value": "42"
+              }
+            ],
+            "url": "{{brokerUrl}}/call/resource/resources/balances",
+            "description": "The broker sends its own key on every call, so the gateway marks a player's request with X-Caller: client. The service then treats it as the player's: internal-only routes answer 403 FORBIDDEN."
+          }
+        },
+        {
+          "name": "Internal Route Not Served by the Gateway (404)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/resources/balances",
+            "description": "Only client routes are reachable from outside: the gateway does not serve service-to-service endpoints."
+          }
+        },
+        {
+          "name": "Metrics of One Instance (Prometheus)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/call/resource/metrics",
+            "description": "What Prometheus scrapes from every Resource replica on :8086/metrics: http_requests_total, http_request_duration_seconds, active_tasks, max_concurrent_tasks, upstream_calls_total, events_consumed_total, events_published_total and the Node.js process metrics."
+          }
+        },
+        {
+          "name": "Recent Logs of One Instance (internal)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/call/resource/internal/logs?level=info&limit=100",
+            "description": "NDJSON, oldest first, from the instance the broker picked (X-Upstream-Instance); X-Log-Oldest and X-Log-Buffered describe its buffer."
+          }
+        },
+        {
+          "name": "Resource Logs (gateway, every instance)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/logs?service=resource&since=15m&level=info",
+            "description": "The gateway asks every Resource instance Discovery lists for GET /internal/logs and merges the lines by time; X-Logs-Sources names the instances that answered."
+          }
+        }
+      ]
     }
   ],
   "variable": [
     {
       "key": "baseUrl",
       "value": "http://localhost:8080"
+    },
+    {
+      "key": "brokerUrl",
+      "value": "http://localhost:8091"
     },
     {
       "key": "reservationId",

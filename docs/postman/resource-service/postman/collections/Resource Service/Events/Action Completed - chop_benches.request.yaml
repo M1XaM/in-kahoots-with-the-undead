@@ -1,8 +1,8 @@
 name: Action Completed - chop_benches
 $kind: http-request
 method: POST
-url: "http://localhost:8080/resources/internal/events"
-description: "Credits 5-15 wood and publishes resource.gathered on ws://resource:8086/events (negotiate it with GET /ws/resource on the gateway)."
+url: "http://localhost:8091/topics/game.action_completed/events"
+description: "Publishes game.action_completed; the broker delivers it to Resource, which credits wood, then relays resource.gathered from its outbox back to the broker (Broker.Publish)."
 headers:
   - key: Content-Type
     value: "application/json"
@@ -21,7 +21,7 @@ body:
         "sessionId": "7a90",
         "playerId": 42,
         "type": "chop_benches",
-        "roomId": 1,
+        "roomId": 3,
         "nodeId": null,
         "completedAt": "2026-09-25T10:00:00Z"
       }

@@ -1,0 +1,8 @@
+name: Resource Dead Letters (broker)
+$kind: http-request
+method: GET
+url: "http://localhost:8091/dead-letters?subscriber=resource"
+description: "Events Resource refused with a 4xx (a malformed envelope) or that ran out of attempts."
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
