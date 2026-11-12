@@ -14,8 +14,8 @@
 | Game | 8082 | `/game` |
 | Exam | 8083 | `/exams` |
 | World | 8084 | `/world` |
-| Zombie | 8085 | `/zombies` |
-| Resource | 8086 | `/resources` |
+| Zombie | 8085 (gRPC 9085) | `/zombies` |
+| Resource | 8086 (gRPC 9086) | `/resources` |
 | Base | 8087 (gRPC 9087) | `/base` |
 | Crafting | 8088 (gRPC 9088) | `/crafting` |
 
@@ -1713,7 +1713,9 @@ SpawnPoint { pointId: int, roomId: int, zombieTypes: [ZombieType] }
 Zombie definitions: types, stats, abilities, sprites. Read-only at runtime.
 
 **Auth:** Zombie reads the acting player from `X-Player-Id` set by the gateway; it does not read
-the cookie. Definitions start empty; add them with `POST /zombies`.
+the cookie, and treats a request marked `X-Caller: client` as the player's. Definitions start empty;
+add them with `POST /zombies`. Zombie calls no other service and subscribes to no topic; the broker
+calls it over gRPC (`Endpoint.Handle` on port 9085).
 
 ### Endpoints
 
@@ -1802,12 +1804,11 @@ Spending is two-phase so a caller that fails after spending can undo it:
 released automatically.
 
 **Auth:** Resource reads the acting player from `X-Player-Id` set by the gateway; it does not read
-the cookie. Resource serves `resource.gathered` on `ws://resource:8086/events`
-and consumes Player's and Game's streams when `PLAYER_EVENTS_URL` / `GAME_EVENTS_URL` are set;
-until then it also accepts events over HTTP at `POST /resources/internal/events` (same handlers,
-same `eventId` deduplication). Room → node resource types come from World's
-`GET /world/rooms/{id}` when `WORLD_SERVICE_URL` is set, otherwise from a built-in copy of the
-example rooms.
+the cookie, and treats a request marked `X-Caller: client` as the player's. It calls World through
+the broker over gRPC (`Broker.Call`; room → node resource types come from `GET /world/rooms/{id}`),
+publishes `resource.gathered` from its outbox with `Broker.Publish`, and receives the
+`player.registered` and `game.action_completed` topics at `POST /internal/events` (or
+`Endpoint.Deliver` on gRPC port 9086), deduplicated on `eventId`.
 
 ### Endpoints
 
@@ -1964,20 +1965,22 @@ Takes `min(requested, free balance)` per resource; never fails for insufficient 
 </details>
 
 <details>
-<summary><b>POST</b> <code>/resources/internal/events</code> — Deliver an event over HTTP</summary>
+<summary><b>POST</b> <code>/internal/events</code> — Receive a broker event</summary>
 
-**Caller:** internal · **Auth:** `X-Internal-Key` · **Idempotent:** yes (deduplicated on `eventId`)
+**Caller:** internal (the broker) · **Auth:** `X-Internal-Key` · **Idempotent:** yes (deduplicated on `eventId`)
 
-Accepts a full event envelope (`player.registered` or `game.action_completed`) and runs the same
-handler as the WebSocket consumer. `GET /resources/internal/events?since=<seq>` lists the events
-Resource has produced.
+Takes one event in the standard [envelope](#envelope), delivered by the broker from the topics
+Resource subscribes to (`player.registered`, `game.action_completed`); over gRPC the broker calls
+`Endpoint.Deliver` instead, which runs this same route. `200` is sent only once the effect is
+committed; `X-Delivery-Attempt` is logged.
 
 **Responses**
 
 | Code | When |
 |---|---|
-| `202` | `{ "eventId", "status": "handled" \| "duplicate" \| "ignored" }` |
-| `400 VALIDATION_ERROR` | Malformed envelope or payload |
+| `200` | `{ "eventId", "status": "handled" \| "duplicate" \| "ignored" }` (the broker acks) |
+| `400 VALIDATION_ERROR` | Malformed envelope or payload (the broker dead-letters it) |
+| `5xx` | The effect could not be committed (the broker retries) |
 
 </details>
 
