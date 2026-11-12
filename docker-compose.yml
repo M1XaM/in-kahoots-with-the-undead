@@ -317,7 +317,7 @@ services:
       retries: 10
 
   zombie:
-    image: ${ZOMBIE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-zombie-service:${ZOMBIE_SERVICE_TAG:-3}
+    image: ${ZOMBIE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-zombie-service:${ZOMBIE_SERVICE_TAG:-4}
     restart: unless-stopped
     # every replica shares zombie-db; `docker compose up -d --scale zombie=3`
     deploy:
@@ -333,7 +333,9 @@ services:
       DB_USERNAME: ${ZOMBIE_POSTGRES_USER:-postgres}
       DB_PASSWORD: ${ZOMBIE_POSTGRES_PASSWORD:-qwerty}
       DB_NAME: ${ZOMBIE_POSTGRES_DB:-zombie}
-      # registers on startup, heartbeats, deregisters on shutdown
+      # Zombie calls no service; the broker calls it on its gRPC port (broker.v1.Endpoint)
+      GRPC_PORT: 9085
+      # registers with its grpc_url (and no topics) on startup, heartbeats, deregisters on shutdown
       DISCOVERY_URL: http://discovery:8089
     depends_on:
       zombie-db:
@@ -356,7 +358,7 @@ services:
       retries: 10
 
   resource:
-    image: ${RESOURCE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-resource-service:${RESOURCE_SERVICE_TAG:-3}
+    image: ${RESOURCE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-resource-service:${RESOURCE_SERVICE_TAG:-4}
     restart: unless-stopped
     # every replica shares resource-db; `docker compose up -d --scale resource=3`
     deploy:
@@ -372,18 +374,20 @@ services:
       DB_USERNAME: ${RESOURCE_POSTGRES_USER:-postgres}
       DB_PASSWORD: ${RESOURCE_POSTGRES_PASSWORD:-qwerty}
       DB_NAME: ${RESOURCE_POSTGRES_DB:-resource}
-      # World is called through the gateway; empty = built-in World mock
-      WORLD_SERVICE_URL: ${RESOURCE_WORLD_SERVICE_URL-http://gateway:8080}
-      # `gateway` = ask the gateway for the producer's /events URL, then connect
-      # directly; empty = not connected (use POST /resources/internal/events)
-      PLAYER_EVENTS_URL: ${RESOURCE_PLAYER_EVENTS_URL-gateway}
-      GAME_EVENTS_URL: ${RESOURCE_GAME_EVENTS_URL-gateway}
-      GATEWAY_URL: http://gateway:8080
-      # registers on startup, heartbeats, deregisters on shutdown
+      # calls to World go through the broker over gRPC (Broker.Call) and the outbox is relayed
+      # with Broker.Publish; the broker calls Resource back on its gRPC port and delivers the
+      # `player.registered` and `game.action_completed` topics
+      BROKER_TRANSPORT: ${RESOURCE_BROKER_TRANSPORT:-grpc}
+      BROKER_GRPC_URL: broker:${BROKER_GRPC_PORT:-8092}
+      BROKER_URL: http://broker:${BROKER_PORT:-8091}
+      GRPC_PORT: 9086
+      # registers with its grpc_url and topics on startup, heartbeats, deregisters on shutdown
       DISCOVERY_URL: http://discovery:8089
     depends_on:
       resource-db:
         condition: service_healthy
+      broker:
+        condition: service_started
 
   gateway:
     image: ${GATEWAY_DOCKERHUB_USERNAME:-timurcravtov}/gateway:${GATEWAY_SERVICE_TAG:-3}
@@ -432,7 +436,7 @@ services:
       - crafting
 
   # Prometheus scrapes the broker (calls, queues, breakers, instance load, events, dead letters)
-  # and every Base and Crafting replica; config in monitoring/prometheus/prometheus.yml
+  # and every replica of every service; config in monitoring/prometheus/prometheus.yml
   prometheus:
     image: prom/prometheus:v3.5.0
     restart: unless-stopped
