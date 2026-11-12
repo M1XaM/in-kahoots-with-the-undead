@@ -241,7 +241,7 @@ services:
       retries: 10
 
   exam:
-    image: ${EXAM_DOCKERHUB_USERNAME:-inercaso}/exam-service:${EXAM_SERVICE_TAG:-3}
+    image: ${EXAM_DOCKERHUB_USERNAME:-inercaso}/exam-service:${EXAM_SERVICE_TAG:-4}
     restart: unless-stopped
     # every replica shares exam-db; `docker compose up -d --scale exam=3`
     deploy:
@@ -252,15 +252,23 @@ services:
       INTERNAL_KEY: ${INTERNAL_KEY:-changeme}
       TASK_TIMEOUT_MS: ${EXAM_TASK_TIMEOUT_MS:-10000}
       MAX_CONCURRENT_TASKS: ${EXAM_MAX_CONCURRENT_TASKS:-100}
-      # REST to Player and Zombie goes through the gateway; `mock` = built-in stand-ins
-      GATEWAY_URL: http://gateway:8080
-      PLAYER_CLIENT: ${EXAM_PLAYER_CLIENT:-http}
-      ZOMBIE_CLIENT: ${EXAM_ZOMBIE_CLIENT:-http}
-      # registers on startup, heartbeats, deregisters on shutdown
+      LOG_LEVEL: ${EXAM_LOG_LEVEL:-info}
+      # calls to Player and Zombie go through the broker over gRPC (Broker.Call), exam.completed is
+      # published to its broker topic; the broker calls Exam back on its gRPC port.
+      # `mock` = built-in Player / Zombie stand-ins (Exam alone)
+      BROKER_TRANSPORT: ${EXAM_BROKER_TRANSPORT:-grpc}
+      BROKER_GRPC_URL: broker:${BROKER_GRPC_PORT:-8092}
+      BROKER_URL: http://broker:${BROKER_PORT:-8091}
+      GRPC_PORT: 9083
+      PLAYER_CLIENT: ${EXAM_PLAYER_CLIENT:-broker}
+      ZOMBIE_CLIENT: ${EXAM_ZOMBIE_CLIENT:-broker}
+      # registers with its grpc_url (and no topics) on startup, heartbeats, deregisters on shutdown
       DISCOVERY_URL: http://discovery:8089
     depends_on:
       exam-db:
         condition: service_healthy
+      broker:
+        condition: service_started
 
   world-db:
     image: postgres:16-alpine
@@ -279,7 +287,7 @@ services:
       retries: 10
 
   world:
-    image: ${WORLD_DOCKERHUB_USERNAME:-inercaso}/world-service:${WORLD_SERVICE_TAG:-3}
+    image: ${WORLD_DOCKERHUB_USERNAME:-inercaso}/world-service:${WORLD_SERVICE_TAG:-4}
     restart: unless-stopped
     # every replica shares world-db; `docker compose up -d --scale world=3`
     deploy:
@@ -290,15 +298,20 @@ services:
       INTERNAL_KEY: ${INTERNAL_KEY:-changeme}
       TASK_TIMEOUT_MS: ${WORLD_TASK_TIMEOUT_MS:-10000}
       MAX_CONCURRENT_TASKS: ${WORLD_MAX_CONCURRENT_TASKS:-100}
-      # `gateway` = ask the gateway for Exam's /events URL, then connect directly;
-      # `off` = not connected (use POST /world/internal/events)
-      EXAM_EVENTS_URL: ${WORLD_EXAM_EVENTS_URL-gateway}
-      GATEWAY_URL: http://gateway:8080
-      # registers on startup, heartbeats, deregisters on shutdown
+      LOG_LEVEL: ${WORLD_LOG_LEVEL:-info}
+      # world.wing_unlocked is published to its broker topic over gRPC (Broker.Publish); the broker
+      # calls World back on its gRPC port and delivers the `exam.completed` topic (Endpoint.Deliver)
+      BROKER_TRANSPORT: ${WORLD_BROKER_TRANSPORT:-grpc}
+      BROKER_GRPC_URL: broker:${BROKER_GRPC_PORT:-8092}
+      BROKER_URL: http://broker:${BROKER_PORT:-8091}
+      GRPC_PORT: 9084
+      # registers with its grpc_url and topics on startup, heartbeats, deregisters on shutdown
       DISCOVERY_URL: http://discovery:8089
     depends_on:
       world-db:
         condition: service_healthy
+      broker:
+        condition: service_started
 
   zombie-db:
     image: postgres:16-alpine
