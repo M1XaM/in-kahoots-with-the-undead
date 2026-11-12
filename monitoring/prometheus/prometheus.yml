@@ -67,6 +67,20 @@ scrape_configs:
         port: 8085
         refresh_interval: 15s
 
+  - job_name: exam
+    dns_sd_configs:
+      - names: ["exam"]
+        type: A
+        port: 8083
+        refresh_interval: 15s
+
+  - job_name: world
+    dns_sd_configs:
+      - names: ["world"]
+        type: A
+        port: 8084
+        refresh_interval: 15s
+
   - job_name: prometheus
     static_configs:
       - targets: ["localhost:9090"]
