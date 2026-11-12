@@ -188,10 +188,10 @@ browser sockets all land on `game`; the others serve REST and the `/events` stre
 - **Status:** Lab 4. The broker is a submodule (`services/broker`) and runs from `docker-compose.yml`
   as `timurcravtov/broker:4` (`BROKER_DOCKERHUB_USERNAME`, `BROKER_SERVICE_TAG`), with HTTP on
   `BROKER_PORT` (8091) and gRPC on `BROKER_GRPC_PORT` (8092), both published on the host. Events are
-  kept on the `broker-data` volume (`BROKER_STORAGE=log`). Base and Crafting (`:4`) call other
-  services through it over gRPC, are called back over gRPC and consume their topics; the other
-  services still talk through the Gateway (`GATEWAY_LEGACY_SERVICE_ROUTES=true`) until they move to
-  the contract below. A subscriber with no running
+  kept on the `broker-data` volume (`BROKER_STORAGE=log`). Base, Crafting, Exam and World (`:4`)
+  call other services through it over gRPC, are called back over gRPC, publish to and consume their
+  topics; the other services still talk through the Gateway (`GATEWAY_LEGACY_SERVICE_ROUTES=true`)
+  until they move to the contract below. A subscriber with no running
   instance keeps its subscriptions, and its events wait in its durable queue until it is back.
 - **Role:** the only path between the Gateway and the services, between services, and for events.
   Clients never reach it; every non-public route needs `X-Internal-Key`. It registers with Discovery
@@ -371,42 +371,60 @@ Defaults are the design's proposals, not confirmed.
 ### Exam Service
 
 - **Image:** [`inercaso/exam-service`](https://hub.docker.com/r/inercaso/exam-service),
-  version set by `EXAM_SERVICE_TAG` (currently `3`, the lab number; `latest` points at the newest).
+  version set by `EXAM_SERVICE_TAG` (currently `4`, the lab number; `latest` points at the newest),
+  `EXAM_REPLICAS` (2) replicas.
 - **Needs:** its own Postgres (`exam-db`, started by compose and seeded with the question bank and
   achievements from [`db/exam-service/init.sql`](db/exam-service/init.sql)); password defaults to
   `qwerty`, override with `EXAM_POSTGRES_PASSWORD`.
-- **Talks to:** Zombie (a professor's subject) and Player (player check), always through the Gateway
-  (`GATEWAY_URL`, with `X-Internal-Key`). `EXAM_ZOMBIE_CLIENT` / `EXAM_PLAYER_CLIENT` default to
-  `http`; set them to `mock` to run Exam alone with built-in stand-ins (zombies `5`/`6`/`7` are
-  math/physics/programming professors, `9` and `10` are not; every player id exists). Players are
-  identified by the Gateway's `X-Player-Id`; the service never sees the token. Publishes
-  `exam.completed` on `ws://exam:8083/events` (`GET /ws/exam` on the Gateway).
+- **Talks to:** Zombie (a professor's subject) and Player (player check), through the message
+  broker over gRPC (`Broker.Call`; `EXAM_BROKER_TRANSPORT=http` uses `/call/{service}/...`).
+  `EXAM_ZOMBIE_CLIENT` / `EXAM_PLAYER_CLIENT` default to `broker`; set them to `mock` to run Exam
+  alone with built-in stand-ins (zombies `5`/`6`/`7` are math/physics/programming professors, `9`
+  and `10` are not; every player id exists). The broker calls Exam back on its gRPC port (9083,
+  registered as `grpc_url`). Publishes `exam.completed` to the broker topic from its outbox. Players
+  are identified by the Gateway's `X-Player-Id` (`X-Caller: client`); the service never sees the
+  token.
+- **Scaling:** every replica registers with Service Discovery and answers `GET /status` with its
+  load. The outbox, idempotency keys and encounter ids live in Postgres: one replica relays the
+  outbox at a time, and an `Idempotency-Key` is claimed before `POST /exams` runs, so the same
+  request on another replica answers `409 IDEMPOTENCY_KEY_IN_USE` while the first runs.
+- **Operations:** `GET /internal/logs` (collected by the gateway's `GET /logs`) and `GET /metrics`
+  (Prometheus job `exam`).
 - **Limits:** a request past `EXAM_TASK_TIMEOUT_MS` (default 10 s) answers `408 REQUEST_TIMEOUT`;
   beyond `EXAM_MAX_CONCURRENT_TASKS` (default 100) in flight, `429 TOO_MANY_REQUESTS` with
   `Retry-After`.
 - **Try it:** the Postman collection in [`docs/postman/exam-service`](docs/postman/exam-service)
-  (also as a single importable `exam-service.postman_collection.json`) goes through the Gateway:
-  run **Auth (run first)** to register and log in a player, then create and answer an exam.
+  (also as a single importable `exam-service.postman_collection.json`): players go through the
+  Gateway, service-to-service requests through the broker. Run **Auth (run first)** to register and
+  log in a player, then create and answer an exam; **Operations** shows logs, metrics and the
+  `403` / `404` for internal routes.
 
 ### World Service
 
 - **Image:** [`inercaso/world-service`](https://hub.docker.com/r/inercaso/world-service),
-  version set by `WORLD_SERVICE_TAG` (currently `3`, the lab number; `latest` points at the newest).
+  version set by `WORLD_SERVICE_TAG` (currently `4`, the lab number; `latest` points at the newest),
+  `WORLD_REPLICAS` (2) replicas.
 - **Needs:** its own Postgres (`world-db`, started by compose and seeded with the campus map from
   [`db/world-service/init.sql`](db/world-service/init.sql)); password defaults to `qwerty`,
   override with `WORLD_POSTGRES_PASSWORD`.
-- **Talks to:** Exam, over its event stream, negotiated at the Gateway (`WORLD_EXAM_EVENTS_URL`,
-  default `gateway`: `GET /ws/exam`, then a direct connection; `off` = not connected, then events can
-  be delivered over HTTP at `POST /world/internal/events`). A passed `exam.completed` unlocks the
-  matching wing and publishes `world.wing_unlocked` on `ws://world:8084/events` (`GET /ws/world` on
-  the Gateway). Players are identified by the Gateway's `X-Player-Id`; the service never sees the
-  token.
+- **Talks to:** the message broker only. It registers its gRPC port (9084, `grpc_url`) and the
+  topic `exam.completed` with Discovery; the broker delivers `exam.completed` (`Endpoint.Deliver`,
+  or `POST /internal/events` over HTTP). A passed `exam.completed` unlocks the matching wing and
+  publishes `world.wing_unlocked` to the broker topic from its outbox. Players are identified by the
+  Gateway's `X-Player-Id` (`X-Caller: client`); the service never sees the token.
+- **Scaling:** every replica registers with Service Discovery and answers `GET /status` with its
+  load. The broker delivers each event to one replica; a repeat is a `duplicate`
+  (`processed_events`, written in the same transaction as the wing update), and one replica relays
+  the outbox at a time, so a wing is unlocked and announced once.
+- **Operations:** `GET /internal/logs` (collected by the gateway's `GET /logs`) and `GET /metrics`
+  (Prometheus job `world`).
 - **Limits:** `WORLD_TASK_TIMEOUT_MS` (default 10 s, then `408 REQUEST_TIMEOUT`) and
   `WORLD_MAX_CONCURRENT_TASKS` (default 100, then `429 TOO_MANY_REQUESTS` with `Retry-After`).
 - **Try it:** the Postman collection in [`docs/postman/world-service`](docs/postman/world-service)
-  (also as a single importable `world-service.postman_collection.json`) goes through the Gateway:
-  run **Auth (run first)**, then pass an exam through the Exam collection and the matching wing
-  shows `unlocked: true`.
+  (also as a single importable `world-service.postman_collection.json`): players go through the
+  Gateway, service-to-service requests and events through the broker. Run **Auth (run first)**,
+  then pass an exam through the Exam collection and the matching wing shows `unlocked: true`;
+  **Events** publishes `exam.completed` to the broker topic directly.
 
 ### Zombie Service
 

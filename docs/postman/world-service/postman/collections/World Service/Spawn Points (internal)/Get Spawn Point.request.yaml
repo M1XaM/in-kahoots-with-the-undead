@@ -1,7 +1,8 @@
 name: Get Spawn Point
 $kind: http-request
 method: GET
-url: "http://localhost:8080/world/spawn-points/2"
+url: "http://localhost:8091/call/world/world/spawn-points/2"
+description: "Service to service: through the broker with X-Internal-Key."
 headers:
   - key: X-Internal-Key
     value: "changeme"

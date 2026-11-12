@@ -1,0 +1,8 @@
+name: World Dead Letters (broker)
+$kind: http-request
+method: GET
+url: "http://localhost:8091/dead-letters?subscriber=world"
+description: "Events World refused (the malformed one above, reason rejected) or that failed 5 delivery attempts."
+headers:
+  - key: X-Internal-Key
+    value: "changeme"

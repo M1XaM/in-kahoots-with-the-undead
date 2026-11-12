@@ -1,7 +1,9 @@
 name: Update Spawn Point
 $kind: http-request
+description: |-
+  Service to service: through the broker with X-Internal-Key.
 method: PUT
-url: "{{baseUrl}}/world/spawn-points/{{pointId}}"
+url: "{{brokerUrl}}/call/world/world/spawn-points/{{pointId}}"
 headers:
   - key: Content-Type
     value: "application/json"

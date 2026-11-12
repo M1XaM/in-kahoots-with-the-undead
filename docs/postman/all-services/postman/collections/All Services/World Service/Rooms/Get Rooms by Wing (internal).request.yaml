@@ -1,7 +1,9 @@
 name: Get Rooms by Wing (internal)
 $kind: http-request
+description: |-
+  What Game and Base ask, through the broker with X-Internal-Key.
 method: GET
-url: "{{baseUrl}}/world/rooms?wingId=1"
+url: "{{brokerUrl}}/call/world/world/rooms?wingId=1"
 headers:
   - key: X-Internal-Key
     value: "changeme"

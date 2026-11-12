@@ -1109,11 +1109,15 @@ Action     { actionId: uuid, playerId: int, type: ActionType, roomId: int,
 
 Exams, grading, per-player academic history and achievements.
 
-**Auth:** Exam reads the acting player from the `X-Player-Id` header set by the gateway, not from
-the cookie. It calls Player and Zombie through the gateway with `X-Internal-Key`; to run Exam
-alone, `PLAYER_CLIENT=mock` accepts every player id and `ZOMBIE_CLIENT=mock` serves built-in
-professor zombies. It serves `exam.completed` on `ws://exam:8083/events` (`GET /ws/exam` at the
-gateway).
+**Auth:** Exam reads the acting player from `X-Player-Id` set by the gateway; it does not read the
+cookie, and treats a request marked `X-Caller: client` as the player's (owner checks apply, internal
+routes answer `403`). It calls Player and Zombie through the broker over gRPC (`Broker.Call`) and
+publishes `exam.completed` from its outbox with `Broker.Publish`: rows go out in `seq` order and are
+marked sent only after the broker stored them; when the broker refuses or is down the relay backs
+off 1 s → 30 s. It registers its `grpc_url` (`<container IP>:9083`) with Discovery, so the broker
+calls it over gRPC (`broker.v1.Endpoint/Handle`); it consumes no topics. To run Exam alone,
+`PLAYER_CLIENT=mock` accepts every player id and `ZOMBIE_CLIENT=mock` serves built-in professor
+zombies.
 
 ### Endpoints
 
@@ -1126,6 +1130,11 @@ Picks the subject from the professor zombie (`GET /zombies/{zombieId}` → `subj
 questions from the static bank for that subject, and sets a 120 s deadline. The `encounterId` is
 stored so a retried call for the same encounter returns the same exam.
 
+The `Idempotency-Key` header (a UUID) is required. It is claimed in the database before any work,
+so the same request on two replicas (the broker reroutes calls that carry a key) runs once: while
+the first is still running another one answers `409 IDEMPOTENCY_KEY_IN_USE` with `Retry-After: 1`,
+afterwards the stored `201` is returned (24 h).
+
 **Request body**
 
 ```json
@@ -1136,9 +1145,12 @@ stored so a retried call for the same encounter returns the same exam.
 
 | Code | When |
 |---|---|
-| `201` | Exam created |
+| `201` | Exam created (or the stored answer for a repeated `Idempotency-Key`) |
+| `400 VALIDATION_ERROR` | Missing `Idempotency-Key` or invalid body |
 | `404 PLAYER_NOT_FOUND` | No such player |
+| `409 IDEMPOTENCY_KEY_IN_USE` | The same `Idempotency-Key` is still being handled; retry after `Retry-After` |
 | `422 NOT_A_PROFESSOR` | Zombie has no `subject` |
+| `503 SERVICE_UNAVAILABLE` | The broker could not reach Player or Zombie |
 
 ```json
 // 201
@@ -1333,7 +1345,8 @@ the bank never changes an exam in progress or its grade.
 <details>
 <summary><b>publishes</b> <code>exam.completed</code> — An exam was graded</summary>
 
-Emitted for every graded exam, pass or fail. World reacts only when `passed` is true.
+Emitted for every graded exam, pass or fail, to the broker topic `exam.completed`. World reacts
+only when `passed` is true.
 
 ```json
 { "examId": 17, "playerId": 42, "subject": "math", "passed": true, "grade": 8 }
@@ -1364,10 +1377,13 @@ Question   { questionId: int, subject: string, text: string, options: [string], 
 The campus: wings, rooms, resource nodes, zombie spawn points. Geography only — what players build
 on it belongs to Base.
 
-**Auth:** World reads the acting player from the `X-Player-Id` header set by the gateway, not from
-the cookie. It consumes Exam's WebSocket stream (URL negotiated with `GET /ws/exam` at the gateway)
-and also accepts events over HTTP at `POST /world/internal/events`. It serves `world.wing_unlocked`
-on `ws://world:8084/events` (`GET /ws/world` at the gateway).
+**Auth:** World reads the acting player from `X-Player-Id` set by the gateway; it does not read the
+cookie, and treats a request marked `X-Caller: client` as the player's (internal routes answer
+`403`). It calls no other service. It registers its `grpc_url` (`<container IP>:9084`) and the
+topic `exam.completed` with Discovery: the broker calls it over gRPC (`broker.v1.Endpoint/Handle`)
+and delivers the topic with `Endpoint.Deliver` (or `POST /internal/events` over HTTP). It publishes
+`world.wing_unlocked` from its outbox with `Broker.Publish` (in `seq` order, marked sent only after
+the broker stored it, backing off 1 s → 30 s while the broker refuses).
 
 ### Endpoints
 
@@ -1654,18 +1670,26 @@ Same body and rules as create.
 </details>
 
 <details>
-<summary><b>POST</b> <code>/world/internal/events</code> — Receive a service event</summary>
+<summary><b>POST</b> <code>/internal/events</code> — Receive an event delivered by the broker</summary>
 
-**Caller:** internal · **Auth:** `X-Internal-Key` · **Idempotent:** yes (deduplicated on `eventId`)
+**Caller:** the broker · **Auth:** `X-Internal-Key` · **Idempotent:** yes (deduplicated on `eventId`)
 
-Takes one `exam.completed` event in the standard [envelope](#envelope) and applies it exactly as
-the WebSocket consumer does. Other event types are rejected with `400 VALIDATION_ERROR`.
+Takes one event in the standard [envelope](#envelope). `exam.completed` is applied in one
+transaction with its `processed_events` row, and the answer is `200` only after the commit, so a
+second delivery (to any replica) is a `duplicate`. Over gRPC the same handler is
+`Endpoint.Deliver`, answered with a `DeliveryAck`. `POST /world/internal/events` is the same
+handler.
 
 **Responses**
 
+| Code | When |
+|---|---|
+| `200` | Handled: `outcome` is `processed`, `duplicate` (seen before) or `ignored` (a type World does not handle) |
+| `400 VALIDATION_ERROR` | Invalid `exam.completed` envelope (`INVALID_ARGUMENT` over gRPC); the broker dead-letters it |
+
 ```json
-// 200 — duplicate is true when the eventId was seen before
-{ "eventId": "6f1c0c3e-…", "duplicate": false }
+// 200
+{ "eventId": "6f1c0c3e-…", "outcome": "processed" }
 ```
 
 </details>
@@ -1675,13 +1699,16 @@ the WebSocket consumer does. Other event types are rejected with `400 VALIDATION
 <details>
 <summary><b>consumes</b> <code>exam.completed</code> — Unlocks a wing on a pass</summary>
 
-If `passed` is true and a wing has `unlockedBySubject == subject` and is still locked, it is
-unlocked and `world.wing_unlocked` is published. Already-unlocked wings make the event a no-op.
+Delivered by the broker (World's topic subscription). If `passed` is true and a wing has
+`unlockedBySubject == subject` and is still locked, it is unlocked and `world.wing_unlocked` is
+published. Already-unlocked wings make the event a no-op.
 
 </details>
 
 <details>
 <summary><b>publishes</b> <code>world.wing_unlocked</code> — A wing became reachable</summary>
+
+Published to the broker topic `world.wing_unlocked`.
 
 ```json
 { "wingId": 4, "name": "Math Wing", "roomIds": [14, 15, 16] }

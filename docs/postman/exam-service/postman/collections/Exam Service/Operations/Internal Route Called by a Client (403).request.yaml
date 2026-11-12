@@ -1,0 +1,12 @@
+name: Internal Route Called by a Client (403)
+$kind: http-request
+method: GET
+url: "http://localhost:8091/call/exam/exams/questions"
+description: "The broker sends its own key on every call, so the gateway marks a player's request with X-Caller: client. Exam then treats it as the player's: internal-only routes answer 403 FORBIDDEN."
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+  - key: X-Caller
+    value: "client"
+  - key: X-Player-Id
+    value: "{{playerId}}"

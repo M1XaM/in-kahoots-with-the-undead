@@ -1,0 +1,10 @@
+name: exam.completed Dead Letters (broker)
+$kind: http-request
+description: |-
+  exam.completed events a subscriber refused (4xx) or that failed 5 delivery attempts.
+method: GET
+url: "{{brokerUrl}}/dead-letters?topic=exam.completed"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+order: 2000

@@ -1,0 +1,9 @@
+name: Exam Metrics
+$kind: http-request
+description: |-
+  GET /metrics of the Exam instance the broker picks; Prometheus scrapes every replica directly (job exam).
+method: GET
+url: "{{brokerUrl}}/call/exam/metrics"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"

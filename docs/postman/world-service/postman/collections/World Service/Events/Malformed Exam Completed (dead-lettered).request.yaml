@@ -1,0 +1,20 @@
+name: Malformed Exam Completed (dead-lettered)
+$kind: http-request
+method: POST
+url: "http://localhost:8091/topics/exam.completed/events"
+description: "passed is not a boolean: World answers 400 (INVALID_ARGUMENT over gRPC) and the broker moves the event to the dead letter channel at once instead of retrying."
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+body:
+  type: json
+  content: |
+    {
+      "eventId": "{{$guid}}",
+      "type": "exam.completed",
+      "version": 1,
+      "occurredAt": "2026-11-12T12:00:00Z",
+      "payload": { "examId": 19, "playerId": 1, "subject": "math", "passed": "yes", "grade": 9 }
+    }

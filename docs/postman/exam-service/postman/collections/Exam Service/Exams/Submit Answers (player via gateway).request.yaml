@@ -16,12 +16,13 @@ scripts:
     language: text/javascript
     code: |-
       // Answers every question correctly from the internal question bank, so the exam passes and
-      // World unlocks the subject's wing (exam.completed over Exam's event stream).
-      const base = pm.variables.get('baseUrl') || 'http://localhost:8080';
+      // World unlocks the subject's wing (exam.completed through the broker topic). The bank is internal,
+      // so it is read through the broker: through the gateway it would be the player's request (403).
+      const broker = pm.variables.get('brokerUrl') || 'http://localhost:8091';
       const questions = JSON.parse(pm.collectionVariables.get('examQuestions') || '[]');
       const subject = pm.collectionVariables.get('examSubject');
       pm.sendRequest({
-        url: `${base}/exams/questions?subject=${subject}`,
+        url: `${broker}/call/exam/exams/questions?subject=${subject}`,
         header: { 'X-Internal-Key': 'changeme' },
       }, (err, res) => {
         const bank = err ? [] : res.json();

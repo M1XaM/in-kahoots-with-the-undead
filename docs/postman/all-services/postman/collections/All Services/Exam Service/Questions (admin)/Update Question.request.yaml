@@ -1,7 +1,9 @@
 name: Update Question
 $kind: http-request
+description: |-
+  Admin, service to service: through the broker with X-Internal-Key.
 method: PUT
-url: "{{baseUrl}}/exams/questions/{{questionId}}"
+url: "{{brokerUrl}}/call/exam/exams/questions/{{questionId}}"
 headers:
   - key: Content-Type
     value: "application/json"

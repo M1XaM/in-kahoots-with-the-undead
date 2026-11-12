@@ -1,13 +1,17 @@
 {
   "info": {
     "name": "Exam Service",
-    "description": "Exam Service through the API Gateway (http://localhost:8080); only the gateway is published in the team compose. Run 'Auth (run first)' to register and log in a player: the gateway verifies the token, strips it and forwards the player as X-Player-Id. Internal requests (what Game sends) use X-Internal-Key (INTERNAL_KEY in the team .env, default changeme). Run the Exams folder in order: it creates an exam for the logged-in player against the math professor, answers it correctly and passes, which unlocks the Math Wing in World.",
+    "description": "Exam Service, Lab 4: players go through the API Gateway (http://localhost:8080), which hands every request to the message broker; service-to-service requests go straight to the broker (http://localhost:8091, /call/exam/...), as Game does. Run 'Auth (run first)' to register and log in a player: the gateway verifies the token, strips it and forwards the player as X-Player-Id with X-Caller: client. Internal requests use X-Internal-Key (INTERNAL_KEY in the team .env, default changeme). Run the Exams folder in order: it creates an exam for the logged-in player against the math professor (Exam asks Zombie and Player through the broker over gRPC), answers it correctly and passes; exam.completed then goes to the broker topic and World unlocks the Math Wing. Operations shows logs, metrics and the 403 for internal routes.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     {
       "key": "baseUrl",
       "value": "http://localhost:8080"
+    },
+    {
+      "key": "brokerUrl",
+      "value": "http://localhost:8091"
     },
     {
       "key": "accessToken",
@@ -146,7 +150,7 @@
                 "value": "{{$guid}}"
               }
             ],
-            "url": "{{baseUrl}}/exams",
+            "url": "{{brokerUrl}}/call/exam/exams",
             "body": {
               "mode": "raw",
               "raw": "{ \"playerId\": {{playerId}}, \"zombieId\": 5, \"encounterId\": \"enc-{{$timestamp}}\" }",
@@ -156,7 +160,7 @@
                 }
               }
             },
-            "description": "What Game sends on a professor encounter. Exam asks Zombie (zombie 5, the math professor) and Player through the gateway."
+            "description": "What Game sends on a professor encounter, through the broker. Exam asks Zombie (zombie 5, the math professor) and Player through the broker over gRPC. The Idempotency-Key is claimed before the exam is created: the same key again returns the same exam, and while the first request still runs another replica answers 409 IDEMPOTENCY_KEY_IN_USE."
           },
           "event": [
             {
@@ -232,12 +236,13 @@
                 "type": "text/javascript",
                 "exec": [
                   "// Answers every question correctly from the internal question bank, so the exam passes and",
-                  "// World unlocks the subject's wing (exam.completed over Exam's event stream).",
-                  "const base = pm.variables.get('baseUrl') || 'http://localhost:8080';",
+                  "// World unlocks the subject's wing (exam.completed through the broker topic). The bank is internal,",
+                  "// so it is read through the broker: through the gateway it would be the player's request (403).",
+                  "const broker = pm.variables.get('brokerUrl') || 'http://localhost:8091';",
                   "const questions = JSON.parse(pm.collectionVariables.get('examQuestions') || '[]');",
                   "const subject = pm.collectionVariables.get('examSubject');",
                   "pm.sendRequest({",
-                  "  url: `${base}/exams/questions?subject=${subject}`,",
+                  "  url: `${broker}/call/exam/exams/questions?subject=${subject}`,",
                   "  header: { 'X-Internal-Key': 'changeme' },",
                   "}, (err, res) => {",
                   "  const bank = err ? [] : res.json();",
@@ -296,7 +301,8 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/exams/questions?subject=math"
+            "url": "{{brokerUrl}}/call/exam/exams/questions?subject=math",
+            "description": "Admin, service to service: through the broker with X-Internal-Key."
           }
         },
         {
@@ -309,7 +315,8 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/exams/questions/1"
+            "url": "{{brokerUrl}}/call/exam/exams/questions/1",
+            "description": "Admin, service to service: through the broker with X-Internal-Key."
           }
         },
         {
@@ -326,7 +333,7 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/exams/questions",
+            "url": "{{brokerUrl}}/call/exam/exams/questions",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"subject\": \"math\",\n  \"text\": \"12 / 4 = ?\",\n  \"options\": [\"2\", \"3\", \"4\", \"6\"],\n  \"correctOption\": 1\n}",
@@ -335,7 +342,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Admin, service to service: through the broker with X-Internal-Key."
           },
           "event": [
             {
@@ -363,7 +371,7 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/exams/questions/{{questionId}}",
+            "url": "{{brokerUrl}}/call/exam/exams/questions/{{questionId}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"subject\": \"math\",\n  \"text\": \"12 / 3 = ?\",\n  \"options\": [\"2\", \"3\", \"4\", \"6\"],\n  \"correctOption\": 2\n}",
@@ -372,7 +380,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Admin, service to service: through the broker with X-Internal-Key."
           }
         },
         {
@@ -385,7 +394,8 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/exams/questions/{{questionId}}"
+            "url": "{{brokerUrl}}/call/exam/exams/questions/{{questionId}}",
+            "description": "Admin, service to service: through the broker with X-Internal-Key."
           }
         }
       ]
@@ -394,7 +404,7 @@
       "name": "Events",
       "item": [
         {
-          "name": "Negotiate Event Stream URL (internal)",
+          "name": "Exam Topics (broker)",
           "request": {
             "method": "GET",
             "header": [
@@ -403,8 +413,105 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/ws/exam",
-            "description": "Where consumers (World, Game, Crafting) open Exam's /events WebSocket. They then connect to the returned URL directly with X-Internal-Key; the gateway never relays."
+            "url": "{{brokerUrl}}/topics",
+            "description": "Exam publishes exam.completed to the broker topic of the same name (from its outbox, in order); World, Game and Crafting subscribe to it through their Discovery registration. Shows producers, subscribers, queue depth and deliveries."
+          }
+        },
+        {
+          "name": "exam.completed Dead Letters (broker)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/dead-letters?topic=exam.completed",
+            "description": "exam.completed events a subscriber refused (4xx) or that failed 5 delivery attempts."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Operations",
+      "item": [
+        {
+          "name": "Internal Route Called by a Client (403)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              },
+              {
+                "key": "X-Caller",
+                "value": "client"
+              },
+              {
+                "key": "X-Player-Id",
+                "value": "{{playerId}}"
+              }
+            ],
+            "url": "{{brokerUrl}}/call/exam/exams/questions",
+            "description": "The broker sends its own key on every call, so the gateway marks a player's request with X-Caller: client. Exam then treats it as the player's: internal-only routes answer 403 FORBIDDEN."
+          }
+        },
+        {
+          "name": "Internal Route Through the Gateway (403)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/exams/questions",
+            "description": "A logged-in player cannot use an internal route: the gateway forwards it through the broker marked X-Caller: client and Exam answers 403 FORBIDDEN (routes under /internal/ are not served by the gateway at all)."
+          }
+        },
+        {
+          "name": "Metrics of One Instance (Prometheus)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/call/exam/metrics",
+            "description": "What Prometheus scrapes from every Exam replica: http_requests_total, http_request_duration_seconds, active_tasks, max_concurrent_tasks, upstream_calls_total, events_published_total and the Node.js process metrics."
+          }
+        },
+        {
+          "name": "Recent Logs of One Instance (internal)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/call/exam/internal/logs?level=info&limit=100",
+            "description": "NDJSON, oldest first, from the instance the broker picked (X-Upstream-Instance); X-Log-Oldest and X-Log-Buffered describe its buffer."
+          }
+        },
+        {
+          "name": "Exam Logs (gateway, every instance)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/logs?service=exam&since=15m&level=info",
+            "description": "The gateway asks every Exam instance Discovery lists for GET /internal/logs and merges the lines by time; X-Logs-Sources names the instances that answered."
           }
         }
       ]

@@ -1,0 +1,10 @@
+name: "Exam Logs (gateway, every instance)"
+$kind: http-request
+description: |-
+  The gateway asks every Exam instance Discovery lists for GET /internal/logs and merges the lines by time; X-Logs-Sources names the instances that answered.
+method: GET
+url: "{{baseUrl}}/logs?service=exam&since=15m&level=info"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+order: 5000
