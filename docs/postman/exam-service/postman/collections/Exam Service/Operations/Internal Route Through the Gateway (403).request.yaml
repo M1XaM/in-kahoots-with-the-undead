@@ -1,0 +1,8 @@
+name: Internal Route Through the Gateway (403)
+$kind: http-request
+method: GET
+url: "http://localhost:8080/exams/questions"
+description: "A logged-in player cannot use an internal route: the gateway forwards it through the broker marked X-Caller: client and Exam answers 403 FORBIDDEN (routes under /internal/ are not served by the gateway at all)."
+headers:
+  - key: Authorization
+    value: "Bearer {{accessToken}}"

@@ -158,6 +158,34 @@
             ],
             "url": "{{craftingUrl}}/internal/logs?limit=100"
           }
+        },
+        {
+          "name": "Exam Own Lines (internal)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/call/exam/internal/logs?limit=100",
+            "description": "Exam is not published in the team compose: GET /internal/logs of the Exam instance the broker picks (X-Upstream-Instance)."
+          }
+        },
+        {
+          "name": "World Own Lines (internal)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/call/world/internal/logs?limit=100",
+            "description": "World is not published in the team compose: GET /internal/logs of the World instance the broker picks (X-Upstream-Instance)."
+          }
         }
       ]
     },
@@ -194,6 +222,34 @@
             "method": "GET",
             "header": [],
             "url": "{{craftingUrl}}/metrics"
+          }
+        },
+        {
+          "name": "Exam Metrics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/call/exam/metrics",
+            "description": "GET /metrics of the Exam instance the broker picks; Prometheus scrapes every replica directly (job exam)."
+          }
+        },
+        {
+          "name": "World Metrics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/call/world/metrics",
+            "description": "GET /metrics of the World instance the broker picks; Prometheus scrapes every replica directly (job world)."
           }
         },
         {

@@ -1,7 +1,8 @@
 name: Create Spawn Point
 $kind: http-request
 method: POST
-url: "http://localhost:8080/world/spawn-points"
+url: "http://localhost:8091/call/world/world/spawn-points"
+description: "Service to service: through the broker with X-Internal-Key."
 headers:
   - key: Content-Type
     value: "application/json"

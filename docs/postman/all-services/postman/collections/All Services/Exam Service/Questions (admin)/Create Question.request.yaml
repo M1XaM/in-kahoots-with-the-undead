@@ -1,7 +1,9 @@
 name: Create Question
 $kind: http-request
+description: |-
+  Admin, service to service: through the broker with X-Internal-Key.
 method: POST
-url: "{{baseUrl}}/exams/questions"
+url: "{{brokerUrl}}/call/exam/exams/questions"
 headers:
   - key: Content-Type
     value: "application/json"

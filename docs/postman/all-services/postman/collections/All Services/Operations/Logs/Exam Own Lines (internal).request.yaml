@@ -1,0 +1,9 @@
+name: Exam Own Lines (internal)
+$kind: http-request
+description: |-
+  Exam is not published in the team compose: GET /internal/logs of the Exam instance the broker picks (X-Upstream-Instance).
+method: GET
+url: "{{brokerUrl}}/call/exam/internal/logs?limit=100"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"

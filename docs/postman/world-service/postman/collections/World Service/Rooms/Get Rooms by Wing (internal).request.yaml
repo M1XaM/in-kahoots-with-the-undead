@@ -1,7 +1,8 @@
 name: Get Rooms by Wing (internal)
 $kind: http-request
 method: GET
-url: "http://localhost:8080/world/rooms?wingId=1"
+url: "http://localhost:8091/call/world/world/rooms?wingId=1"
+description: "What Game and Base ask, through the broker with X-Internal-Key."
 headers:
   - key: X-Internal-Key
     value: "changeme"

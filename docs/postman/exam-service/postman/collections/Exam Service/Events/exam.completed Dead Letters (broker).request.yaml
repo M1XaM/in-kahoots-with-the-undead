@@ -1,0 +1,8 @@
+name: exam.completed Dead Letters (broker)
+$kind: http-request
+method: GET
+url: "http://localhost:8091/dead-letters?topic=exam.completed"
+description: "exam.completed events a subscriber refused (4xx) or that failed 5 delivery attempts."
+headers:
+  - key: X-Internal-Key
+    value: "changeme"

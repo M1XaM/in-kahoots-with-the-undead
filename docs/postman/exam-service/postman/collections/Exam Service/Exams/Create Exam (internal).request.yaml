@@ -1,8 +1,8 @@
 name: Create Exam (internal)
 $kind: http-request
 method: POST
-url: "http://localhost:8080/exams"
-description: "What Game sends on a professor encounter. Exam asks Zombie (zombie 5, the math professor) and Player through the gateway."
+url: "http://localhost:8091/call/exam/exams"
+description: "What Game sends on a professor encounter, through the broker. Exam asks Zombie (zombie 5, the math professor) and Player through the broker over gRPC. The Idempotency-Key is claimed before the exam is created: the same key again returns the same exam, and while the first request still runs another replica answers 409 IDEMPOTENCY_KEY_IN_USE."
 headers:
   - key: Content-Type
     value: "application/json"

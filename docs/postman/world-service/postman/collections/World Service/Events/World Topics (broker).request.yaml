@@ -1,0 +1,8 @@
+name: World Topics (broker)
+$kind: http-request
+method: GET
+url: "http://localhost:8091/topics"
+description: "World subscribes to exam.completed (its Discovery registration lists it) and produces world.wing_unlocked (Game and Crafting subscribe): queue depth, deliveries and dead letters."
+headers:
+  - key: X-Internal-Key
+    value: "changeme"

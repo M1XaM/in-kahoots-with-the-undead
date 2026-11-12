@@ -1,13 +1,17 @@
 {
   "info": {
     "name": "World Service",
-    "description": "World Service through the API Gateway (http://localhost:8080); only the gateway is published in the team compose. Run 'Auth (run first)' to register and log in a player: the gateway verifies the token, strips it and forwards the player as X-Player-Id. Internal requests (Game, Base, Resource and admin) use X-Internal-Key (INTERNAL_KEY in the team .env, default changeme). Pass an exam through the Exam collection and the matching wing shows unlocked: true.",
+    "description": "World Service, Lab 4: players go through the API Gateway (http://localhost:8080), which hands every request to the message broker; service-to-service requests (Game, Base, Resource and admin) go straight to the broker (http://localhost:8091, /call/world/...). Run 'Auth (run first)' to register and log in a player. World receives exam.completed from the broker topic (it registers the topic with Discovery) and publishes world.wing_unlocked to its topic; pass an exam through the Exam collection, or publish exam.completed in Events, and the matching wing shows unlocked: true. Operations shows logs, metrics and the 403 for internal routes.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     {
       "key": "baseUrl",
       "value": "http://localhost:8080"
+    },
+    {
+      "key": "brokerUrl",
+      "value": "http://localhost:8091"
     },
     {
       "key": "accessToken",
@@ -160,7 +164,8 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/world/rooms?wingId=1"
+            "url": "{{brokerUrl}}/call/world/world/rooms?wingId=1",
+            "description": "What Game and Base ask, through the broker with X-Internal-Key."
           }
         },
         {
@@ -196,7 +201,7 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/world/rooms",
+            "url": "{{brokerUrl}}/call/world/world/rooms",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Chem Lab\",\n  \"type\": \"laboratory\",\n  \"wingId\": 2,\n  \"resourceNode\": { \"resourceType\": \"metal\" }\n}",
@@ -205,7 +210,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Service to service: through the broker with X-Internal-Key."
           },
           "event": [
             {
@@ -233,7 +239,7 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/world/rooms/{{roomId}}",
+            "url": "{{brokerUrl}}/call/world/world/rooms/{{roomId}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Chem Lab 2\",\n  \"type\": \"laboratory\",\n  \"wingId\": 2,\n  \"resourceNode\": null\n}",
@@ -242,7 +248,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Service to service: through the broker with X-Internal-Key."
           }
         },
         {
@@ -255,7 +262,8 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/world/rooms/{{roomId}}"
+            "url": "{{brokerUrl}}/call/world/world/rooms/{{roomId}}",
+            "description": "Service to service: through the broker with X-Internal-Key."
           }
         }
       ]
@@ -308,7 +316,7 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/world/wings",
+            "url": "{{brokerUrl}}/call/world/world/wings",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Chemistry Wing {{$timestamp}}\",\n  \"unlocked\": false,\n  \"unlockedBySubject\": \"chemistry\"\n}",
@@ -317,7 +325,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Service to service: through the broker with X-Internal-Key."
           },
           "event": [
             {
@@ -347,7 +356,7 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/world/wings/{{wingId}}",
+            "url": "{{brokerUrl}}/call/world/world/wings/{{wingId}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"{{wingName}}\",\n  \"unlocked\": true,\n  \"unlockedBySubject\": \"chemistry\"\n}",
@@ -370,7 +379,8 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/world/wings/{{wingId}}"
+            "url": "{{brokerUrl}}/call/world/world/wings/{{wingId}}",
+            "description": "Service to service: through the broker with X-Internal-Key."
           }
         }
       ]
@@ -388,7 +398,8 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/world/spawn-points?roomId=3"
+            "url": "{{brokerUrl}}/call/world/world/spawn-points?roomId=3",
+            "description": "Service to service: through the broker with X-Internal-Key."
           }
         },
         {
@@ -401,7 +412,8 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/world/spawn-points/2"
+            "url": "{{brokerUrl}}/call/world/world/spawn-points/2",
+            "description": "Service to service: through the broker with X-Internal-Key."
           }
         },
         {
@@ -418,7 +430,7 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/world/spawn-points",
+            "url": "{{brokerUrl}}/call/world/world/spawn-points",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"roomId\": 3,\n  \"zombieTypes\": [\"dean\"]\n}",
@@ -427,7 +439,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Service to service: through the broker with X-Internal-Key."
           },
           "event": [
             {
@@ -455,7 +468,7 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/world/spawn-points/{{pointId}}",
+            "url": "{{brokerUrl}}/call/world/world/spawn-points/{{pointId}}",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"roomId\": 3,\n  \"zombieTypes\": [\"dean\", \"janitor\"]\n}",
@@ -464,7 +477,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Service to service: through the broker with X-Internal-Key."
           }
         },
         {
@@ -477,7 +491,8 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/world/spawn-points/{{pointId}}"
+            "url": "{{brokerUrl}}/call/world/world/spawn-points/{{pointId}}",
+            "description": "Service to service: through the broker with X-Internal-Key."
           }
         }
       ]
@@ -486,7 +501,7 @@
       "name": "Events",
       "item": [
         {
-          "name": "Exam Completed (internal)",
+          "name": "Exam Completed (publish to the broker)",
           "request": {
             "method": "POST",
             "header": [
@@ -499,21 +514,75 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/world/internal/events",
+            "url": "{{brokerUrl}}/topics/exam.completed/events",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"eventId\": \"{{$guid}}\",\n  \"type\": \"exam.completed\",\n  \"version\": 1,\n  \"occurredAt\": \"2026-10-08T12:00:00Z\",\n  \"payload\": { \"examId\": 17, \"playerId\": 1, \"subject\": \"math\", \"passed\": true, \"grade\": 8 }\n}",
+              "raw": "{\n  \"eventId\": \"{{$guid}}\",\n  \"type\": \"exam.completed\",\n  \"version\": 1,\n  \"occurredAt\": \"2026-11-12T12:00:00Z\",\n  \"payload\": { \"examId\": 17, \"playerId\": 1, \"subject\": \"math\", \"passed\": true, \"grade\": 8 }\n}",
               "options": {
                 "raw": {
                   "language": "json"
                 }
               }
             },
-            "description": "HTTP stand-in for Exam's event stream: applied exactly like the WebSocket consumer (deduplicated on eventId)."
+            "description": "Publishes exam.completed to the broker, which delivers it to every subscriber (World, Game, Crafting), to World over gRPC (Endpoint.Deliver) since it registered a grpc_url. A pass in math unlocks the Math Wing and World publishes world.wing_unlocked; a repeated eventId is ignored by the broker."
           }
         },
         {
-          "name": "Negotiate Exam Stream URL (internal)",
+          "name": "Deliver to World Directly (processed, then duplicate)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/call/world/internal/events",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"6f1c0c3e-0000-4000-8000-000000000001\",\n  \"type\": \"exam.completed\",\n  \"version\": 1,\n  \"occurredAt\": \"2026-11-12T12:00:00Z\",\n  \"payload\": { \"examId\": 18, \"playerId\": 1, \"subject\": \"physics\", \"passed\": false, \"grade\": 3 }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "What the broker does for each event: POST /internal/events on one World replica. Send it twice: the first answers outcome processed, the second duplicate (processed_events, whichever replica gets it)."
+          }
+        },
+        {
+          "name": "Malformed Exam Completed (dead-lettered)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/topics/exam.completed/events",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"{{$guid}}\",\n  \"type\": \"exam.completed\",\n  \"version\": 1,\n  \"occurredAt\": \"2026-11-12T12:00:00Z\",\n  \"payload\": { \"examId\": 19, \"playerId\": 1, \"subject\": \"math\", \"passed\": \"yes\", \"grade\": 9 }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "passed is not a boolean: World answers 400 (INVALID_ARGUMENT over gRPC) and the broker moves the event to the dead letter channel at once instead of retrying."
+          }
+        },
+        {
+          "name": "World Topics (broker)",
           "request": {
             "method": "GET",
             "header": [
@@ -522,12 +591,12 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/ws/exam",
-            "description": "What World does on every (re)connect: the gateway returns Exam's /events URL and World connects to it directly."
+            "url": "{{brokerUrl}}/topics",
+            "description": "World subscribes to exam.completed (its Discovery registration lists it) and produces world.wing_unlocked (Game and Crafting subscribe): queue depth, deliveries and dead letters."
           }
         },
         {
-          "name": "Negotiate World Stream URL (internal)",
+          "name": "World Dead Letters (broker)",
           "request": {
             "method": "GET",
             "header": [
@@ -536,8 +605,91 @@
                 "value": "changeme"
               }
             ],
-            "url": "{{baseUrl}}/ws/world",
-            "description": "Where Game and Crafting open World's /events WebSocket (world.wing_unlocked)."
+            "url": "{{brokerUrl}}/dead-letters?subscriber=world",
+            "description": "Events World refused (the malformed one above, reason rejected) or that failed 5 delivery attempts."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Operations",
+      "item": [
+        {
+          "name": "Internal Route Called by a Client (403)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              },
+              {
+                "key": "X-Caller",
+                "value": "client"
+              },
+              {
+                "key": "X-Player-Id",
+                "value": "{{playerId}}"
+              }
+            ],
+            "url": "{{brokerUrl}}/call/world/world/spawn-points",
+            "description": "The broker sends its own key on every call, so the gateway marks a player's request with X-Caller: client. World then treats it as the player's: internal-only routes answer 403 FORBIDDEN."
+          }
+        },
+        {
+          "name": "Internal Route Through the Gateway (403)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/world/spawn-points",
+            "description": "A logged-in player cannot use an internal route: the gateway forwards it through the broker marked X-Caller: client and World answers 403 FORBIDDEN (routes under /internal/ are not served by the gateway at all)."
+          }
+        },
+        {
+          "name": "Metrics of One Instance (Prometheus)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/call/world/metrics",
+            "description": "What Prometheus scrapes from every World replica: http_requests_total, http_request_duration_seconds, active_tasks, max_concurrent_tasks, upstream_calls_total, events_published_total, events_consumed_total and the Node.js process metrics."
+          }
+        },
+        {
+          "name": "Recent Logs of One Instance (internal)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/call/world/internal/logs?level=info&limit=100",
+            "description": "NDJSON, oldest first, from the instance the broker picked (X-Upstream-Instance); X-Log-Oldest and X-Log-Buffered describe its buffer."
+          }
+        },
+        {
+          "name": "World Logs (gateway, every instance)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{baseUrl}}/logs?service=world&since=15m&level=info",
+            "description": "The gateway asks every World instance Discovery lists for GET /internal/logs and merges the lines by time; X-Logs-Sources names the instances that answered."
           }
         }
       ]

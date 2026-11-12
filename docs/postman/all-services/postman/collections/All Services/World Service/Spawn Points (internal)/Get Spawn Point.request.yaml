@@ -1,7 +1,9 @@
 name: Get Spawn Point
 $kind: http-request
+description: |-
+  Service to service: through the broker with X-Internal-Key.
 method: GET
-url: "{{baseUrl}}/world/spawn-points/2"
+url: "{{brokerUrl}}/call/world/world/spawn-points/2"
 headers:
   - key: X-Internal-Key
     value: "changeme"

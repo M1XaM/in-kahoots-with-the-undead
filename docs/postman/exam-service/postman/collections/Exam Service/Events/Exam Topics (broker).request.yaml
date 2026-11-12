@@ -1,0 +1,8 @@
+name: Exam Topics (broker)
+$kind: http-request
+method: GET
+url: "http://localhost:8091/topics"
+description: "Exam publishes exam.completed to the broker topic of the same name (from its outbox, in order); World, Game and Crafting subscribe to it through their Discovery registration. Shows producers, subscribers, queue depth and deliveries."
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
