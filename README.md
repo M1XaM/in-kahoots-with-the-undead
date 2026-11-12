@@ -343,7 +343,7 @@ Defaults are the design's proposals, not confirmed.
 ### Player Service
 
 - **Image:** [`timurcravtov/player-service`](https://hub.docker.com/r/timurcravtov/player-service),
-  version set by `PLAYER_SERVICE_TAG` (default `3`).
+  version set by `PLAYER_SERVICE_TAG` (default `4`).
 - **Needs:** its own Postgres (`player-db`, started by compose); password defaults to `qwerty`, override with `PLAYER_POSTGRES_PASSWORD`.
 - **Talks to:** Game, over its event stream: it asks the gateway for the stream URL (`GATEWAY_URL`) and
   keeps `online` in step with `game.presence_changed`. It issues the login cookie, publishes the JWKS
@@ -354,7 +354,7 @@ Defaults are the design's proposals, not confirmed.
 ### Game Service
 
 - **Image:** [`timurcravtov/game-service`](https://hub.docker.com/r/timurcravtov/game-service),
-  version set by `GAME_SERVICE_TAG` (default `3`), `game` plus `GAME_EXTRA_REPLICAS` (1) `game-replica` replicas.
+  version set by `GAME_SERVICE_TAG` (default `4`), `game` plus `GAME_EXTRA_REPLICAS` (1) `game-replica` replicas.
 - **Needs:** its own Postgres (`game-db`, started by compose); password defaults to `qwerty`, override with `GAME_POSTGRES_PASSWORD`.
 - **Scaling:** instance-agnostic: lobbies, the event outbox and which sockets are joined (so
   `game.presence_changed` fires when a player's first socket anywhere joins and their last one
