@@ -1,0 +1,25 @@
+name: Reserve Resources
+$kind: http-request
+method: POST
+url: "{{baseUrl}}/resources/players/42/reservations"
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+  - key: Idempotency-Key
+    value: "{{$guid}}"
+body:
+  type: json
+  content: |-
+    {
+      "resources": {
+        "wood": 3
+      }
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.collectionVariables.set('reservationId', pm.response.json().reservationId);
+order: 4000

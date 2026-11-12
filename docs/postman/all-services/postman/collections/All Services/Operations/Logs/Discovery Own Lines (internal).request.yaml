@@ -1,0 +1,7 @@
+name: Discovery Own Lines (internal)
+$kind: http-request
+method: GET
+url: "{{discoveryUrl}}/internal/logs?limit=100"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"

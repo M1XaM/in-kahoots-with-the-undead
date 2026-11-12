@@ -1,0 +1,7 @@
+name: List Dead Letters
+$kind: http-request
+method: GET
+url: "http://localhost:8091/dead-letters"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"

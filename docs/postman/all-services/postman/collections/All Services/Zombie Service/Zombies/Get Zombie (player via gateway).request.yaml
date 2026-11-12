@@ -1,0 +1,8 @@
+name: Get Zombie (player via gateway)
+$kind: http-request
+method: GET
+url: "{{baseUrl}}/zombies/{{zombieId}}"
+headers:
+  - key: Authorization
+    value: "Bearer {{accessToken}}"
+order: 6000

@@ -1,0 +1,8 @@
+name: Resource Topics (broker)
+$kind: http-request
+method: GET
+url: "http://localhost:8091/topics"
+description: "Resource subscribes to player.registered and game.action_completed (its Discovery registration lists them) and produces resource.gathered: see their queue depth, deliveries and dead letters."
+headers:
+  - key: X-Internal-Key
+    value: "changeme"

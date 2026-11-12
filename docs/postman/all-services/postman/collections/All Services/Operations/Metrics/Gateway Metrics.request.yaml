@@ -1,0 +1,4 @@
+name: Gateway Metrics
+$kind: http-request
+method: GET
+url: "{{baseUrl}}/metrics"

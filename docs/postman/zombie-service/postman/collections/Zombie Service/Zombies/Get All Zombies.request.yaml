@@ -1,7 +1,7 @@
 name: Get All Zombies
 $kind: http-request
 method: GET
-url: "http://localhost:8080/zombies"
+url: "http://localhost:8091/call/zombie/zombies"
 headers:
   - key: X-Internal-Key
     value: "changeme"

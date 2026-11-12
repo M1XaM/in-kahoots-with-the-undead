@@ -1,0 +1,5 @@
+name: Create Lobby
+$kind: http-request
+method: POST
+url: "{{gameUrl}}/game/lobbies"
+order: 1000

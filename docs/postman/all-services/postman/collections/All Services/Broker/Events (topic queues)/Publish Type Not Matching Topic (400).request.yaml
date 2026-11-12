@@ -1,0 +1,22 @@
+name: Publish Type Not Matching Topic (400)
+$kind: http-request
+method: POST
+url: "{{brokerUrl}}/topics/exam.completed/events"
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+body:
+  type: json
+  content: |-
+    {
+      "eventId": "{{$guid}}",
+      "type": "exam.started",
+      "version": 1,
+      "occurredAt": "2026-09-09T18:04:11Z",
+      "payload": {
+        "score": 9
+      }
+    }
+order: 3000

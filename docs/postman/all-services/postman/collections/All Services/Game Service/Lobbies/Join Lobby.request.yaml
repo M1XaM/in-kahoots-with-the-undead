@@ -1,0 +1,5 @@
+name: Join Lobby
+$kind: http-request
+method: POST
+url: "{{gameUrl}}/game/lobbies/c1d4e5f6-0000-4000-8000-000000000001/players"
+order: 2000

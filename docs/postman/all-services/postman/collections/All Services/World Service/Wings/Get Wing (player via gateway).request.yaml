@@ -1,0 +1,8 @@
+name: Get Wing (player via gateway)
+$kind: http-request
+method: GET
+url: "{{baseUrl}}/world/wings/4"
+headers:
+  - key: Authorization
+    value: "Bearer {{accessToken}}"
+order: 2000

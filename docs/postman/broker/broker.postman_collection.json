@@ -1,0 +1,372 @@
+{
+  "info": {
+    "name": "Broker",
+    "description": "The Camus message broker is published on http://localhost:8091 (HTTP) and 8092 (gRPC) in the team compose. Every route except /health, /status and /metrics needs X-Internal-Key (INTERNAL_KEY in the team .env, default changeme). Requests: forward a call to one healthy instance of a service through its queue; watch X-Upstream-Instance and X-Reroutes. Events: publish to a topic named <service>.<event>, list topics, read the dead letter channel.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Broker Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{brokerUrl}}/health"
+      }
+    },
+    {
+      "name": "Broker Status",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{brokerUrl}}/status"
+      }
+    },
+    {
+      "name": "Metrics (Prometheus)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{brokerUrl}}/metrics"
+      }
+    },
+    {
+      "name": "Requests (call a service)",
+      "item": [
+        {
+          "name": "Call Base Players (send several times)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/call/base/base/players"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "console.log('answered by', pm.response.headers.get('X-Upstream-Instance'), 'reroutes', pm.response.headers.get('X-Reroutes') || 0);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Call Crafting Recipes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/call/crafting/crafting/recipes"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "console.log('answered by', pm.response.headers.get('X-Upstream-Instance'), 'reroutes', pm.response.headers.get('X-Reroutes') || 0);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Call With Short Deadline (X-Timeout-Ms)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              },
+              {
+                "key": "X-Timeout-Ms",
+                "value": "50"
+              }
+            ],
+            "url": "{{brokerUrl}}/call/base/base/players"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "console.log('answered by', pm.response.headers.get('X-Upstream-Instance'), 'reroutes', pm.response.headers.get('X-Reroutes') || 0);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Call With Query String",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/call/crafting/crafting/recipes?limit=5"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "console.log('answered by', pm.response.headers.get('X-Upstream-Instance'), 'reroutes', pm.response.headers.get('X-Reroutes') || 0);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Call Unregistered Service (503)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/call/ghost/anything"
+          }
+        },
+        {
+          "name": "Call Invalid Service Name (400)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/call/Bad_Name/anything"
+          }
+        },
+        {
+          "name": "Call Without Key (401)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{brokerUrl}}/call/base/base/players"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Events (topic queues)",
+      "item": [
+        {
+          "name": "Publish Event",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/topics/exam.completed/events",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"type\": \"exam.completed\",\n  \"version\": 1,\n  \"occurredAt\": \"2026-09-09T18:04:11Z\",\n  \"payload\": {\n    \"score\": 9\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('eventId', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Publish Same Event Again (duplicate)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/topics/exam.completed/events",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"type\": \"exam.completed\",\n  \"version\": 1,\n  \"occurredAt\": \"2026-09-09T18:04:11Z\",\n  \"payload\": {\n    \"score\": 9\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Publish Type Not Matching Topic (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/topics/exam.completed/events",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"{{$guid}}\",\n  \"type\": \"exam.started\",\n  \"version\": 1,\n  \"occurredAt\": \"2026-09-09T18:04:11Z\",\n  \"payload\": {\n    \"score\": 9\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Publish Invalid Topic (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/topics/completed/events",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"{{$guid}}\",\n  \"type\": \"completed\",\n  \"version\": 1,\n  \"occurredAt\": \"2026-09-09T18:04:11Z\",\n  \"payload\": {\n    \"score\": 9\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "List Topics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/topics"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dead Letters",
+      "item": [
+        {
+          "name": "List Dead Letters",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/dead-letters"
+          }
+        },
+        {
+          "name": "Dead Letters of a Topic (filtered)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/dead-letters?topic=exam.completed&reason=max_attempts&limit=20"
+          }
+        },
+        {
+          "name": "Dead Letters Next Page",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/dead-letters?limit=1&after=100"
+          }
+        },
+        {
+          "name": "Dead Letters Invalid Reason (400)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Key",
+                "value": "changeme"
+              }
+            ],
+            "url": "{{brokerUrl}}/dead-letters?reason=oops"
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "brokerUrl",
+      "value": "http://localhost:8091"
+    },
+    {
+      "key": "eventId",
+      "value": "6f1c0c3e-0001"
+    }
+  ]
+}

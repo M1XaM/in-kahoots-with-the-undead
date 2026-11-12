@@ -1,0 +1,7 @@
+name: List Topics
+$kind: http-request
+method: GET
+url: "http://localhost:8091/topics"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"

@@ -1,0 +1,8 @@
+name: Delete Balance
+$kind: http-request
+method: DELETE
+url: "{{baseUrl}}/resources/balances/{{balanceId}}"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+order: 6000

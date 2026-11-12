@@ -1,0 +1,5 @@
+name: Delete Inventory Item
+$kind: http-request
+method: DELETE
+url: "{{playerUrl}}/players/1/inventory/coffee"
+order: 2000

@@ -1,0 +1,5 @@
+name: Discovery Status
+$kind: http-request
+method: GET
+url: "{{discoveryUrl}}/status"
+order: 2000

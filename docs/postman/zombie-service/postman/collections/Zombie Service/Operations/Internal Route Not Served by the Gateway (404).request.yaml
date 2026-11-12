@@ -1,0 +1,8 @@
+name: Internal Route Not Served by the Gateway (404)
+$kind: http-request
+method: GET
+url: "http://localhost:8080/zombies"
+description: "Only client routes are reachable from outside: the gateway does not serve service-to-service endpoints."
+headers:
+  - key: Authorization
+    value: "Bearer {{accessToken}}"

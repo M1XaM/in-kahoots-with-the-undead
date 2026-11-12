@@ -1,0 +1,8 @@
+name: Get All Ledger Entries
+$kind: http-request
+method: GET
+url: "{{baseUrl}}/resources/ledger"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+order: 2000

@@ -1,0 +1,8 @@
+name: Call Invalid Service Name (400)
+$kind: http-request
+method: GET
+url: "{{brokerUrl}}/call/Bad_Name/anything"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+order: 6000

@@ -1,0 +1,10 @@
+name: Negotiate Exam Stream URL (internal)
+$kind: http-request
+description: |-
+  What World does on every (re)connect: the gateway returns Exam's /events URL and World connects to it directly.
+method: GET
+url: "{{baseUrl}}/ws/exam"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+order: 2000

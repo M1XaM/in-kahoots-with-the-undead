@@ -1,0 +1,15 @@
+name: Create Player
+$kind: http-request
+method: POST
+url: "{{playerUrl}}/players"
+headers:
+  - key: Content-Type
+    value: "application/json"
+body:
+  type: json
+  content: |-
+    {
+      "username": "razvan",
+      "password": "hunter2hunter2"
+    }
+order: 1000

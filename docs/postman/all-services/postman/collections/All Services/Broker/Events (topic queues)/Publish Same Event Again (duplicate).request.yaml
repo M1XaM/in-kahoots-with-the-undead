@@ -1,0 +1,22 @@
+name: Publish Same Event Again (duplicate)
+$kind: http-request
+method: POST
+url: "{{brokerUrl}}/topics/exam.completed/events"
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+body:
+  type: json
+  content: |-
+    {
+      "eventId": "{{eventId}}",
+      "type": "exam.completed",
+      "version": 1,
+      "occurredAt": "2026-09-09T18:04:11Z",
+      "payload": {
+        "score": 9
+      }
+    }
+order: 2000

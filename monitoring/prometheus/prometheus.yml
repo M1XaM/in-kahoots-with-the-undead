@@ -1,0 +1,72 @@
+# Prometheus for Kahoot With Undead. Every target is scraped on the compose network.
+global:
+  scrape_interval: 5s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # the broker sees every call and every event between the services, so it describes the whole
+  # system: calls by service and outcome, queues, circuit breakers, instance load, dead letters
+  - job_name: broker
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["broker:8091"]
+
+  # the entry point: requests by service prefix and status, calls through the broker, load
+  - job_name: gateway
+    static_configs:
+      - targets: ["gateway:8080"]
+
+  # the registry: instances by health, their load and failed checks, topic subscribers
+  - job_name: discovery
+    static_configs:
+      - targets: ["discovery:8089"]
+
+  # Base and Crafting run several replicas: the compose service name resolves to all of them,
+  # so every replica is scraped on its own (instance = its IP)
+  - job_name: base
+    dns_sd_configs:
+      - names: ["base"]
+        type: A
+        port: 8087
+        refresh_interval: 15s
+
+  - job_name: crafting
+    dns_sd_configs:
+      - names: ["crafting"]
+        type: A
+        port: 8088
+        refresh_interval: 15s
+
+  # Player runs several replicas; Game runs one `game` container plus the `game-replica` ones
+  - job_name: player
+    dns_sd_configs:
+      - names: ["player"]
+        type: A
+        port: 8081
+        refresh_interval: 15s
+
+  - job_name: game
+    dns_sd_configs:
+      - names: ["game", "game-replica"]
+        type: A
+        port: 8082
+        refresh_interval: 15s
+
+  # Resource and Zombie run several replicas too
+  - job_name: resource
+    dns_sd_configs:
+      - names: ["resource"]
+        type: A
+        port: 8086
+        refresh_interval: 15s
+
+  - job_name: zombie
+    dns_sd_configs:
+      - names: ["zombie"]
+        type: A
+        port: 8085
+        refresh_interval: 15s
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

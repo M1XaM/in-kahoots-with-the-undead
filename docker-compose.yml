@@ -1,6 +1,25 @@
 # example RS256 key shared by every Player replica, so a token any replica issues verifies against any replica's JWKS; never use in production
 x-jwt-private-key: &jwt-private-key ${JWT_PRIVATE_KEY:------BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC99rl42elYEQDr\nkbctTRpYUYTDl4IjiRWAIUMNexD7Mu93nHb3EU/Rgf2EBIuPm3dPLR74ojx+K33c\n3npCmrKC4u5F6ii+qKLmBJsCpGLsscufki/s3fRqwfvND9+9bPaDyQnuf5rugo9s\nT6tN27EN8epF78bCH8lOCYclskpQgDtNyvVVUqLxSFauQG0H5iCcNC7u2ounerys\ns/AvIKFAGlr3ea7Xgz+1HHhew1AzeepMZC/myABy/P9ehfrCtmTlSZdab4GTBKrs\nDijY3/3TL7Vl/XlPZlM9o8gXCQegCTR96l9Rfrx9cGsNahw+4K8aLJLyza18QU/4\nEzjT6rbbAgMBAAECggEAUNV9vALCTDLEGPnDIDhIhx99JrvAaX2qVAETZteg9LuK\ncfP3HZBUzjqJ1dUXTA8kOGFjZfqnUisQnl1fWhs47gBB0ydemi7pTobULU4lOEI5\n+xd6ZElYeds82lgwZYtJ5O811jKfi3GsNTM7mmBrWZtBDOyIv89F2nqscyqIe/Mw\nSFtn6Yvt88tBQIGpaJ9fRWQbE4mo9UckK0At6m5R+uvdJ391xBgkPsZDIKl2PTVy\nZGPCUA6ly63NgEIRNaxtkgA4qIvZ+BTLK9G4qqvXS4oyAVYU0GfoDgmRELLPhDa2\nOgQhK5RsBYKV0HsGjIDcaPPAgAMny41gU08Gkm6RyQKBgQD1ahA/MXiSFRAafsv8\n1cHIoKopayCbF1mLHpN1ffAyAs4rxVBsJeYXyFjV0J5OKiFgLZyhtadMmXyq7OQA\noeiRYHJQrrrti9ZUWloGiPj+KJNBkD80uK3/8JUaDZkI7Tov034Tsm5S6jSQDf9h\nhfMdRhdMsKZrogz8ouP5FJN7cwKBgQDGKFwk1/NZ+Y03U674FLkQzOqXu5QKitBN\nXJJJxIiIhwRVdoRd9QayaBbfiEl9OPNFtbA/CDf19FsQJDb6cn0Y7XWxp07mEWjP\nj8popyH7wckVfpSv2Xt0dENNP3KXP0ZjNK0CxzcnkZ8tYXU/xMemIGbn3YTekSVX\nOSfVN4jM+QKBgQDvxlvvUgdqOtgL+vyUn8iAm7EFXJxzyyF6kjoiXhRy2FjVXSgR\nMgoYDG/3H6e72N/ZF1dki5XUelXari6qC4atmxy1hbIu6yRSMCCrJ+KWd9BAC44l\nlZazbDxRQx3VIepq1ejll7zAmAEZCgQNJZF9dYDINgOzP5YOs5unPZpGzwKBgQDE\nLJa0fvpTXARa/sTcox9oK4Yf+zsfiLeZrwjAcQo+J3S56yA2KGqd2wCyAanHh8cH\nf0zhyhAkteolO8UWApwoPoXi/+DTUe7ydccL/lJdfEbHuc4XnXZkHum2Ixcd9y2G\n71JMys6mpLryYWaDYBvLMo7OA3cUJJvUEyiFJHqReQKBgEpmolERCmXFsvzC+pmw\nHL1weYIgG+PQ/YlzLeOPDdSjfiAlg5F9nZlTFPW2lQsH6rMjGTRqg5tv0KoeA7Bs\nNYnQCK8s4nuo7X1LZuTw2O1kQPmvYVT6JyvHL5Ap52qAeOU+cYtnbA/zEvFzJjMN\nAWYvr0hQZKe0Q13CruO45ZEx\n-----END PRIVATE KEY-----}
 
+x-game-service: &game-service
+  image: ${DOCKERHUB_USERNAME:-timurcravtov}/game-service:${GAME_SERVICE_TAG:-3}
+  restart: unless-stopped
+  environment:
+    PORT: ${GAME_PORT:-8082}
+    DATABASE_URL: postgres://${GAME_POSTGRES_USER:-postgres}:${GAME_POSTGRES_PASSWORD:-qwerty}@game-db:5432/${GAME_POSTGRES_DB:-game}?sslmode=disable
+    INTERNAL_KEY: ${INTERNAL_KEY:-changeme}
+    JWT_PRIVATE_KEY: *jwt-private-key
+    KAFKA_BROKERS: ${KAFKA_BROKERS:-localhost:9092}
+    TASK_TIMEOUT_MS: ${GAME_TASK_TIMEOUT_MS:-10000}
+    MAX_CONCURRENT_TASKS: ${GAME_MAX_CONCURRENT_TASKS:-100}
+    # signing keys for the Socket.IO handshake and service-to-service REST go through the gateway
+    GATEWAY_URL: http://gateway:8080
+    # registers on startup, heartbeats, deregisters on shutdown
+    DISCOVERY_URL: http://discovery:8089
+  depends_on:
+    game-db:
+      condition: service_healthy
+
 services:
   discovery:
     image: ${DISCOVERY_DOCKERHUB_USERNAME:-inercaso}/service-discovery:${DISCOVERY_SERVICE_TAG:-3}
@@ -25,6 +44,31 @@ services:
     # published so the registry can be shown from the host (GET /services needs X-Internal-Key)
     ports:
       - "${DISCOVERY_PORT:-8089}:8089"
+
+  broker:
+    image: ${BROKER_DOCKERHUB_USERNAME:-timurcravtov}/broker:${BROKER_SERVICE_TAG:-4}
+    restart: unless-stopped
+    environment:
+      PORT: ${BROKER_PORT:-8091}
+      GRPC_PORT: ${BROKER_GRPC_PORT:-8092}
+      INTERNAL_KEY: ${INTERNAL_KEY:-changeme}
+      TASK_TIMEOUT_MS: ${BROKER_TASK_TIMEOUT_MS:-10000}
+      MAX_CONCURRENT_TASKS: ${BROKER_MAX_CONCURRENT_TASKS:-100}
+      # least_load: the instance with the lowest (broker in-flight + Discovery active tasks) / max tasks
+      LB_STRATEGY: ${BROKER_LB_STRATEGY:-least_load}
+      # `log` = events survive a restart (kept on the broker-data volume), `memory` = kept nothing
+      STORAGE: ${BROKER_STORAGE:-log}
+      DATA_DIR: /data
+      LOG_LEVEL: ${BROKER_LOG_LEVEL:-info}
+      # polls the registry for instances, health and load; registers itself as `broker`
+      DISCOVERY_URL: http://discovery:8089
+    volumes:
+      - broker-data:/data
+    ports:
+      - "${BROKER_PORT:-8091}:${BROKER_PORT:-8091}"
+      - "${BROKER_GRPC_PORT:-8092}:${BROKER_GRPC_PORT:-8092}"
+    depends_on:
+      - discovery
 
   player-db:
     image: postgres:16-alpine
@@ -79,32 +123,19 @@ services:
       timeout: 5s
       retries: 10
 
+  # Socket.IO clients connect here directly (GET /ws/game); REST goes through the gateway. Replicas
+  # started together race for a host port range, so only this one publishes a port and the extra
+  # replicas run as game-replica. The gateway hands every browser GAME_PUBLIC_WS_URL anyway
   game:
-    image: ${DOCKERHUB_USERNAME:-timurcravtov}/game-service:${GAME_SERVICE_TAG:-3}
-    restart: unless-stopped
-    # instance-agnostic: lobbies, presence and events live in game-db; `docker compose up -d --scale game=3`
-    deploy:
-      replicas: ${GAME_REPLICAS:-2}
-    environment:
-      PORT: ${GAME_PORT:-8082}
-      DATABASE_URL: postgres://${GAME_POSTGRES_USER:-postgres}:${GAME_POSTGRES_PASSWORD:-qwerty}@game-db:5432/${GAME_POSTGRES_DB:-game}?sslmode=disable
-      INTERNAL_KEY: ${INTERNAL_KEY:-changeme}
-      JWT_PRIVATE_KEY: *jwt-private-key
-      KAFKA_BROKERS: ${KAFKA_BROKERS:-localhost:9092}
-      TASK_TIMEOUT_MS: ${GAME_TASK_TIMEOUT_MS:-10000}
-      MAX_CONCURRENT_TASKS: ${GAME_MAX_CONCURRENT_TASKS:-100}
-      # signing keys for the Socket.IO handshake and service-to-service REST go through the gateway
-      GATEWAY_URL: http://gateway:8080
-      # registers on startup, heartbeats, deregisters on shutdown
-      DISCOVERY_URL: http://discovery:8089
-    # Socket.IO clients connect here directly (GET /ws/game); REST goes through the gateway. Replicas
-    # cannot share one host port, so each takes the next free one from GAME_HOST_PORT up to
-    # GAME_HOST_PORT_LAST (a range of its own, clear of the other services' ports)
+    <<: *game-service
     ports:
-      - "${GAME_HOST_PORT:-8090}-${GAME_HOST_PORT_LAST:-8099}:${GAME_PORT:-8082}"
-    depends_on:
-      game-db:
-        condition: service_healthy
+      - "${GAME_HOST_PORT:-8090}:${GAME_PORT:-8082}"
+
+  # instance-agnostic: lobbies, presence and events live in game-db; `docker compose up -d --scale game-replica=3`
+  game-replica:
+    <<: *game-service
+    deploy:
+      replicas: ${GAME_EXTRA_REPLICAS:-1}
 
   base-db:
     image: postgres:16-alpine
@@ -122,27 +153,32 @@ services:
       retries: 10
 
   base:
-    image: ${BASE_DOCKERHUB_USERNAME:-mixam052}/kahoots-base-service:${BASE_SERVICE_TAG:-3}
+    image: ${BASE_DOCKERHUB_USERNAME:-mixam052}/kahoots-base-service:${BASE_SERVICE_TAG:-4}
     restart: unless-stopped
-    # instance-agnostic: one replica consumes each event stream, Idempotency-Keys are claimed in
-    # the shared database; change at runtime with `docker compose up -d --scale base=3`
+    # instance-agnostic: the broker delivers each event to one replica, events and Idempotency-Keys
+    # are deduplicated in the shared database; `docker compose up -d --scale base=3`
     deploy:
       replicas: ${BASE_REPLICAS:-2}
     environment:
       PORT: ${BASE_PORT:-8087}
       DATABASE_URL: postgres://${BASE_POSTGRES_USER:-postgres}:${BASE_POSTGRES_PASSWORD:-qwerty}@base-db:5432/${BASE_POSTGRES_DB:-base}?sslmode=disable
       INTERNAL_KEY: ${INTERNAL_KEY:-changeme}
-      # REST to Resource, World and Player goes through the gateway, which also
-      # negotiates the URL of Player's event stream
-      GATEWAY_URL: http://gateway:8080
+      # calls to Resource, World and Player go through the broker over gRPC (Broker.Call); the
+      # broker calls Base back on its gRPC port and delivers the `player.registered` topic
+      BROKER_TRANSPORT: ${BASE_BROKER_TRANSPORT:-grpc}
+      BROKER_GRPC_URL: broker:${BROKER_GRPC_PORT:-8092}
+      BROKER_URL: http://broker:${BROKER_PORT:-8091}
+      GRPC_PORT: 9087
       TASK_TIMEOUT_MS: ${BASE_TASK_TIMEOUT_MS:-10000}
       MAX_CONCURRENT_TASKS: ${BASE_MAX_CONCURRENT_TASKS:-100}
       LOG_LEVEL: ${BASE_LOG_LEVEL:-info}
-      # registers on startup, heartbeats, deregisters on shutdown
+      # registers with its grpc_url and topics on startup, heartbeats, deregisters on shutdown
       DISCOVERY_URL: http://discovery:8089
     depends_on:
       base-db:
         condition: service_healthy
+      broker:
+        condition: service_started
 
   crafting-db:
     image: postgres:16-alpine
@@ -161,7 +197,7 @@ services:
       retries: 10
 
   crafting:
-    image: ${CRAFTING_DOCKERHUB_USERNAME:-mixam052}/kahoots-crafting-service:${CRAFTING_SERVICE_TAG:-3}
+    image: ${CRAFTING_DOCKERHUB_USERNAME:-mixam052}/kahoots-crafting-service:${CRAFTING_SERVICE_TAG:-4}
     restart: unless-stopped
     # instance-agnostic like Base; `docker compose up -d --scale crafting=3`
     deploy:
@@ -170,17 +206,23 @@ services:
       PORT: ${CRAFTING_PORT:-8088}
       DATABASE_URL: postgres://${CRAFTING_POSTGRES_USER:-postgres}:${CRAFTING_POSTGRES_PASSWORD:-qwerty}@crafting-db:5432/${CRAFTING_POSTGRES_DB:-crafting}?sslmode=disable
       INTERNAL_KEY: ${INTERNAL_KEY:-changeme}
-      # REST to Resource and Player goes through the gateway, which also negotiates
-      # the URLs of Player's, Exam's and World's event streams
-      GATEWAY_URL: http://gateway:8080
+      # calls to Resource and Player go through the broker over gRPC (Broker.Call); the broker
+      # calls Crafting back on its gRPC port and delivers `player.leveled_up`, `exam.completed`
+      # and `world.wing_unlocked`
+      BROKER_TRANSPORT: ${CRAFTING_BROKER_TRANSPORT:-grpc}
+      BROKER_GRPC_URL: broker:${BROKER_GRPC_PORT:-8092}
+      BROKER_URL: http://broker:${BROKER_PORT:-8091}
+      GRPC_PORT: 9088
       TASK_TIMEOUT_MS: ${CRAFTING_TASK_TIMEOUT_MS:-10000}
       MAX_CONCURRENT_TASKS: ${CRAFTING_MAX_CONCURRENT_TASKS:-100}
       LOG_LEVEL: ${CRAFTING_LOG_LEVEL:-info}
-      # registers on startup, heartbeats, deregisters on shutdown
+      # registers with its grpc_url and topics on startup, heartbeats, deregisters on shutdown
       DISCOVERY_URL: http://discovery:8089
     depends_on:
       crafting-db:
         condition: service_healthy
+      broker:
+        condition: service_started
 
   exam-db:
     image: postgres:16-alpine
@@ -275,7 +317,7 @@ services:
       retries: 10
 
   zombie:
-    image: ${ZOMBIE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-zombie-service:${ZOMBIE_SERVICE_TAG:-3}
+    image: ${ZOMBIE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-zombie-service:${ZOMBIE_SERVICE_TAG:-4}
     restart: unless-stopped
     # every replica shares zombie-db; `docker compose up -d --scale zombie=3`
     deploy:
@@ -291,7 +333,9 @@ services:
       DB_USERNAME: ${ZOMBIE_POSTGRES_USER:-postgres}
       DB_PASSWORD: ${ZOMBIE_POSTGRES_PASSWORD:-qwerty}
       DB_NAME: ${ZOMBIE_POSTGRES_DB:-zombie}
-      # registers on startup, heartbeats, deregisters on shutdown
+      # Zombie calls no service; the broker calls it on its gRPC port (broker.v1.Endpoint)
+      GRPC_PORT: 9085
+      # registers with its grpc_url (and no topics) on startup, heartbeats, deregisters on shutdown
       DISCOVERY_URL: http://discovery:8089
     depends_on:
       zombie-db:
@@ -314,7 +358,7 @@ services:
       retries: 10
 
   resource:
-    image: ${RESOURCE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-resource-service:${RESOURCE_SERVICE_TAG:-3}
+    image: ${RESOURCE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-resource-service:${RESOURCE_SERVICE_TAG:-4}
     restart: unless-stopped
     # every replica shares resource-db; `docker compose up -d --scale resource=3`
     deploy:
@@ -330,23 +374,34 @@ services:
       DB_USERNAME: ${RESOURCE_POSTGRES_USER:-postgres}
       DB_PASSWORD: ${RESOURCE_POSTGRES_PASSWORD:-qwerty}
       DB_NAME: ${RESOURCE_POSTGRES_DB:-resource}
-      # World is called through the gateway; empty = built-in World mock
-      WORLD_SERVICE_URL: ${RESOURCE_WORLD_SERVICE_URL-http://gateway:8080}
-      # `gateway` = ask the gateway for the producer's /events URL, then connect
-      # directly; empty = not connected (use POST /resources/internal/events)
-      PLAYER_EVENTS_URL: ${RESOURCE_PLAYER_EVENTS_URL-gateway}
-      GAME_EVENTS_URL: ${RESOURCE_GAME_EVENTS_URL-gateway}
-      GATEWAY_URL: http://gateway:8080
-      # registers on startup, heartbeats, deregisters on shutdown
+      # calls to World go through the broker over gRPC (Broker.Call) and the outbox is relayed
+      # with Broker.Publish; the broker calls Resource back on its gRPC port and delivers the
+      # `player.registered` and `game.action_completed` topics
+      BROKER_TRANSPORT: ${RESOURCE_BROKER_TRANSPORT:-grpc}
+      BROKER_GRPC_URL: broker:${BROKER_GRPC_PORT:-8092}
+      BROKER_URL: http://broker:${BROKER_PORT:-8091}
+      GRPC_PORT: 9086
+      # registers with its grpc_url and topics on startup, heartbeats, deregisters on shutdown
       DISCOVERY_URL: http://discovery:8089
     depends_on:
       resource-db:
         condition: service_healthy
+      broker:
+        condition: service_started
 
   gateway:
     image: ${GATEWAY_DOCKERHUB_USERNAME:-timurcravtov}/gateway:${GATEWAY_SERVICE_TAG:-3}
     restart: unless-stopped
     environment:
+      # from the Lab 4 gateway on, every request goes to the broker as /call/{service}/...; the
+      # broker balances the instances and runs the circuit breakers. The *_SERVICE_URL below and
+      # DISCOVERY_URL routing are only read by the Lab 3 image.
+      BROKER_TRANSPORT: ${GATEWAY_BROKER_TRANSPORT:-grpc}
+      BROKER_GRPC_URL: broker:${BROKER_GRPC_PORT:-8092}
+      BROKER_URL: http://broker:${BROKER_PORT:-8091}
+      # /<prefix>/internal/... and the /ws/{producer} event streams, for services that still call
+      # each other through the gateway; set to false once every service uses the broker
+      LEGACY_SERVICE_ROUTES: ${GATEWAY_LEGACY_SERVICE_ROUTES:-true}
       PLAYER_SERVICE_URL: http://player:${PLAYER_PORT:-8081}
       GAME_SERVICE_URL: http://game:${GAME_PORT:-8082}
       EXAM_SERVICE_URL: http://exam:${EXAM_PORT:-8083}
@@ -370,6 +425,7 @@ services:
       - "${GATEWAY_PORT:-8080}:8080"
     depends_on:
       - discovery
+      - broker
       - player
       - game
       - exam
@@ -379,7 +435,49 @@ services:
       - base
       - crafting
 
+  # Prometheus scrapes the broker (calls, queues, breakers, instance load, events, dead letters)
+  # and every replica of every service; config in monitoring/prometheus/prometheus.yml
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-7d}
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    depends_on:
+      - broker
+
+  # Grafana with the Prometheus data source and the "Kahoot With Undead" dashboard provisioned;
+  # anonymous visitors can view, log in as admin to edit
+  grafana:
+    image: grafana/grafana:12.1.1
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/kahoot-overview.json
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    depends_on:
+      - prometheus
+
 volumes:
+  prometheus-data:
+  grafana-data:
+  broker-data:
   player-db-data:
   game-db-data:
   base-db-data:

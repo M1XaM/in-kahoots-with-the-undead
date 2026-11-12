@@ -1,0 +1,8 @@
+name: Get All Rooms (player via gateway)
+$kind: http-request
+method: GET
+url: "{{baseUrl}}/world/rooms?unlocked=true"
+headers:
+  - key: Authorization
+    value: "Bearer {{accessToken}}"
+order: 1000

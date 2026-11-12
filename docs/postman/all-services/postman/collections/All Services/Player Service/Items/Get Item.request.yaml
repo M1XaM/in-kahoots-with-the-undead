@@ -1,0 +1,5 @@
+name: Get Item
+$kind: http-request
+method: GET
+url: "{{playerUrl}}/items/coffee"
+order: 3000

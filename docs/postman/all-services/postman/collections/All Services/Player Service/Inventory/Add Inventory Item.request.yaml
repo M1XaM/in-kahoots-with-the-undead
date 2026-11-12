@@ -1,0 +1,15 @@
+name: Add Inventory Item
+$kind: http-request
+method: POST
+url: "{{playerUrl}}/players/1/inventory"
+headers:
+  - key: Content-Type
+    value: "application/json"
+body:
+  type: json
+  content: |-
+    {
+      "itemId": "coffee",
+      "quantity": 3
+    }
+order: 1000

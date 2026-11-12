@@ -1,0 +1,8 @@
+name: Get All Bases
+$kind: http-request
+method: GET
+url: "{{baseServiceUrl}}/base/players"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+order: 3000

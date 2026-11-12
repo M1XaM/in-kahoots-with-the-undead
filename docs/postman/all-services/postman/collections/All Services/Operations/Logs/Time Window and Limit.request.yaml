@@ -1,0 +1,7 @@
+name: Time Window and Limit
+$kind: http-request
+method: GET
+url: "{{baseUrl}}/logs?since=2h&until=1h&limit=200"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"

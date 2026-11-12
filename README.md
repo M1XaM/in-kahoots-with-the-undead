@@ -25,14 +25,18 @@ wings of the university to explore, tying academic progress directly to survival
 [![resource-service postman](https://img.shields.io/badge/resource--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/resource-service)
 [![base-service postman](https://img.shields.io/badge/base--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/base-service)
 [![crafting-service postman](https://img.shields.io/badge/crafting--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/crafting-service)
+[![broker postman](https://img.shields.io/badge/broker-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/broker)
+[![operations postman](https://img.shields.io/badge/logs%20%26%20metrics-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/operations)
+[![all services postman](https://img.shields.io/badge/all%20services-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/all-services)
 
 
 ## Architecture
 
 ![Architecture diagram](docs/architecture.png)
 
-- **Gateway**: the single entry point: routing, authorization, task limits, WebSocket negotiation
-- **Service Discovery**: the registry of running instances: health checks, load alerts, Telegram notifications
+- **Gateway**: the single entry point for clients: authorization, task limits, routing by path prefix to the broker, WebSocket negotiation
+- **Camus Message Broker** (Dart, ports 8091 HTTP / 8092 gRPC): carries every call between the Gateway and the services and between services (per-service request queues, load balancing, circuit breakers), and every event (topics with durable queues, retries, dead letter channel). Design: [`architecture.md`](https://github.com/TimurCravtov/CamusMessageBroker/blob/main/docs/architecture.md)
+- **Service Discovery**: the registry of running instances and the topics they consume: health checks, load alerts, Telegram notifications
 - **Player**: identity, auth, profiles, XP/levels, inventory, trading
 - **Game**: sessions, day/night cycle, timed actions, zombie encounters
 - **Exam**: exam generation, grading, academic history, achievements
@@ -42,13 +46,19 @@ wings of the university to explore, tying academic progress directly to survival
 - **Base**: what players have built: base level, facilities, barricades
 - **Crafting**: recipes and crafting, delivering items into Player's inventory
 
-Clients and services reach each other's REST APIs only through the Gateway (services
-authenticate with `X-Internal-Key`); WebSocket URLs are negotiated at the Gateway and the
-connection then goes directly to the service. Game orchestrates a session by calling World, Zombie
-and Exam over REST; Resource, Base and
-Crafting react to what Game reports via async events, and publish their own events (level-ups,
-exam results, wing unlocks) for services that depend on them. See the [Communication
-Contract](docs/communication.md) for the full endpoint and event contract.
+Clients reach the REST APIs through the Gateway, which verifies the login and forwards each
+request to the broker as `/call/{service}/...`; services call each other the same way, with
+`X-Internal-Key`. The broker queues the request, picks a healthy instance, guards it with a circuit
+breaker and returns the response. Events no longer travel over per-producer `/events` WebSockets:
+a producer publishes to a broker topic (`POST /topics/{topic}/events`), and the broker delivers it
+to one instance of every subscribing service (`POST /internal/events`), retrying and finally
+dead-lettering what cannot be delivered. The topics a service consumes are declared in its Discovery
+registration. Only Game's Socket.IO connection still goes directly from the browser to the service.
+Game orchestrates a session by calling World, Zombie and Exam; Resource, Base and Crafting react to
+what Game reports via topics, and publish their own events (level-ups, exam results, wing unlocks)
+for services that depend on them. The diagram's source is [`docs/architecture.drawio`](docs/architecture.drawio).
+See the [Communication Contract](docs/communication.md) for the full endpoint and event contract
+(not yet rewritten for the broker; tracked by the Lab 4 contract tasks).
 
 ## Running
 
@@ -72,6 +82,9 @@ docker compose up                                # every service, without the cl
 | **Gateway** (entry point) | http://localhost:8080 |
 | Game (Socket.IO only) | http://localhost:8090 |
 | Service Discovery (registry, `X-Internal-Key`) | http://localhost:8089 |
+| Message Broker (HTTP, `X-Internal-Key`; gRPC on 8092) | http://localhost:8091 |
+| Grafana (dashboard "Kahoot With Undead"; anonymous view, `admin`/`admin` to edit) | http://localhost:3001 |
+| Prometheus | http://localhost:9090 |
 
 Only the gateway and Game's Socket.IO port are published, so every REST call from a client has to pass
 the gateway's authorization. To reach a service directly while debugging (Player 8081, Exam 8083, World
@@ -84,7 +97,8 @@ docker compose -f docker-compose.client.yml -f docker-compose.dev.yml up
 ```
 
 **Scaling:** Player, Game, Exam, World, Zombie, Resource, Base and Crafting start with
-`<SERVICE>_REPLICAS` (`PLAYER_REPLICAS`, `GAME_REPLICAS`, ...; 2 each) replicas. Every
+`<SERVICE>_REPLICAS` (`PLAYER_REPLICAS`, `EXAM_REPLICAS`, ...; 2 each) replicas, Game with
+`game` plus `GAME_EXTRA_REPLICAS` (1) more. Every
 replica registers with Service Discovery and the gateway balances across them, so replicas can be
 added and removed while everything runs:
 
@@ -96,43 +110,42 @@ curl -H 'X-Internal-Key: changeme' localhost:8089/services   # what Discovery se
 
 Each response from the gateway names the replica that answered in `X-Upstream-Instance`. Game
 replicas keep lobbies, presence and the event stream in `game-db`, so any replica can serve any
-request. Each replica publishes its Socket.IO port on the next free host port from
-`GAME_HOST_PORT` (8090) to `GAME_HOST_PORT_LAST` (8099), but the gateway hands every browser the same
-`GAME_PUBLIC_WS_URL`, so browser sockets all land on one replica; the others serve REST and the
-`/events` stream.
+request. The `game` service publishes its Socket.IO port on `GAME_HOST_PORT` (8090) and
+`game-replica` runs `GAME_EXTRA_REPLICAS` (1) more without a host port, because replicas started
+together race for a port range. The gateway hands every browser the same `GAME_PUBLIC_WS_URL`, so
+browser sockets all land on `game`; the others serve REST and the `/events` stream. Scale Game with
+`--scale game-replica=3`.
 
 ### Gateway
 
 - **Repository:** [`services/gateway`](https://github.com/TimurCravtov/KahootWithUndeadGateway),
   Python / FastAPI (the lab's "banned" language).
 - **Image:** [`timurcravtov/gateway`](https://hub.docker.com/r/timurcravtov/gateway), version set
-  by `GATEWAY_SERVICE_TAG` (currently `3`).
+  by `GATEWAY_SERVICE_TAG` (currently `3`; the Lab 4 behaviour below needs the image released from
+  the gateway's Lab 4 branch).
 - **Routes** by the first path segment to the owning service (prefixes in the
-  [Communication Contract](docs/communication.md#conventions)). Base, Crafting, Exam, World and
-  Resource are configured to call other services through it, so all REST traffic, client and
-  service-to-service, passes the gateway.
+  [Communication Contract](docs/communication.md#conventions)) **through the message broker**:
+  `Broker.Call` over gRPC (`GATEWAY_BROKER_TRANSPORT=grpc`, or `http` for `/call/{service}/...`).
+  The broker picks the instance (least load), runs the circuit breakers and reroutes; the gateway
+  has no balancer or breaker of its own. Every response names the instance in `X-Upstream-Instance`.
 - **Authorizes** every client request: the login JWT (`Authorization: Bearer` or the
-  `access_token` cookie) is verified with Player's JWKS (`GATEWAY_AUTH_MODE=jwks`; `secret` for
-  HS256 with `GATEWAY_JWT_SECRET`, `off` to disable). The `Authorization` header is never forwarded;
-  services receive the verified player as `X-Player-Id`. The `access_token` cookie is stripped
-  too, so no service sees the token. Services authenticate with `X-Internal-Key`.
+  `access_token` cookie) is verified with Player's JWKS, fetched through the broker
+  (`GATEWAY_AUTH_MODE=jwks`; `secret` for HS256 with `GATEWAY_JWT_SECRET`, `off` to disable). The
+  `Authorization` header and the cookie are never forwarded; services receive the verified player as
+  `X-Player-Id` and **`X-Caller: client`**, so they treat it as the player's request even though the
+  broker sends its own `X-Internal-Key`.
+- **Only client routes:** `/<prefix>/internal/...` and the old event stream negotiation
+  `GET /ws/{producer}` answer `404`. `GATEWAY_LEGACY_SERVICE_ROUTES=true` (the compose default until
+  every service uses the broker) lets services holding `X-Internal-Key` reach them again.
 - **Limits:** requests past `GATEWAY_TASK_TIMEOUT` seconds answer `504`, requests beyond
-  `GATEWAY_MAX_CONCURRENT_TASKS` in flight answer `429`. Zombie, Resource, Base and Crafting enforce
-  the same limits themselves (`408` / `429`).
-- **WebSockets:** `GET /ws/game` returns Game's Socket.IO URL for the browser and
-  `GET /ws/{player|game|exam|world|resource}` (internal) the `/events` URL of one of the
-  producer's instances. The gateway never relays the connection.
-- **Service Discovery:** with `DISCOVERY_URL` it fetches every service's instances every 2 s and
-  routes only to the healthy ones, **round-robin**, without asking Discovery per request. A service
-  Discovery has never listed (it does not register yet) is reached at its `*_SERVICE_URL`; a listed
-  service without a healthy instance answers `503`. When Discovery is down the last lists are kept.
-  Every response names the instance that answered in `X-Upstream-Instance`.
-- **Circuit breaker:** 3 failed calls (timeout, connection error or `5xx`) to one service within
-  105 s (`GATEWAY_TASK_TIMEOUT` × 3.5) trip it and log `circuit breaker tripped`. A failing instance
-  listed by Discovery leaves the rotation at once and is reported to Discovery; a service at its
-  static URL is answered `503` at once for 105 s, then one trial request decides.
-- **Status:** `GET /status` reports its load like every service, and the gateway registers itself
-  with Discovery, which checks it like any other instance.
+  `GATEWAY_MAX_CONCURRENT_TASKS` in flight answer `429`. Every service enforces the same limits
+  itself (`408` / `429`).
+- **WebSockets:** `GET /ws/game` returns Game's Socket.IO URL for the browser. The gateway never
+  relays the connection.
+- **Logs:** `GET /logs` (`X-Internal-Key`) downloads the logs of the whole system, see
+  [Logs](#logs).
+- **Status and metrics:** `GET /status` reports its load like every service, `GET /metrics` feeds
+  Prometheus, and the gateway registers itself with Discovery.
 - **Try it:** http://localhost:8080/docs, health check `GET /health`.
 
 ### Service Discovery
@@ -156,6 +169,9 @@ request. Each replica publishes its Socket.IO port on the next free host port fr
 - **Telegram:** create a bot with @BotFather, add it to the team chat and send it `/chatid`; put
   the token in `TELEGRAM_BOT_TOKEN` and the chat ids, comma-separated, in `TELEGRAM_CHATS_IDS`
   in `.env` (never commit them). Without a token alerts only go to the log.
+- **Lab 4:** an instance registers its `grpc_url` (the broker then calls it over gRPC) and the
+  `topics` it consumes (the broker subscribes the service). It also serves `GET /metrics` and
+  `GET /internal/logs` like every service.
 - **Try it:** `curl -H 'X-Internal-Key: changeme' localhost:8089/services` lists every instance with
   its health and load; `GET /status` and `GET /health` are public. The Postman collection in
   [`docs/postman/service-discovery`](docs/postman/service-discovery) (also as a single importable
@@ -164,6 +180,149 @@ request. Each replica publishes its Socket.IO port on the next free host port fr
   changing between replicas. Swagger UI at
   http://localhost:8089/docs; API reference:
   [`docs/openapi/service-discovery.openapi.json`](docs/openapi/service-discovery.openapi.json).
+
+### Message Broker
+
+- **Repository:** [`CamusMessageBroker`](https://github.com/TimurCravtov/CamusMessageBroker), Dart (a
+  language no other service uses). Design: [`docs/architecture.md`](https://github.com/TimurCravtov/CamusMessageBroker/blob/main/docs/architecture.md).
+- **Status:** Lab 4. The broker is a submodule (`services/broker`) and runs from `docker-compose.yml`
+  as `timurcravtov/broker:4` (`BROKER_DOCKERHUB_USERNAME`, `BROKER_SERVICE_TAG`), with HTTP on
+  `BROKER_PORT` (8091) and gRPC on `BROKER_GRPC_PORT` (8092), both published on the host. Events are
+  kept on the `broker-data` volume (`BROKER_STORAGE=log`). Base and Crafting (`:4`) call other
+  services through it over gRPC, are called back over gRPC and consume their topics; the other
+  services still talk through the Gateway (`GATEWAY_LEGACY_SERVICE_ROUTES=true`) until they move to
+  the contract below. A subscriber with no running
+  instance keeps its subscriptions, and its events wait in its durable queue until it is back.
+- **Role:** the only path between the Gateway and the services, between services, and for events.
+  Clients never reach it; every non-public route needs `X-Internal-Key`. It registers with Discovery
+  as `broker` like any service, and polls `GET /services` every 2 s for instances, health, load,
+  `topics` and `grpc_url`.
+- **Stays in the Gateway:** JWT check, task timeout and concurrent task limit for clients, routing by
+  path prefix, `GET /logs`. **Moves to the broker:** choosing an instance, circuit breakers,
+  service-to-service calls, events.
+
+#### Contract: requests (subscriber-based queues)
+
+`ANY /call/{service}/{original path}`, e.g. `GET /call/world/world/rooms/12`. The caller names the
+target service and never picks an instance. Services use `BROKER_URL` where they used the Gateway URL.
+
+| Header | Rule |
+|---|---|
+| `X-Internal-Key` | Required; the broker sets its own key on the upstream call. |
+| `X-Player-Id`, `X-Request-Id`, `Idempotency-Key`, `Content-Type`, `Accept` | Forwarded; a missing `X-Request-Id` is minted. |
+| `X-Timeout-Ms` | The caller's remaining budget; default and maximum `TASK_TIMEOUT_MS` (10 s). |
+| `Authorization`, `Cookie` | Dropped. |
+| `X-Upstream-Instance` (out) | The instance that answered, also on a failed call. |
+| `X-Reroutes` (out) | How many other instances were tried first. |
+
+The upstream's status and body come back unchanged. The broker adds only `429 TOO_MANY_REQUESTS`
+(queue of 200 full, or concurrency limit; with `Retry-After`), `503 SERVICE_UNAVAILABLE` (no healthy
+instance or breaker open) and `504 GATEWAY_TIMEOUT` (deadline passed while queued or in flight).
+
+- **Queue:** one bounded FIFO per target service, in memory. A request is dispatched only when an
+  instance has room (`max_concurrent_tasks` from Discovery minus the broker's own in-flight count).
+- **Load balancing:** round-robin over healthy instances; least load
+  (`(broker_in_flight + discovery_active_tasks) / max_concurrent_tasks`) with `LB_STRATEGY=least_load`.
+- **Circuit breaker:** per instance; 3 failures (timeout, connection error, `5xx`) within
+  `TASK_TIMEOUT_MS` × 3.5 trip it, log `circuit breaker tripped` and report it with
+  `POST /services/{service}/instances/{id}/failures`. Resource commit and release stay allowed while
+  a breaker is open (`CB_BYPASS_PATHS`).
+- **Reroute:** a failed call goes to the next healthy instance within the deadline only if it cannot
+  apply a write twice: the connection failed before sending, the method is `GET`/`HEAD`/`OPTIONS`, or
+  the request has an `Idempotency-Key`.
+
+#### Contract: events (topic-based queues)
+
+A topic is an event type, `<service>.<event>`. Services declare the topics they consume in their
+Discovery registration (`"topics": ["exam.completed"]`). The unit of subscription is the service: each
+subscribing service gets one copy of every event, delivered to one healthy instance, through a durable
+queue per (topic, subscriber).
+
+| Topic | Producer | Subscribers |
+|---|---|---|
+| `player.registered` | Player | Base, Resource |
+| `player.leveled_up` | Player | Crafting |
+| `game.action_completed` | Game | Resource |
+| `game.presence_changed` | Game | Player |
+| `resource.gathered` | Resource | Game |
+| `exam.completed` | Exam | World, Game, Crafting |
+| `world.wing_unlocked` | World | Game, Crafting |
+
+- **Publish:** `POST /topics/{topic}/events` with the existing envelope
+  `{eventId, type, version, occurredAt, payload}`. `202` once the event is in every subscriber's queue
+  and durably stored; `400` for an invalid envelope or a `type` that differs from the topic. A repeated
+  `eventId` within 24 h answers `202` and enqueues nothing. Producers keep their outbox and mark a row
+  sent only after the `202`.
+- **Deliver:** `POST /internal/events` on the consumer, with `X-Internal-Key`, `X-Request-Id` and
+  `X-Delivery-Attempt`. `2xx` acks. `5xx` or a timeout retries with backoff 1 s, 2 s, 4 s … 30 s,
+  preferring another instance. A `4xx` other than 408/429, or more than 5 attempts, dead-letters the
+  event. Delivery is at-least-once, so consumers keep deduplicating on `eventId` and answer `2xx` only
+  after persisting.
+- **Ordering:** one event in flight per queue (`QUEUE_PREFETCH=1`), so a subscriber sees a producer's
+  events in order; a failing event blocks only its own queue.
+- **Dead letters:** `GET /dead-letters?topic=&subscriber=&reason=&limit=&after=` lists them newest
+  first with the full envelope, `reason` (`max_attempts`, `rejected`, `no_subscribers`), attempts and
+  last status/error/instance. An event published to a topic nobody subscribes to is dead-lettered as
+  `no_subscribers` (proposal).
+- **Storage:** `STORAGE=log` appends every event to a log on the `broker-data` volume and fsyncs
+  before the `202`; queues and dead letters are rebuilt on restart. `STORAGE=memory` (default) keeps
+  nothing.
+
+#### Endpoints (port 8091)
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| `GET` | `/health`, `/status` | public | Liveness; `/status` reports `active_tasks / max_concurrent_tasks` like every service |
+| any | `/call/{service}/{path}` | key | Request queues |
+| `POST` | `/topics/{topic}/events` | key | Publish an event |
+| `GET` | `/topics` | key | Topics with producers seen, subscribers, queue depth, in-flight, published total |
+| `GET` | `/dead-letters` | key | Dead letter channel |
+| `GET` | `/metrics` | internal network | Prometheus text (grade 10) |
+
+#### gRPC (grade 8)
+
+One file, `proto/broker/v1/broker.proto`, owned by the broker repository; Base and Crafting keep a
+copy and generate their Go stubs from it:
+
+```proto
+service Broker {                       // served by the broker, port 8092
+  rpc Call(CallRequest) returns (CallResponse);
+  rpc Publish(Event) returns (PublishAck);
+}
+service Endpoint {                     // served by every service
+  rpc Handle(CallRequest) returns (CallResponse);
+  rpc Deliver(Event) returns (DeliveryAck);
+}
+message CallRequest  { string service = 1; string method = 2; string path = 3;
+                       map<string, string> headers = 4; bytes body = 5; }
+message CallResponse { int32 status = 1; map<string, string> headers = 2; bytes body = 3; string instance = 4; }
+message Event        { string event_id = 1; string type = 2; int32 version = 3; string occurred_at = 4; bytes payload = 5; }
+```
+
+- **One envelope, not a proto per service:** each service keeps its handlers. `Endpoint.Handle` feeds
+  the call into the service's own router, and `Deliver` runs the same code as `POST /internal/events`,
+  so the migration is one adapter per service.
+- **Mapping:** the key travels as `x-internal-key` metadata, gRPC deadlines replace `X-Timeout-Ms`, and
+  `RESOURCE_EXHAUSTED` / `UNAVAILABLE` / `DEADLINE_EXCEEDED` mean 429 / 503 / 504.
+- **Migration:** a service adds `grpc_url` to its Discovery registration; the broker calls an instance
+  over gRPC when it has one and over HTTP otherwise, so services move one at a time. The Gateway then
+  calls the broker over gRPC too and drops the routes a player must not reach (`/<prefix>/internal/...`,
+  `/ws/{service}`); `/ws/game` stays.
+
+#### Configuration
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `PORT` / `GRPC_PORT` | `8091` / `8092` | Listen ports |
+| `INTERNAL_KEY` | required | Shared secret; the broker refuses to start without it |
+| `DISCOVERY_URL` | `http://discovery:8089` | Discovery |
+| `TASK_TIMEOUT_MS`, `MAX_CONCURRENT_TASKS`, `REQUEST_QUEUE_MAX` | `10000`, `100`, `200` | Deadline, live tasks before `429`, per-service queue bound |
+| `LB_STRATEGY`, `CB_BYPASS_PATHS` | `round_robin`, Resource commit/release | Balancing and breaker bypass |
+| `CONCURRENCY_MODEL` | `inline` | `inline` or `isolate_per_request` (grade 7) |
+| `QUEUE_PREFETCH`, `MAX_DELIVERY_ATTEMPTS`, `DEDUP_WINDOW_S` | `1`, `5`, `86400` | Event delivery |
+| `STORAGE`, `DATA_DIR` | `memory`, `/data` | Storage |
+
+Defaults are the design's proposals, not confirmed.
 
 ### Client
 
@@ -195,7 +354,7 @@ request. Each replica publishes its Socket.IO port on the next free host port fr
 ### Game Service
 
 - **Image:** [`timurcravtov/game-service`](https://hub.docker.com/r/timurcravtov/game-service),
-  version set by `GAME_SERVICE_TAG` (default `3`), `GAME_REPLICAS` (2) replicas.
+  version set by `GAME_SERVICE_TAG` (default `3`), `game` plus `GAME_EXTRA_REPLICAS` (1) `game-replica` replicas.
 - **Needs:** its own Postgres (`game-db`, started by compose); password defaults to `qwerty`, override with `GAME_POSTGRES_PASSWORD`.
 - **Scaling:** instance-agnostic: lobbies, the event outbox and which sockets are joined (so
   `game.presence_changed` fires when a player's first socket anywhere joins and their last one
@@ -307,42 +466,81 @@ request. Each replica publishes its Socket.IO port on the next free host port fr
 ### Base Service
 
 - **Image:** [`mixam052/kahoots-base-service`](https://hub.docker.com/r/mixam052/kahoots-base-service),
-  version set by `BASE_SERVICE_TAG` (currently `3`), `BASE_REPLICAS` (2) replicas.
+  version set by `BASE_SERVICE_TAG` (currently `4`), `BASE_REPLICAS` (2) replicas.
 - **Needs:** its own Postgres (`base-db`, started by compose); password defaults to `qwerty`, override with `BASE_POSTGRES_PASSWORD`.
-- **Talks to:** Resource, World and Player over REST through the Gateway (`GATEWAY_URL`). Until
-  they run, spending endpoints (upgrades, barricades, Kiki) return `503 SERVICE_UNAVAILABLE`;
-  reading and creating bases work on their own. It consumes `player.registered` from Player's
-  `/events` stream, negotiated at the Gateway, so a new player gets a base right after registering.
+- **Talks to:** Resource, World and Player through the message broker over gRPC (`Broker.Call` on
+  `broker:8092`; `BASE_BROKER_TRANSPORT=http` uses `/call/{service}/...`). Until they run, spending
+  endpoints (upgrades, barricades, Kiki) return `503 SERVICE_UNAVAILABLE`; reading and creating bases
+  work on their own. The broker calls Base back over gRPC (`broker.v1.Endpoint` on port 9087,
+  registered as `grpc_url`) and delivers the `player.registered` topic, declared in its Discovery
+  registration, so a new player gets a base right after registering (once Player publishes the
+  topic to the broker).
 - **Limits:** `BASE_TASK_TIMEOUT_MS` (`408`) and `BASE_MAX_CONCURRENT_TASKS` (`429`), per replica.
 - **Scaling:** each replica registers with Service Discovery and answers `GET /status` with its load.
-  Only one replica consumes Player's event stream at a time (a PostgreSQL advisory lock; another
-  takes over within 5 s), every event is applied once in a transaction, and an `Idempotency-Key` is
+  The broker delivers each event to one replica, every event is applied once in a transaction
+  (deduplicated on `eventId`; a `4xx` answer dead-letters it, a `5xx` has it retried), and an `Idempotency-Key` is
   claimed in the database before the request runs, so a duplicate on another replica gets
   `409 IDEMPOTENCY_KEY_IN_USE`.
-- **Circuit breaker:** 3 failed calls to one service within 35 s (task timeout × 3.5) trip it; the
-  failing instance named by the gateway's `X-Upstream-Instance` is reported to Discovery, otherwise
-  calls to that service fail fast with `503` for 35 s.
+- **Circuit breaker / load balancing:** none of its own any more, the broker does both.
 - **Logs:** one JSON line per event in the shared format; `BASE_LOG_LEVEL` (`info`).
+- **Metrics:** `GET /metrics`, scraped by Prometheus (see [Monitoring](#monitoring)).
 - **Try it:** Postman collection in [`docs/postman/base-service`](docs/postman/base-service).
 
 ### Crafting Service
 
 - **Image:** [`mixam052/kahoots-crafting-service`](https://hub.docker.com/r/mixam052/kahoots-crafting-service),
-  version set by `CRAFTING_SERVICE_TAG` (currently `3`), `CRAFTING_REPLICAS` (2) replicas.
+  version set by `CRAFTING_SERVICE_TAG` (currently `4`), `CRAFTING_REPLICAS` (2) replicas.
 - **Needs:** its own Postgres (`crafting-db`, started by compose); password defaults to `qwerty`, override with `CRAFTING_POSTGRES_PASSWORD`.
   Seeded from [`db/crafting-service/init.sql`](db/crafting-service/init.sql) with five recipes
   (two gated: one by level, one by a passed math exam and the Math Wing); their output items are
   seeded into Player's catalogue by [`db/player-service/init.sql`](db/player-service/init.sql).
-- **Talks to:** Resource and Player over REST through the Gateway (`GATEWAY_URL`). Until they run,
-  crafting returns `503 SERVICE_UNAVAILABLE`; recipes and availability work on their own. It
-  consumes Player's, Exam's and World's `/events` streams, negotiated at the Gateway, to track
-  levels, passed subjects and unlocked wings.
+- **Talks to:** Resource and Player through the message broker over gRPC, like Base. Until they run,
+  crafting returns `503 SERVICE_UNAVAILABLE`; recipes and availability work on their own. The broker
+  calls it back over gRPC (port 9088) and delivers the `player.leveled_up`, `exam.completed` and
+  `world.wing_unlocked` topics to track levels, passed subjects and unlocked wings.
 - **Limits:** `CRAFTING_TASK_TIMEOUT_MS` (`408`) and `CRAFTING_MAX_CONCURRENT_TASKS` (`429`), per replica.
-- **Scaling:** like Base: registers with Service Discovery, one replica per event stream (Player,
-  Exam, World), events applied once, `Idempotency-Key` claimed before a craft runs.
-- **Circuit breaker:** like Base, for its calls to Resource and Player.
-- **Logs:** shared JSON format; `CRAFTING_LOG_LEVEL` (`info`).
+- **Scaling:** like Base: registers with Service Discovery, the broker delivers each event to one
+  replica, events applied once, `Idempotency-Key` claimed before a craft runs.
+- **Circuit breaker / load balancing:** none of its own, the broker does both.
+- **Logs:** shared JSON format; `CRAFTING_LOG_LEVEL` (`info`). **Metrics:** `GET /metrics`.
 - **Try it:** Postman collection in [`docs/postman/crafting-service`](docs/postman/crafting-service).
+
+## Monitoring
+
+`docker compose up` also starts **Prometheus** (http://localhost:9090) and **Grafana**
+(http://localhost:3001), configured from [`monitoring/`](monitoring):
+
+- **Prometheus** ([`monitoring/prometheus/prometheus.yml`](monitoring/prometheus/prometheus.yml))
+  scrapes every 5 s the gateway, Discovery, the broker's `GET /metrics` and every Player, Game, Base and Crafting replica (found through the
+  compose DNS name, so `--scale base=3` is picked up). The broker sees every call and every event, so
+  one target describes the whole system: calls by service and outcome, latency, request queues,
+  reroutes, open circuit breakers, instance health and load, events published / delivered /
+  dead-lettered and queue depth. Player, Game, Base and Crafting add their own requests by route and status,
+  events consumed by outcome (Player, Base, Crafting), calls to other services and active tasks. Data is kept for
+  `PROMETHEUS_RETENTION` (7 days) on the `prometheus-data` volume.
+- **Grafana** is provisioned with the Prometheus data source and the **Kahoot With Undead** dashboard
+  ([`monitoring/grafana/dashboards/kahoot-overview.json`](monitoring/grafana/dashboards/kahoot-overview.json)),
+  also its home page: an overview row (calls/s, failed calls, open breakers, unhealthy instances,
+  dead letters, broker load), then requests through the broker, instances, events, and Base and
+  Crafting. Anyone can view it; log in with `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD`
+  (`admin` / `admin`) to edit. The provisioned dashboard is read-only: change the JSON file to keep a
+  change.
+
+### Logs
+
+Every instance keeps its last log lines in memory and serves them on `GET /internal/logs`; the
+gateway's `GET /logs` asks every instance Discovery lists (and Discovery), merges the lines by time
+and returns them as one NDJSON download. No extra container is involved.
+
+```
+curl -H 'X-Internal-Key: changeme' 'localhost:8080/logs?since=1h&level=warn' -o logs.ndjson
+curl -H 'X-Internal-Key: changeme' 'localhost:8080/logs?request_id=<X-Request-Id of a response>'
+curl -H 'X-Internal-Key: changeme' 'localhost:8080/logs?service=base,broker&since=15m'
+```
+
+`X-Logs-Sources` names the instances that answered and `X-Logs-Missing` the ones that did not, with
+the reason (`404` until a service implements the endpoint). The endpoint every service implements
+is in the [contract](docs/communication.md#log-collection-get-internallogs-and-get-logs).
 
 ## GitHub Workflow
 

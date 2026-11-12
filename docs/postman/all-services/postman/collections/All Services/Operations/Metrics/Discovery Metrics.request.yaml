@@ -1,0 +1,4 @@
+name: Discovery Metrics
+$kind: http-request
+method: GET
+url: "{{discoveryUrl}}/metrics"

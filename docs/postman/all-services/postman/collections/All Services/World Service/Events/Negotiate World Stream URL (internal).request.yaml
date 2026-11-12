@@ -1,0 +1,10 @@
+name: Negotiate World Stream URL (internal)
+$kind: http-request
+description: |-
+  Where Game and Crafting open World's /events WebSocket (world.wing_unlocked).
+method: GET
+url: "{{baseUrl}}/ws/world"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+order: 3000

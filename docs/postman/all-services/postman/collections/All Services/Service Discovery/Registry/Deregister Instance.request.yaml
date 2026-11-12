@@ -1,0 +1,8 @@
+name: Deregister Instance
+$kind: http-request
+method: DELETE
+url: "{{discoveryUrl}}/services/demo/instances/demo-1"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+order: 6000

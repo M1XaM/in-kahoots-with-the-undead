@@ -1,0 +1,5 @@
+name: List Without Key (401)
+$kind: http-request
+method: GET
+url: "{{discoveryUrl}}/services"
+order: 7000

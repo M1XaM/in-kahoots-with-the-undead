@@ -1,0 +1,19 @@
+name: Feed Kiki
+$kind: http-request
+method: POST
+url: "{{baseServiceUrl}}/base/players/1/kiki/feed"
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Player-Id
+    value: "1"
+  - key: Idempotency-Key
+    value: "{{$guid}}"
+body:
+  type: json
+  content: |-
+    {
+      "resourceType": "food",
+      "amount": 3
+    }
+order: 2000

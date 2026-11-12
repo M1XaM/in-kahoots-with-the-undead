@@ -1,7 +1,7 @@
 name: Create Professor Zombie
 $kind: http-request
 method: POST
-url: "http://localhost:8080/zombies"
+url: "http://localhost:8091/call/zombie/zombies"
 headers:
   - key: Content-Type
     value: "application/json"

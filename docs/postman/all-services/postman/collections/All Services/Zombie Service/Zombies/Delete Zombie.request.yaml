@@ -1,0 +1,8 @@
+name: Delete Zombie
+$kind: http-request
+method: DELETE
+url: "{{baseUrl}}/zombies/{{zombieId}}"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+order: 8000

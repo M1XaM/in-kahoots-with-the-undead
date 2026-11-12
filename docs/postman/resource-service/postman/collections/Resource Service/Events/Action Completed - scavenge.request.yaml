@@ -1,8 +1,8 @@
 name: Action Completed - scavenge
 $kind: http-request
 method: POST
-url: "http://localhost:8080/resources/internal/events"
-description: "Room 3 (Lab 204) / node 1 is metal, as in World Service's seed."
+url: "http://localhost:8091/topics/game.action_completed/events"
+description: "Room 3 (Lab 204) / node 1 is metal, as in World Service's seed. Resource asks World for the room through the broker (Broker.Call), credits metal and publishes resource.gathered."
 headers:
   - key: Content-Type
     value: "application/json"

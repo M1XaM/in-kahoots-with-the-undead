@@ -1,0 +1,8 @@
+name: Get Zombies by Type
+$kind: http-request
+method: GET
+url: "{{baseUrl}}/zombies?type=professor"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+order: 4000

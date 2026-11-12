@@ -1,0 +1,7 @@
+name: Warnings and Errors of Base (last hour)
+$kind: http-request
+method: GET
+url: "{{baseUrl}}/logs?service=base&level=warn&since=1h"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"

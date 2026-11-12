@@ -1,0 +1,4 @@
+name: Call Without Key (401)
+$kind: http-request
+method: GET
+url: "http://localhost:8091/call/base/base/players"

@@ -1,0 +1,13 @@
+name: Call With Query String
+$kind: http-request
+method: GET
+url: "{{brokerUrl}}/call/crafting/crafting/recipes?limit=5"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      console.log('answered by', pm.response.headers.get('X-Upstream-Instance'), 'reroutes', pm.response.headers.get('X-Reroutes') || 0);
+order: 4000
