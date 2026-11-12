@@ -29,25 +29,23 @@ CREATE TABLE spawn_points (
 );
 CREATE INDEX spawn_points_room_id_idx ON spawn_points (room_id);
 
--- Transactional outbox for events this service publishes (served on GET /events).
+-- Transactional outbox for events this service publishes, relayed in seq order to the broker's topics.
 CREATE TABLE outbox_events (
-    seq         BIGSERIAL   PRIMARY KEY,
-    event_id    UUID        NOT NULL UNIQUE,
-    type        TEXT        NOT NULL,
-    version     INT         NOT NULL DEFAULT 1,
-    occurred_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    payload     JSONB       NOT NULL
+    seq          BIGSERIAL   PRIMARY KEY,
+    event_id     UUID        NOT NULL UNIQUE,
+    type         TEXT        NOT NULL,
+    version      INT         NOT NULL DEFAULT 1,
+    occurred_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    payload      JSONB       NOT NULL,
+    -- set once the broker stored the event (its 202); NULL rows are still to be relayed
+    published_at TIMESTAMPTZ
 );
+CREATE INDEX outbox_events_unpublished_idx ON outbox_events (seq) WHERE published_at IS NULL;
 
--- Consumer side: dedupe on eventId and remember the last acked seq per producer.
+-- Consumer side: events the broker delivered, deduplicated on eventId.
 CREATE TABLE processed_events (
     event_id     UUID        PRIMARY KEY,
     processed_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE TABLE consumer_offsets (
-    source   TEXT   PRIMARY KEY,
-    last_seq BIGINT NOT NULL DEFAULT 0
 );
 
 -- ---------------------------------------------------------------------------
@@ -93,8 +91,6 @@ INSERT INTO spawn_points (point_id, room_id, zombie_types) VALUES
     (6, 11, ARRAY['dean', 'tourist']),
     (7, 13, ARRAY['professor']),
     (8, 14, ARRAY['janitor']);
-
-INSERT INTO consumer_offsets (source, last_seq) VALUES ('exam', 0);
 
 -- Keep sequences past the explicit seed ids.
 SELECT setval('wings_wing_id_seq',          (SELECT MAX(wing_id)  FROM wings));

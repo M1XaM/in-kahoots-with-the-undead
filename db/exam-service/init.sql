@@ -73,15 +73,18 @@ CREATE TABLE idempotency_keys (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Transactional outbox for events this service publishes (served on GET /events).
+-- Transactional outbox for events this service publishes, relayed in seq order to the broker's topics.
 CREATE TABLE outbox_events (
-    seq         BIGSERIAL   PRIMARY KEY,
-    event_id    UUID        NOT NULL UNIQUE,
-    type        TEXT        NOT NULL,
-    version     INT         NOT NULL DEFAULT 1,
-    occurred_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    payload     JSONB       NOT NULL
+    seq          BIGSERIAL   PRIMARY KEY,
+    event_id     UUID        NOT NULL UNIQUE,
+    type         TEXT        NOT NULL,
+    version      INT         NOT NULL DEFAULT 1,
+    occurred_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    payload      JSONB       NOT NULL,
+    -- set once the broker stored the event (its 202); NULL rows are still to be relayed
+    published_at TIMESTAMPTZ
 );
+CREATE INDEX outbox_events_unpublished_idx ON outbox_events (seq) WHERE published_at IS NULL;
 
 -- ---------------------------------------------------------------------------
 -- Seed
