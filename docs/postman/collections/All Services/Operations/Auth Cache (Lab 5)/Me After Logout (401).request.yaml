@@ -1,0 +1,10 @@
+name: Me After Logout (401)
+$kind: http-request
+description: |-
+  The same token, still correctly signed and not expired, is now refused: 401 UNAUTHENTICATED "This session was logged out". Run 'Auth (run first)' again for a new token.
+method: GET
+url: "{{baseUrl}}/players/me"
+headers:
+  - key: Authorization
+    value: "Bearer {{accessToken}}"
+order: 6000
