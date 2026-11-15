@@ -1,8 +1,0 @@
-name: Delete Spawn Point
-$kind: http-request
-method: DELETE
-url: "http://localhost:8091/call/world/world/spawn-points/{{pointId}}"
-description: "Service to service: through the broker with X-Internal-Key."
-headers:
-  - key: X-Internal-Key
-    value: "changeme"

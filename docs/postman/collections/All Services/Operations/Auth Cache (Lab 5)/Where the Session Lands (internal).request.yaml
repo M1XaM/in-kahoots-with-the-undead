@@ -1,0 +1,10 @@
+name: Where the Session Lands (internal)
+$kind: http-request
+description: |-
+  Run a folder's 'Auth (run first)' before. Shows the shards holding the logged-in player's cached claims (auth:session:<sha256>) and, after logout, its revocation (auth:revoked:<sha256>, on 2 shards). Only the hashes are stored, never the token.
+method: GET
+url: "{{baseUrl}}/internal/cache?token={{accessToken}}"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+order: 3000

@@ -27,3 +27,7 @@ services:
   crafting:
     ports:
       - "${CRAFTING_PORT:-8088}"
+  # the data warehouse, for a SQL client on the host
+  warehouse-db:
+    ports:
+      - "${WAREHOUSE_PORT:-5440}:5432"

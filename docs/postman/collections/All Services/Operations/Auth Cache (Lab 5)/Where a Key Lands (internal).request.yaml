@@ -1,0 +1,10 @@
+name: Where a Key Lands (internal)
+$kind: http-request
+description: |-
+  The owner shard of any key on the ring, the order of the shards it falls back to (clockwise) and the shard serving it now. Change the key to see it move.
+method: GET
+url: "{{baseUrl}}/internal/cache?key=player:42"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+order: 2000
