@@ -6,6 +6,18 @@ x-jwt-private-key: &jwt-private-key ${JWT_PRIVATE_KEY:------BEGIN PRIVATE KEY---
 include:
   - docker-compose.db.yml
 
+# one shard of the gateway's auth cache: claims of verified player tokens and logout revocations.
+# Not persisted and capped: every key has a TTL, and the ones closest to expiring go first.
+x-cache-shard: &cache-shard
+  image: valkey/valkey:8.1-alpine
+  restart: unless-stopped
+  command: [valkey-server, --save, "", --appendonly, "no", --maxmemory, 32mb, --maxmemory-policy, volatile-ttl]
+  healthcheck:
+    test: ["CMD", "valkey-cli", "ping"]
+    interval: 5s
+    timeout: 3s
+    retries: 10
+
 x-game-service: &game-service
   image: ${DOCKERHUB_USERNAME:-timurcravtov}/game-service:${GAME_SERVICE_TAG:-4}
   restart: unless-stopped
@@ -281,6 +293,16 @@ services:
       broker:
         condition: service_started
 
+  # the auth cache, sharded by the gateway with consistent hashing (each key on the first shard
+  # clockwise from its hash on a ring of CACHE_VNODES points per shard); GET /internal/cache on
+  # the gateway shows the split. A shard that stops answering hands its keys to the next one.
+  redis-0:
+    <<: *cache-shard
+  redis-1:
+    <<: *cache-shard
+  redis-2:
+    <<: *cache-shard
+
   gateway:
     image: ${GATEWAY_DOCKERHUB_USERNAME:-timurcravtov}/gateway:${GATEWAY_SERVICE_TAG:-3}
     restart: unless-stopped
@@ -310,6 +332,13 @@ services:
       JWT_SECRET: ${GATEWAY_JWT_SECRET:-}
       TASK_TIMEOUT: ${GATEWAY_TASK_TIMEOUT:-30}
       MAX_CONCURRENT_TASKS: ${GATEWAY_MAX_CONCURRENT_TASKS:-100}
+      # verified token claims are cached on these shards (sharded by consistent hashing) for
+      # AUTH_CACHE_TTL_S, and POST /auth/logout revokes the token on REVOCATION_COPIES of them;
+      # empty = no cache, every request verifies its token. Read from the Lab 5 gateway on.
+      REDIS_SHARDS: ${GATEWAY_REDIS_SHARDS:-redis-0:6379,redis-1:6379,redis-2:6379}
+      CACHE_VNODES: ${GATEWAY_CACHE_VNODES:-160}
+      AUTH_CACHE_TTL_S: ${GATEWAY_AUTH_CACHE_TTL_S:-300}
+      REVOCATION_COPIES: ${GATEWAY_REVOCATION_COPIES:-2}
       # routes to the healthy instances Discovery lists, round-robin; the *_SERVICE_URL above
       # are only used for services Discovery has not listed (they do not register yet)
       DISCOVERY_URL: http://discovery:8089
@@ -318,6 +347,9 @@ services:
     depends_on:
       - discovery
       - broker
+      - redis-0
+      - redis-1
+      - redis-2
       - player
       - game
       - exam
