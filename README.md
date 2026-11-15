@@ -62,9 +62,10 @@ See the [Communication Contract](docs/communication.md) for the full endpoint an
 
 ## Running
 
-`docker-compose.yml` brings up every published service together, each with its own Postgres
-instance (one DB per service, no shared tables), pulling images from Docker Hub — it never builds
-from a service's Dockerfile.
+`docker-compose.yml` brings up every published service together, each with its own replicated
+Postgres cluster (one DB per service, no shared tables; see [Data layer](#data-layer)), pulling the
+service images from Docker Hub — it never builds from a service's Dockerfile. The one image built
+locally is the Patroni node (`db/patroni/`), on the first `docker compose up`.
 
 Requirements: Docker with Compose v2, and the service ports below free on your machine.
 
@@ -522,6 +523,95 @@ Defaults are the design's proposals, not confirmed.
 - **Circuit breaker / load balancing:** none of its own, the broker does both.
 - **Logs:** shared JSON format; `CRAFTING_LOG_LEVEL` (`info`). **Metrics:** `GET /metrics`.
 - **Try it:** Postman collection in [`docs/postman/crafting-service`](docs/postman/crafting-service).
+
+## Data layer
+
+Databases, the data warehouse and the auth cache, in [`docker-compose.db.yml`](docker-compose.db.yml)
+(included by `docker-compose.yml`) and [`db/`](db).
+
+### Replication and failover
+
+Every service database is a **3-node Postgres 16 cluster managed by Patroni**: one primary and two
+replicas that copy it with Postgres' built-in streaming replication (each through its own replication
+slot). The nodes are `<service>-db-0`, `-1` and `-2`; `etcd` stores each cluster's leader lock.
+
+- **The primary dies:** it stops renewing its leader lock in etcd. The lock expires after `ttl`
+  (20 s; on a clean `docker stop` the primary hands it over at once). The most up-to-date replica
+  takes it and is promoted, and never one more than 1 MB of WAL behind. The other replica switches
+  to streaming from the new primary.
+- **The old primary comes back:** it finds the lock held by another node, so it never takes writes.
+  Patroni rewinds it to the new timeline (`pg_rewind`) and it rejoins as a replica of the new primary.
+- **The services keep their connection settings:** each cluster has an **HAProxy under the old
+  hostname** (`player-db`, `base-db`, ...). It asks every node's Patroni REST API who is primary
+  (`GET /primary`, every 2 s) and routes `:5432` to the primary only. Connections still open to a
+  node that is no longer primary are cut, so the services' pools reconnect to the new one.
+  `:5433` reaches a replica (read-only), or the primary when no replica is up. HAProxy only reports
+  healthy once its cluster has a primary, and the services wait for that.
+
+```
+docker compose exec base-db-0 patronictl list                 # roles, timeline, replication lag
+docker compose stop base-db-1                                 # stop the primary (whichever node it is)
+docker compose exec base-db-0 patronictl list                 # a replica took over, the TL went up
+docker compose start base-db-1                                # it comes back as a replica
+docker compose exec base-db-0 patronictl switchover --force   # hand the primary role over on purpose
+```
+
+A clean stop gives a new primary in about 8 s, and a `docker compose kill` in about 20 s (the lock
+`ttl`). Requests through the gateway may fail for a little longer: until the broker's circuit
+breakers for the service close again. Each node takes about 50–70 MB (Postgres with
+`shared_buffers=16MB`, plus Patroni), about 1.2 GB for the 24 nodes.
+
+The clusters start empty. Patroni's `post_init` creates the service database and runs
+`db/<service>/init.sql` once, on the first primary; the replicas copy it. The volumes are
+`<service>-db-<n>-data`. The single-node volumes from Lab 4 (`<service>-db-data`) are no longer
+used: `docker volume rm` them, or dump and restore their data into the new primary.
+
+### Data warehouse and ETL
+
+`warehouse-db` is a plain Postgres. Every `ETL_INTERVAL_S` (60 s), `warehouse-etl` applies
+[`db/warehouse/etl.sql`](db/warehouse/etl.sql) and runs `CALL etl.run()`:
+
+1. **Extract:** each service database is a `postgres_fdw` server, read through its cluster's
+   replica port (`<service>-db:5433`), so the ETL never loads a primary. Its tables are imported
+   again on every run, so new tables and columns are picked up.
+2. **Load:** every business table is copied as a snapshot into `staging_<service>.<table>`.
+   Idempotency keys, processed-event logs and `password_hash` are left out.
+3. **Transform:** the snapshots are joined across services into a star schema:
+   - `dw.dim_player`: Player plus their Base
+   - `dw.dim_item`, `dw.dim_zombie`, `dw.dim_location`: World's rooms and wings
+   - `dw.fact_craft`
+   - `dw.fact_exam`
+   - `dw.fact_resource`: Resource's ledger, placed in World's rooms
+   - `dw.fact_event`: every service's outbox
+
+   Two report views sit on top: `dw.player_report` and `dw.daily_activity`.
+
+Each source and each table is its own step. A step that fails, for example because a source is down,
+keeps its previous data and is logged in `etl.runs`; the other steps carry on.
+
+```
+docker compose exec warehouse-db psql -U postgres -d warehouse -c 'select * from etl.last_run'
+docker compose exec warehouse-db psql -U postgres -d warehouse -c 'select * from dw.player_report'
+```
+
+`docker-compose.dev.yml` publishes the warehouse on `WAREHOUSE_PORT` (5440) for a SQL client.
+
+### Auth cache (Redis, consistent hashing)
+
+`redis-0`, `redis-1` and `redis-2` are Valkey shards (the same protocol as Redis). Each runs
+in-memory only, capped at 32 MB. The gateway shards keys across them with **consistent hashing**:
+
+- Every shard owns `CACHE_VNODES` (160) points on a ring of 2^64 positions.
+- A key belongs to the first point clockwise from its hash.
+- Adding or removing a shard moves only about 1/N of the keys. `hash % N` would move about (N-1)/N.
+
+The gateway caches the claims of every verified player token (keyed by the token's SHA-256), so a
+repeated request skips the RS256 verification. `POST /auth/logout` writes a revocation on two shards,
+and the logged-out token is refused from then on until it expires.
+
+A shard that stops answering is skipped, and its keys go to the next shard clockwise. With no shard
+up, every token is verified as before. See the gateway README for details, and
+`curl -H 'X-Internal-Key: changeme' localhost:8080/internal/cache` for how the ring splits keys.
 
 ## Monitoring
 

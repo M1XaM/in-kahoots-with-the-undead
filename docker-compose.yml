@@ -1,6 +1,23 @@
 # example RS256 key shared by every Player replica, so a token any replica issues verifies against any replica's JWKS; never use in production
 x-jwt-private-key: &jwt-private-key ${JWT_PRIVATE_KEY:------BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC99rl42elYEQDr\nkbctTRpYUYTDl4IjiRWAIUMNexD7Mu93nHb3EU/Rgf2EBIuPm3dPLR74ojx+K33c\n3npCmrKC4u5F6ii+qKLmBJsCpGLsscufki/s3fRqwfvND9+9bPaDyQnuf5rugo9s\nT6tN27EN8epF78bCH8lOCYclskpQgDtNyvVVUqLxSFauQG0H5iCcNC7u2ounerys\ns/AvIKFAGlr3ea7Xgz+1HHhew1AzeepMZC/myABy/P9ehfrCtmTlSZdab4GTBKrs\nDijY3/3TL7Vl/XlPZlM9o8gXCQegCTR96l9Rfrx9cGsNahw+4K8aLJLyza18QU/4\nEzjT6rbbAgMBAAECggEAUNV9vALCTDLEGPnDIDhIhx99JrvAaX2qVAETZteg9LuK\ncfP3HZBUzjqJ1dUXTA8kOGFjZfqnUisQnl1fWhs47gBB0ydemi7pTobULU4lOEI5\n+xd6ZElYeds82lgwZYtJ5O811jKfi3GsNTM7mmBrWZtBDOyIv89F2nqscyqIe/Mw\nSFtn6Yvt88tBQIGpaJ9fRWQbE4mo9UckK0At6m5R+uvdJ391xBgkPsZDIKl2PTVy\nZGPCUA6ly63NgEIRNaxtkgA4qIvZ+BTLK9G4qqvXS4oyAVYU0GfoDgmRELLPhDa2\nOgQhK5RsBYKV0HsGjIDcaPPAgAMny41gU08Gkm6RyQKBgQD1ahA/MXiSFRAafsv8\n1cHIoKopayCbF1mLHpN1ffAyAs4rxVBsJeYXyFjV0J5OKiFgLZyhtadMmXyq7OQA\noeiRYHJQrrrti9ZUWloGiPj+KJNBkD80uK3/8JUaDZkI7Tov034Tsm5S6jSQDf9h\nhfMdRhdMsKZrogz8ouP5FJN7cwKBgQDGKFwk1/NZ+Y03U674FLkQzOqXu5QKitBN\nXJJJxIiIhwRVdoRd9QayaBbfiEl9OPNFtbA/CDf19FsQJDb6cn0Y7XWxp07mEWjP\nj8popyH7wckVfpSv2Xt0dENNP3KXP0ZjNK0CxzcnkZ8tYXU/xMemIGbn3YTekSVX\nOSfVN4jM+QKBgQDvxlvvUgdqOtgL+vyUn8iAm7EFXJxzyyF6kjoiXhRy2FjVXSgR\nMgoYDG/3H6e72N/ZF1dki5XUelXari6qC4atmxy1hbIu6yRSMCCrJ+KWd9BAC44l\nlZazbDxRQx3VIepq1ejll7zAmAEZCgQNJZF9dYDINgOzP5YOs5unPZpGzwKBgQDE\nLJa0fvpTXARa/sTcox9oK4Yf+zsfiLeZrwjAcQo+J3S56yA2KGqd2wCyAanHh8cH\nf0zhyhAkteolO8UWApwoPoXi/+DTUe7ydccL/lJdfEbHuc4XnXZkHum2Ixcd9y2G\n71JMys6mpLryYWaDYBvLMo7OA3cUJJvUEyiFJHqReQKBgEpmolERCmXFsvzC+pmw\nHL1weYIgG+PQ/YlzLeOPDdSjfiAlg5F9nZlTFPW2lQsH6rMjGTRqg5tv0KoeA7Bs\nNYnQCK8s4nuo7X1LZuTw2O1kQPmvYVT6JyvHL5Ap52qAeOU+cYtnbA/zEvFzJjMN\nAWYvr0hQZKe0Q13CruO45ZEx\n-----END PRIVATE KEY-----}
 
+# every database is a replicated Patroni cluster behind an HAProxy that keeps the old hostname
+# (player-db, base-db, ...), plus etcd and the data warehouse with its ETL
+include:
+  - docker-compose.db.yml
+
+# one shard of the gateway's auth cache: claims of verified player tokens and logout revocations.
+# Not persisted and capped: every key has a TTL, and the ones closest to expiring go first.
+x-cache-shard: &cache-shard
+  image: valkey/valkey:8.1-alpine
+  restart: unless-stopped
+  command: [valkey-server, --save, "", --appendonly, "no", --maxmemory, 32mb, --maxmemory-policy, volatile-ttl]
+  healthcheck:
+    test: ["CMD", "valkey-cli", "ping"]
+    interval: 5s
+    timeout: 3s
+    retries: 10
+
 x-game-service: &game-service
   image: ${DOCKERHUB_USERNAME:-timurcravtov}/game-service:${GAME_SERVICE_TAG:-4}
   restart: unless-stopped
@@ -70,22 +87,6 @@ services:
     depends_on:
       - discovery
 
-  player-db:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${PLAYER_POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${PLAYER_POSTGRES_PASSWORD:-qwerty}
-      POSTGRES_DB: ${PLAYER_POSTGRES_DB:-player}
-    volumes:
-      - player-db-data:/var/lib/postgresql/data
-      - ./db/player-service/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${PLAYER_POSTGRES_USER:-postgres} -d ${PLAYER_POSTGRES_DB:-player}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
   player:
     image: ${DOCKERHUB_USERNAME:-timurcravtov}/player-service:${PLAYER_SERVICE_TAG:-4}
     restart: unless-stopped
@@ -108,21 +109,6 @@ services:
       player-db:
         condition: service_healthy
 
-  game-db:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${GAME_POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${GAME_POSTGRES_PASSWORD:-qwerty}
-      POSTGRES_DB: ${GAME_POSTGRES_DB:-game}
-    volumes:
-      - game-db-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${GAME_POSTGRES_USER:-postgres} -d ${GAME_POSTGRES_DB:-game}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
   # Socket.IO clients connect here directly (GET /ws/game); REST goes through the gateway. Replicas
   # started together race for a host port range, so only this one publishes a port and the extra
   # replicas run as game-replica. The gateway hands every browser GAME_PUBLIC_WS_URL anyway
@@ -136,21 +122,6 @@ services:
     <<: *game-service
     deploy:
       replicas: ${GAME_EXTRA_REPLICAS:-1}
-
-  base-db:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${BASE_POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${BASE_POSTGRES_PASSWORD:-qwerty}
-      POSTGRES_DB: ${BASE_POSTGRES_DB:-base}
-    volumes:
-      - base-db-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${BASE_POSTGRES_USER:-postgres} -d ${BASE_POSTGRES_DB:-base}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
 
   base:
     image: ${BASE_DOCKERHUB_USERNAME:-mixam052}/kahoots-base-service:${BASE_SERVICE_TAG:-4}
@@ -180,22 +151,6 @@ services:
       broker:
         condition: service_started
 
-  crafting-db:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${CRAFTING_POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${CRAFTING_POSTGRES_PASSWORD:-qwerty}
-      POSTGRES_DB: ${CRAFTING_POSTGRES_DB:-crafting}
-    volumes:
-      - crafting-db-data:/var/lib/postgresql/data
-      - ./db/crafting-service/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${CRAFTING_POSTGRES_USER:-postgres} -d ${CRAFTING_POSTGRES_DB:-crafting}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
   crafting:
     image: ${CRAFTING_DOCKERHUB_USERNAME:-mixam052}/kahoots-crafting-service:${CRAFTING_SERVICE_TAG:-4}
     restart: unless-stopped
@@ -223,22 +178,6 @@ services:
         condition: service_healthy
       broker:
         condition: service_started
-
-  exam-db:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${EXAM_POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${EXAM_POSTGRES_PASSWORD:-qwerty}
-      POSTGRES_DB: ${EXAM_POSTGRES_DB:-exam}
-    volumes:
-      - exam-db-data:/var/lib/postgresql/data
-      - ./db/exam-service/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${EXAM_POSTGRES_USER:-postgres} -d ${EXAM_POSTGRES_DB:-exam}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
 
   exam:
     image: ${EXAM_DOCKERHUB_USERNAME:-inercaso}/exam-service:${EXAM_SERVICE_TAG:-4}
@@ -270,22 +209,6 @@ services:
       broker:
         condition: service_started
 
-  world-db:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${WORLD_POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${WORLD_POSTGRES_PASSWORD:-qwerty}
-      POSTGRES_DB: ${WORLD_POSTGRES_DB:-world}
-    volumes:
-      - world-db-data:/var/lib/postgresql/data
-      - ./db/world-service/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${WORLD_POSTGRES_USER:-postgres} -d ${WORLD_POSTGRES_DB:-world}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
   world:
     image: ${WORLD_DOCKERHUB_USERNAME:-inercaso}/world-service:${WORLD_SERVICE_TAG:-4}
     restart: unless-stopped
@@ -313,22 +236,6 @@ services:
       broker:
         condition: service_started
 
-  zombie-db:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${ZOMBIE_POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${ZOMBIE_POSTGRES_PASSWORD:-qwerty}
-      POSTGRES_DB: ${ZOMBIE_POSTGRES_DB:-zombie}
-    volumes:
-      - zombie-db-data:/var/lib/postgresql/data
-      - ./db/zombie-service/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${ZOMBIE_POSTGRES_USER:-postgres} -d ${ZOMBIE_POSTGRES_DB:-zombie}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
   zombie:
     image: ${ZOMBIE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-zombie-service:${ZOMBIE_SERVICE_TAG:-4}
     restart: unless-stopped
@@ -353,22 +260,6 @@ services:
     depends_on:
       zombie-db:
         condition: service_healthy
-
-  resource-db:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${RESOURCE_POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${RESOURCE_POSTGRES_PASSWORD:-qwerty}
-      POSTGRES_DB: ${RESOURCE_POSTGRES_DB:-resource}
-    volumes:
-      - resource-db-data:/var/lib/postgresql/data
-      - ./db/resource-service/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${RESOURCE_POSTGRES_USER:-postgres} -d ${RESOURCE_POSTGRES_DB:-resource}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
 
   resource:
     image: ${RESOURCE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-resource-service:${RESOURCE_SERVICE_TAG:-4}
@@ -402,6 +293,16 @@ services:
       broker:
         condition: service_started
 
+  # the auth cache, sharded by the gateway with consistent hashing (each key on the first shard
+  # clockwise from its hash on a ring of CACHE_VNODES points per shard); GET /internal/cache on
+  # the gateway shows the split. A shard that stops answering hands its keys to the next one.
+  redis-0:
+    <<: *cache-shard
+  redis-1:
+    <<: *cache-shard
+  redis-2:
+    <<: *cache-shard
+
   gateway:
     image: ${GATEWAY_DOCKERHUB_USERNAME:-timurcravtov}/gateway:${GATEWAY_SERVICE_TAG:-3}
     restart: unless-stopped
@@ -431,6 +332,13 @@ services:
       JWT_SECRET: ${GATEWAY_JWT_SECRET:-}
       TASK_TIMEOUT: ${GATEWAY_TASK_TIMEOUT:-30}
       MAX_CONCURRENT_TASKS: ${GATEWAY_MAX_CONCURRENT_TASKS:-100}
+      # verified token claims are cached on these shards (sharded by consistent hashing) for
+      # AUTH_CACHE_TTL_S, and POST /auth/logout revokes the token on REVOCATION_COPIES of them;
+      # empty = no cache, every request verifies its token. Read from the Lab 5 gateway on.
+      REDIS_SHARDS: ${GATEWAY_REDIS_SHARDS:-redis-0:6379,redis-1:6379,redis-2:6379}
+      CACHE_VNODES: ${GATEWAY_CACHE_VNODES:-160}
+      AUTH_CACHE_TTL_S: ${GATEWAY_AUTH_CACHE_TTL_S:-300}
+      REVOCATION_COPIES: ${GATEWAY_REVOCATION_COPIES:-2}
       # routes to the healthy instances Discovery lists, round-robin; the *_SERVICE_URL above
       # are only used for services Discovery has not listed (they do not register yet)
       DISCOVERY_URL: http://discovery:8089
@@ -439,6 +347,9 @@ services:
     depends_on:
       - discovery
       - broker
+      - redis-0
+      - redis-1
+      - redis-2
       - player
       - game
       - exam
@@ -491,11 +402,3 @@ volumes:
   prometheus-data:
   grafana-data:
   broker-data:
-  player-db-data:
-  game-db-data:
-  base-db-data:
-  crafting-db-data:
-  exam-db-data:
-  world-db-data:
-  zombie-db-data:
-  resource-db-data:
