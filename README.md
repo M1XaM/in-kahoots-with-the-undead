@@ -16,18 +16,7 @@ wings of the university to explore, tying academic progress directly to survival
 [![base-service](https://img.shields.io/docker/v/mixam052/kahoots-base-service?sort=date&label=base-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/mixam052/kahoots-base-service)
 [![crafting-service](https://img.shields.io/docker/v/mixam052/kahoots-crafting-service?sort=date&label=crafting-service&color=2496ED&logo=docker&logoColor=white)](https://hub.docker.com/r/mixam052/kahoots-crafting-service)
 
-[![service-discovery postman](https://img.shields.io/badge/service--discovery-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/service-discovery)
-[![player-service postman](https://img.shields.io/badge/player--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/player-service)
-[![game-service postman](https://img.shields.io/badge/game--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/game-service)
-[![exam-service postman](https://img.shields.io/badge/exam--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/exam-service)
-[![world-service postman](https://img.shields.io/badge/world--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/world-service)
-[![zombie-service postman](https://img.shields.io/badge/zombie--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/zombie-service)
-[![resource-service postman](https://img.shields.io/badge/resource--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/resource-service)
-[![base-service postman](https://img.shields.io/badge/base--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/base-service)
-[![crafting-service postman](https://img.shields.io/badge/crafting--service-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/crafting-service)
-[![broker postman](https://img.shields.io/badge/broker-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/broker)
-[![operations postman](https://img.shields.io/badge/logs%20%26%20metrics-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/operations)
-[![all services postman](https://img.shields.io/badge/all%20services-postman-FF6C37?logo=postman&logoColor=white)](docs/postman/all-services)
+[![postman](https://img.shields.io/badge/all%20services-postman-FF6C37?logo=postman&logoColor=white)](docs/postman)
 
 
 ## Architecture
@@ -181,9 +170,8 @@ browser sockets all land on `game`; the others serve REST and the `/events` stre
   `topics` it consumes (the broker subscribes the service). It also serves `GET /metrics` and
   `GET /internal/logs` like every service.
 - **Try it:** `curl -H 'X-Internal-Key: changeme' localhost:8089/services` lists every instance with
-  its health and load; `GET /status` and `GET /health` are public. The Postman collection in
-  [`docs/postman/service-discovery`](docs/postman/service-discovery) (also as a single importable
-  `service-discovery.postman_collection.json`) walks the registry (register, heartbeat, report a
+  its health and load; `GET /status` and `GET /health` are public. The Postman folder
+  [`Service Discovery`](docs/postman/collections/All%20Services/Service%20Discovery) walks the registry (register, heartbeat, report a
   failure, deregister) and sends requests through the gateway to show `X-Upstream-Instance`
   changing between replicas. Swagger UI at
   http://localhost:8089/docs; API reference:
@@ -357,7 +345,7 @@ Defaults are the design's proposals, not confirmed.
   keeps `online` in step with `game.presence_changed`. It issues the login cookie, publishes the JWKS
   the gateway verifies it with, serves `POST /players/{id}/xp` and streams `player.registered` and
   `player.leveled_up` on `ws://player:8081/events`.
-- **Try it:** Postman collection in [`docs/postman/player-service`](docs/postman/player-service).
+- **Try it:** the [`Player Service`](docs/postman/collections/All%20Services/Player%20Service) folder of the Postman collection.
 
 ### Game Service
 
@@ -373,7 +361,7 @@ Defaults are the design's proposals, not confirmed.
   depends on them will fail; creating lobbies works on its own. Game reads the acting player from
   `X-Player-Id`; the Socket.IO handshake checks the login cookie itself against Player's JWKS and
   publishes `game.presence_changed` on `ws://game:8082/events`.
-- **Try it:** Postman collection in [`docs/postman/game-service`](docs/postman/game-service).
+- **Try it:** the [`Game Service`](docs/postman/collections/All%20Services/Game%20Service) folder of the Postman collection.
   Log in through the Player collection first, since Game authenticates with the login cookie.
 
 ### Exam Service
@@ -401,8 +389,7 @@ Defaults are the design's proposals, not confirmed.
 - **Limits:** a request past `EXAM_TASK_TIMEOUT_MS` (default 10 s) answers `408 REQUEST_TIMEOUT`;
   beyond `EXAM_MAX_CONCURRENT_TASKS` (default 100) in flight, `429 TOO_MANY_REQUESTS` with
   `Retry-After`.
-- **Try it:** the Postman collection in [`docs/postman/exam-service`](docs/postman/exam-service)
-  (also as a single importable `exam-service.postman_collection.json`): players go through the
+- **Try it:** the [`Exam Service`](docs/postman/collections/All%20Services/Exam%20Service) folder of the Postman collection: players go through the
   Gateway, service-to-service requests through the broker. Run **Auth (run first)** to register and
   log in a player, then create and answer an exam; **Operations** shows logs, metrics and the
   `403` / `404` for internal routes.
@@ -428,8 +415,7 @@ Defaults are the design's proposals, not confirmed.
   (Prometheus job `world`).
 - **Limits:** `WORLD_TASK_TIMEOUT_MS` (default 10 s, then `408 REQUEST_TIMEOUT`) and
   `WORLD_MAX_CONCURRENT_TASKS` (default 100, then `429 TOO_MANY_REQUESTS` with `Retry-After`).
-- **Try it:** the Postman collection in [`docs/postman/world-service`](docs/postman/world-service)
-  (also as a single importable `world-service.postman_collection.json`): players go through the
+- **Try it:** the [`World Service`](docs/postman/collections/All%20Services/World%20Service) folder of the Postman collection: players go through the
   Gateway, service-to-service requests and events through the broker. Run **Auth (run first)**,
   then pass an exam through the Exam collection and the matching wing shows `unlocked: true`;
   **Events** publishes `exam.completed` to the broker topic directly.
@@ -450,8 +436,7 @@ Defaults are the design's proposals, not confirmed.
   (`503` while its database is down). Definitions live only in `zombie-db`, so any replica answers
   any request. It calls no other service, so it has no circuit breaker.
 - **Logs:** one JSON line per event in the shared format; `ZOMBIE_LOG_LEVEL` (`info`).
-- **Try it:** the Postman collection in [`docs/postman/zombie-service`](docs/postman/zombie-service)
-  (also as a single importable `zombie-service.postman_collection.json`) goes through the Gateway:
+- **Try it:** the [`Zombie Service`](docs/postman/collections/All%20Services/Zombie%20Service) folder of the Postman collection goes through the Gateway:
   run **Auth (run first)** to register and log in a player. API reference:
   [`docs/openapi/zombie-service.openapi.json`](docs/openapi/zombie-service.openapi.json) (Swagger UI
   is served at `/docs` on the service port, which compose does not publish).
@@ -482,8 +467,7 @@ Defaults are the design's proposals, not confirmed.
   it; the failing instance named by `X-Upstream-Instance` is reported to Discovery, otherwise calls
   fail fast for 35 s and a single trial call decides whether it closes.
 - **Logs:** one JSON line per event in the shared format; `RESOURCE_LOG_LEVEL` (`info`).
-- **Try it:** the Postman collection in [`docs/postman/resource-service`](docs/postman/resource-service)
-  (also as a single importable `resource-service.postman_collection.json`) goes through the Gateway:
+- **Try it:** the [`Resource Service`](docs/postman/collections/All%20Services/Resource%20Service) folder of the Postman collection goes through the Gateway:
   run **Auth (run first)** to register and log in a player, who gets zero balances from
   `player.registered`. Players `1`-`3` are seeded; the Events folder gives player 42 balances. API
   reference: [`docs/openapi/resource-service.openapi.json`](docs/openapi/resource-service.openapi.json)
@@ -510,7 +494,7 @@ Defaults are the design's proposals, not confirmed.
 - **Circuit breaker / load balancing:** none of its own any more, the broker does both.
 - **Logs:** one JSON line per event in the shared format; `BASE_LOG_LEVEL` (`info`).
 - **Metrics:** `GET /metrics`, scraped by Prometheus (see [Monitoring](#monitoring)).
-- **Try it:** Postman collection in [`docs/postman/base-service`](docs/postman/base-service).
+- **Try it:** the [`Base Service`](docs/postman/collections/All%20Services/Base%20Service) folder of the Postman collection.
 
 ### Crafting Service
 
@@ -529,7 +513,7 @@ Defaults are the design's proposals, not confirmed.
   replica, events applied once, `Idempotency-Key` claimed before a craft runs.
 - **Circuit breaker / load balancing:** none of its own, the broker does both.
 - **Logs:** shared JSON format; `CRAFTING_LOG_LEVEL` (`info`). **Metrics:** `GET /metrics`.
-- **Try it:** Postman collection in [`docs/postman/crafting-service`](docs/postman/crafting-service).
+- **Try it:** the [`Crafting Service`](docs/postman/collections/All%20Services/Crafting%20Service) folder of the Postman collection.
 
 ## Data layer
 
@@ -698,3 +682,8 @@ is in the [contract](docs/communication.md#log-collection-get-internallogs-and-g
 
 - [Technologies](docs/technologies.md): tech stack per service and the trade-offs behind each choice.
 - [Communication Contract](docs/communication.md): data ownership, endpoints and event payloads across services.
+- [Postman collection](docs/postman/collections/All%20Services): every request of the system in one collection
+  (**All Services**), one folder per service plus Broker, Service Discovery and Operations (logs, metrics,
+  the Lab 5 auth cache). It is stored in Postman's file format: open `docs/` in Postman (Local View; the
+  workspace is `docs/.postman`) or import the `docs/postman` folder. Run a folder's **Auth (run first)**
+  once: the token is shared by every folder.

@@ -1,7 +1,0 @@
-name: Commit Reservation
-$kind: http-request
-method: POST
-url: "http://localhost:8091/call/resource/resources/reservations/{{reservationId}}/commit"
-headers:
-  - key: X-Internal-Key
-    value: "changeme"

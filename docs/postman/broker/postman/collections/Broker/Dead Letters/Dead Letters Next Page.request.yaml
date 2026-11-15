@@ -1,7 +1,0 @@
-name: Dead Letters Next Page
-$kind: http-request
-method: GET
-url: "http://localhost:8091/dead-letters?limit=1&after=100"
-headers:
-  - key: X-Internal-Key
-    value: "changeme"
