@@ -1,4 +1,0 @@
-name: Delete Player
-$kind: http-request
-method: DELETE
-url: http://localhost:8081/players/1
