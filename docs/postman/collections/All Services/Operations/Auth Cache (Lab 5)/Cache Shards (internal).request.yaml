@@ -1,0 +1,10 @@
+name: Cache Shards (internal)
+$kind: http-request
+description: |-
+  The gateway's auth cache: every Valkey shard (up, share of the consistent-hashing ring, keys, memory). Each shard owns 160 points on a 2^64 ring and a key goes to the first point clockwise from its hash, so the shares are close to 1/3 each. Stop a shard (docker compose stop redis-1) and call it again: it shows up: false and its keys go to the next shard clockwise.
+method: GET
+url: "{{baseUrl}}/internal/cache"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+order: 1000

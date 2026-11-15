@@ -1,0 +1,10 @@
+name: Me (cached token)
+$kind: http-request
+description: |-
+  The first call verifies the token and caches its claims; every later one is an auth cache hit on the token's shard (the gateway logs auth_cache=hit and cache_shard).
+method: GET
+url: "{{baseUrl}}/players/me"
+headers:
+  - key: Authorization
+    value: "Bearer {{accessToken}}"
+order: 4000

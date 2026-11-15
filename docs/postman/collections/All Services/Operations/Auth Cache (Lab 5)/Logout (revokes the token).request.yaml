@@ -1,0 +1,10 @@
+name: Logout (revokes the token)
+$kind: http-request
+description: |-
+  Player clears the cookie; the gateway also revokes the token on 2 shards until it expires.
+method: POST
+url: "{{baseUrl}}/auth/logout"
+headers:
+  - key: Authorization
+    value: "Bearer {{accessToken}}"
+order: 5000
