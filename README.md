@@ -45,6 +45,13 @@ wings of the university to explore, tying academic progress directly to survival
 - **Resource**: per-player resource balances and the gather/spend economy
 - **Base**: what players have built: base level, facilities, barricades
 - **Crafting**: recipes and crafting, delivering items into Player's inventory
+- **Databases**: each service owns a 3-node Postgres cluster (Patroni, one primary and two
+  streaming replicas, automatic failover through etcd) behind an HAProxy under the service's
+  `<service>-db` hostname
+- **Data warehouse**: `warehouse-db` with a star schema, filled every minute by `warehouse-etl` from every
+  database's replicas
+- **Auth cache**: three Valkey shards the Gateway splits keys across with consistent hashing (cached
+  token claims, logout revocations)
 
 Clients reach the REST APIs through the Gateway, which verifies the login and forwards each
 request to the broker as `/call/{service}/...`; services call each other the same way, with
