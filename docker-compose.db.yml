@@ -1,0 +1,386 @@
+# Database layer, included by docker-compose.yml.
+#
+# Every service database is a 3-node Postgres cluster run by Patroni: one primary and two replicas
+# that stream its WAL (built-in streaming replication, one replication slot each). The primary
+# holds the cluster's leader lock in etcd. When it dies, the lock expires (ttl 20 s; at once on a
+# clean stop), the most up-to-date replica takes it and is promoted, and the other replica
+# switches to streaming from the new primary. A returning old primary finds the lock taken, is
+# rewound with pg_rewind and rejoins as a replica, so it never takes writes again.
+#
+# Services reach a cluster through an HAProxy under the cluster's old hostname (player-db,
+# base-db, ...), so no DATABASE_URL / DB_HOST changes: port 5432 always reaches the current
+# primary, 5433 a replica (read-only). Nodes are <cluster>-db-0, -1 and -2:
+#   docker compose exec base-db-0 patronictl list        # who is primary, replication lag
+#   docker compose stop base-db-1                         # kill whichever node is primary
+
+x-pg-node: &pg-node
+  image: kahoots/patroni:16
+  build: ./db/patroni
+  restart: unless-stopped
+  # Patroni must not be PID 1, or it forks two extra Python processes to act as init
+  init: true
+  # a clean stop hands the leader lock over at once instead of waiting for it to expire
+  stop_grace_period: 30s
+  depends_on:
+    - etcd
+
+x-pg-env: &pg-env
+  PATRONI_ETCD3_HOSTS: etcd:2379
+  PATRONI_REPLICATION_USERNAME: replicator
+  PATRONI_REPLICATION_PASSWORD: ${PG_REPLICATION_PASSWORD:-replicate}
+
+x-pg-router: &pg-router
+  image: haproxy:3.0-alpine
+  restart: unless-stopped
+  volumes:
+    - ./db/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+  # healthy once the cluster has a primary; services wait for it (depends_on: service_healthy)
+  healthcheck:
+    test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8404/healthz"]
+    interval: 3s
+    timeout: 3s
+    retries: 60
+
+services:
+  # holds each cluster's leader lock and member list; a single node is enough for the lab
+  # (failsafe_mode keeps a primary that still reaches its replicas writable while etcd is down)
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.21
+    restart: unless-stopped
+    command:
+      - etcd
+      - --name=etcd
+      - --data-dir=/etcd-data
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --advertise-client-urls=http://etcd:2379
+      - --listen-peer-urls=http://0.0.0.0:2380
+      - --initial-advertise-peer-urls=http://etcd:2380
+      - --initial-cluster=etcd=http://etcd:2380
+      - --quota-backend-bytes=134217728
+    volumes:
+      - etcd-data:/etcd-data
+
+  # --- player-db: Player Service's database ---
+  player-db-0:
+    <<: *pg-node
+    environment: &player-db-env
+      <<: *pg-env
+      PATRONI_SCOPE: player
+      NODE: player-db-0
+      APP_DB: ${PLAYER_POSTGRES_DB:-player}
+      PATRONI_SUPERUSER_USERNAME: ${PLAYER_POSTGRES_USER:-postgres}
+      PATRONI_SUPERUSER_PASSWORD: ${PLAYER_POSTGRES_PASSWORD:-qwerty}
+    volumes:
+      - player-db-0-data:/var/lib/postgresql/data
+      - ./db/player-service/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+  player-db-1:
+    <<: *pg-node
+    environment:
+      <<: *player-db-env
+      NODE: player-db-1
+    volumes:
+      - player-db-1-data:/var/lib/postgresql/data
+      - ./db/player-service/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+  player-db-2:
+    <<: *pg-node
+    environment:
+      <<: *player-db-env
+      NODE: player-db-2
+    volumes:
+      - player-db-2-data:/var/lib/postgresql/data
+      - ./db/player-service/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+  player-db:
+    <<: *pg-router
+    environment:
+      CLUSTER: player-db
+    depends_on:
+      - player-db-0
+      - player-db-1
+      - player-db-2
+
+  # --- game-db: Game Service's database ---
+  game-db-0:
+    <<: *pg-node
+    environment: &game-db-env
+      <<: *pg-env
+      PATRONI_SCOPE: game
+      NODE: game-db-0
+      APP_DB: ${GAME_POSTGRES_DB:-game}
+      PATRONI_SUPERUSER_USERNAME: ${GAME_POSTGRES_USER:-postgres}
+      PATRONI_SUPERUSER_PASSWORD: ${GAME_POSTGRES_PASSWORD:-qwerty}
+    volumes:
+      - game-db-0-data:/var/lib/postgresql/data
+  game-db-1:
+    <<: *pg-node
+    environment:
+      <<: *game-db-env
+      NODE: game-db-1
+    volumes:
+      - game-db-1-data:/var/lib/postgresql/data
+  game-db-2:
+    <<: *pg-node
+    environment:
+      <<: *game-db-env
+      NODE: game-db-2
+    volumes:
+      - game-db-2-data:/var/lib/postgresql/data
+  game-db:
+    <<: *pg-router
+    environment:
+      CLUSTER: game-db
+    depends_on:
+      - game-db-0
+      - game-db-1
+      - game-db-2
+
+  # --- base-db: Base Service's database ---
+  base-db-0:
+    <<: *pg-node
+    environment: &base-db-env
+      <<: *pg-env
+      PATRONI_SCOPE: base
+      NODE: base-db-0
+      APP_DB: ${BASE_POSTGRES_DB:-base}
+      PATRONI_SUPERUSER_USERNAME: ${BASE_POSTGRES_USER:-postgres}
+      PATRONI_SUPERUSER_PASSWORD: ${BASE_POSTGRES_PASSWORD:-qwerty}
+    volumes:
+      - base-db-0-data:/var/lib/postgresql/data
+  base-db-1:
+    <<: *pg-node
+    environment:
+      <<: *base-db-env
+      NODE: base-db-1
+    volumes:
+      - base-db-1-data:/var/lib/postgresql/data
+  base-db-2:
+    <<: *pg-node
+    environment:
+      <<: *base-db-env
+      NODE: base-db-2
+    volumes:
+      - base-db-2-data:/var/lib/postgresql/data
+  base-db:
+    <<: *pg-router
+    environment:
+      CLUSTER: base-db
+    depends_on:
+      - base-db-0
+      - base-db-1
+      - base-db-2
+
+  # --- crafting-db: Crafting Service's database ---
+  crafting-db-0:
+    <<: *pg-node
+    environment: &crafting-db-env
+      <<: *pg-env
+      PATRONI_SCOPE: crafting
+      NODE: crafting-db-0
+      APP_DB: ${CRAFTING_POSTGRES_DB:-crafting}
+      PATRONI_SUPERUSER_USERNAME: ${CRAFTING_POSTGRES_USER:-postgres}
+      PATRONI_SUPERUSER_PASSWORD: ${CRAFTING_POSTGRES_PASSWORD:-qwerty}
+    volumes:
+      - crafting-db-0-data:/var/lib/postgresql/data
+      - ./db/crafting-service/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+  crafting-db-1:
+    <<: *pg-node
+    environment:
+      <<: *crafting-db-env
+      NODE: crafting-db-1
+    volumes:
+      - crafting-db-1-data:/var/lib/postgresql/data
+      - ./db/crafting-service/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+  crafting-db-2:
+    <<: *pg-node
+    environment:
+      <<: *crafting-db-env
+      NODE: crafting-db-2
+    volumes:
+      - crafting-db-2-data:/var/lib/postgresql/data
+      - ./db/crafting-service/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+  crafting-db:
+    <<: *pg-router
+    environment:
+      CLUSTER: crafting-db
+    depends_on:
+      - crafting-db-0
+      - crafting-db-1
+      - crafting-db-2
+
+  # --- exam-db: Exam Service's database ---
+  exam-db-0:
+    <<: *pg-node
+    environment: &exam-db-env
+      <<: *pg-env
+      PATRONI_SCOPE: exam
+      NODE: exam-db-0
+      APP_DB: ${EXAM_POSTGRES_DB:-exam}
+      PATRONI_SUPERUSER_USERNAME: ${EXAM_POSTGRES_USER:-postgres}
+      PATRONI_SUPERUSER_PASSWORD: ${EXAM_POSTGRES_PASSWORD:-qwerty}
+    volumes:
+      - exam-db-0-data:/var/lib/postgresql/data
+      - ./db/exam-service/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+  exam-db-1:
+    <<: *pg-node
+    environment:
+      <<: *exam-db-env
+      NODE: exam-db-1
+    volumes:
+      - exam-db-1-data:/var/lib/postgresql/data
+      - ./db/exam-service/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+  exam-db-2:
+    <<: *pg-node
+    environment:
+      <<: *exam-db-env
+      NODE: exam-db-2
+    volumes:
+      - exam-db-2-data:/var/lib/postgresql/data
+      - ./db/exam-service/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+  exam-db:
+    <<: *pg-router
+    environment:
+      CLUSTER: exam-db
+    depends_on:
+      - exam-db-0
+      - exam-db-1
+      - exam-db-2
+
+  # --- world-db: World Service's database ---
+  world-db-0:
+    <<: *pg-node
+    environment: &world-db-env
+      <<: *pg-env
+      PATRONI_SCOPE: world
+      NODE: world-db-0
+      APP_DB: ${WORLD_POSTGRES_DB:-world}
+      PATRONI_SUPERUSER_USERNAME: ${WORLD_POSTGRES_USER:-postgres}
+      PATRONI_SUPERUSER_PASSWORD: ${WORLD_POSTGRES_PASSWORD:-qwerty}
+    volumes:
+      - world-db-0-data:/var/lib/postgresql/data
+      - ./db/world-service/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+  world-db-1:
+    <<: *pg-node
+    environment:
+      <<: *world-db-env
+      NODE: world-db-1
+    volumes:
+      - world-db-1-data:/var/lib/postgresql/data
+      - ./db/world-service/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+  world-db-2:
+    <<: *pg-node
+    environment:
+      <<: *world-db-env
+      NODE: world-db-2
+    volumes:
+      - world-db-2-data:/var/lib/postgresql/data
+      - ./db/world-service/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+  world-db:
+    <<: *pg-router
+    environment:
+      CLUSTER: world-db
+    depends_on:
+      - world-db-0
+      - world-db-1
+      - world-db-2
+
+  # --- zombie-db: Zombie Service's database ---
+  zombie-db-0:
+    <<: *pg-node
+    environment: &zombie-db-env
+      <<: *pg-env
+      PATRONI_SCOPE: zombie
+      NODE: zombie-db-0
+      APP_DB: ${ZOMBIE_POSTGRES_DB:-zombie}
+      PATRONI_SUPERUSER_USERNAME: ${ZOMBIE_POSTGRES_USER:-postgres}
+      PATRONI_SUPERUSER_PASSWORD: ${ZOMBIE_POSTGRES_PASSWORD:-qwerty}
+    volumes:
+      - zombie-db-0-data:/var/lib/postgresql/data
+      - ./db/zombie-service/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+  zombie-db-1:
+    <<: *pg-node
+    environment:
+      <<: *zombie-db-env
+      NODE: zombie-db-1
+    volumes:
+      - zombie-db-1-data:/var/lib/postgresql/data
+      - ./db/zombie-service/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+  zombie-db-2:
+    <<: *pg-node
+    environment:
+      <<: *zombie-db-env
+      NODE: zombie-db-2
+    volumes:
+      - zombie-db-2-data:/var/lib/postgresql/data
+      - ./db/zombie-service/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+  zombie-db:
+    <<: *pg-router
+    environment:
+      CLUSTER: zombie-db
+    depends_on:
+      - zombie-db-0
+      - zombie-db-1
+      - zombie-db-2
+
+  # --- resource-db: Resource Service's database ---
+  resource-db-0:
+    <<: *pg-node
+    environment: &resource-db-env
+      <<: *pg-env
+      PATRONI_SCOPE: resource
+      NODE: resource-db-0
+      APP_DB: ${RESOURCE_POSTGRES_DB:-resource}
+      PATRONI_SUPERUSER_USERNAME: ${RESOURCE_POSTGRES_USER:-postgres}
+      PATRONI_SUPERUSER_PASSWORD: ${RESOURCE_POSTGRES_PASSWORD:-qwerty}
+    volumes:
+      - resource-db-0-data:/var/lib/postgresql/data
+      - ./db/resource-service/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+  resource-db-1:
+    <<: *pg-node
+    environment:
+      <<: *resource-db-env
+      NODE: resource-db-1
+    volumes:
+      - resource-db-1-data:/var/lib/postgresql/data
+      - ./db/resource-service/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+  resource-db-2:
+    <<: *pg-node
+    environment:
+      <<: *resource-db-env
+      NODE: resource-db-2
+    volumes:
+      - resource-db-2-data:/var/lib/postgresql/data
+      - ./db/resource-service/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+  resource-db:
+    <<: *pg-router
+    environment:
+      CLUSTER: resource-db
+    depends_on:
+      - resource-db-0
+      - resource-db-1
+      - resource-db-2
+
+volumes:
+  etcd-data:
+  player-db-0-data:
+  player-db-1-data:
+  player-db-2-data:
+  game-db-0-data:
+  game-db-1-data:
+  game-db-2-data:
+  base-db-0-data:
+  base-db-1-data:
+  base-db-2-data:
+  crafting-db-0-data:
+  crafting-db-1-data:
+  crafting-db-2-data:
+  exam-db-0-data:
+  exam-db-1-data:
+  exam-db-2-data:
+  world-db-0-data:
+  world-db-1-data:
+  world-db-2-data:
+  zombie-db-0-data:
+  zombie-db-1-data:
+  zombie-db-2-data:
+  resource-db-0-data:
+  resource-db-1-data:
+  resource-db-2-data:
