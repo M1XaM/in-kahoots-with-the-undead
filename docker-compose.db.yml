@@ -12,6 +12,9 @@
 # primary, 5433 a replica (read-only). Nodes are <cluster>-db-0, -1 and -2:
 #   docker compose exec base-db-0 patronictl list        # who is primary, replication lag
 #   docker compose stop base-db-1                         # kill whichever node is primary
+#
+# The data warehouse (warehouse-db) is filled every ETL_INTERVAL_S by warehouse-etl, which reads
+# every cluster's replicas through postgres_fdw (db/warehouse/).
 
 x-pg-node: &pg-node
   image: kahoots/patroni:16
@@ -358,8 +361,54 @@ services:
       - resource-db-1
       - resource-db-2
 
+  # --- data warehouse ---
+  # a plain Postgres: the star schema (dw.dim_*, dw.fact_*), the staging snapshots and the ETL's
+  # run log (etl.runs, etl.last_run). Not replicated: everything in it is rebuilt from the sources.
+  #   docker compose exec warehouse-db psql -U postgres -d warehouse -c 'select * from etl.last_run'
+  warehouse-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    command: [postgres, -c, shared_buffers=16MB, -c, work_mem=4MB, -c, max_connections=20]
+    environment:
+      POSTGRES_USER: ${WAREHOUSE_POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${WAREHOUSE_POSTGRES_PASSWORD:-qwerty}
+      POSTGRES_DB: ${WAREHOUSE_POSTGRES_DB:-warehouse}
+    volumes:
+      - warehouse-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${WAREHOUSE_POSTGRES_USER:-postgres} -d ${WAREHOUSE_POSTGRES_DB:-warehouse}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # extract-transform-load every ETL_INTERVAL_S: snapshots every service database (read from its
+  # replicas, port 5433 of the cluster's HAProxy) into staging_<service>, then rebuilds dw.*
+  warehouse-etl:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    entrypoint: ["/etl/run.sh"]
+    environment:
+      WAREHOUSE_URL: postgres://${WAREHOUSE_POSTGRES_USER:-postgres}:${WAREHOUSE_POSTGRES_PASSWORD:-qwerty}@warehouse-db:5432/${WAREHOUSE_POSTGRES_DB:-warehouse}?sslmode=disable
+      ETL_INTERVAL_S: ${ETL_INTERVAL_S:-60}
+      # name host port database user password
+      ETL_SOURCES: |
+        player    player-db 5433 ${PLAYER_POSTGRES_DB:-player} ${PLAYER_POSTGRES_USER:-postgres} ${PLAYER_POSTGRES_PASSWORD:-qwerty}
+        game      game-db 5433 ${GAME_POSTGRES_DB:-game} ${GAME_POSTGRES_USER:-postgres} ${GAME_POSTGRES_PASSWORD:-qwerty}
+        base      base-db 5433 ${BASE_POSTGRES_DB:-base} ${BASE_POSTGRES_USER:-postgres} ${BASE_POSTGRES_PASSWORD:-qwerty}
+        crafting  crafting-db 5433 ${CRAFTING_POSTGRES_DB:-crafting} ${CRAFTING_POSTGRES_USER:-postgres} ${CRAFTING_POSTGRES_PASSWORD:-qwerty}
+        exam      exam-db 5433 ${EXAM_POSTGRES_DB:-exam} ${EXAM_POSTGRES_USER:-postgres} ${EXAM_POSTGRES_PASSWORD:-qwerty}
+        world     world-db 5433 ${WORLD_POSTGRES_DB:-world} ${WORLD_POSTGRES_USER:-postgres} ${WORLD_POSTGRES_PASSWORD:-qwerty}
+        zombie    zombie-db 5433 ${ZOMBIE_POSTGRES_DB:-zombie} ${ZOMBIE_POSTGRES_USER:-postgres} ${ZOMBIE_POSTGRES_PASSWORD:-qwerty}
+        resource  resource-db 5433 ${RESOURCE_POSTGRES_DB:-resource} ${RESOURCE_POSTGRES_USER:-postgres} ${RESOURCE_POSTGRES_PASSWORD:-qwerty}
+    volumes:
+      - ./db/warehouse:/etl:ro
+    depends_on:
+      warehouse-db:
+        condition: service_healthy
+
 volumes:
   etcd-data:
+  warehouse-db-data:
   player-db-0-data:
   player-db-1-data:
   player-db-2-data:
