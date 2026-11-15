@@ -1,0 +1,58 @@
+# Shared by every node of every cluster. The node's name, cluster (scope), addresses and
+# passwords come from PATRONI_* environment variables set by entrypoint.sh and compose.
+restapi:
+  listen: 0.0.0.0:8008
+
+bootstrap:
+  # written to etcd once, when the cluster is created; `patronictl edit-config` changes it later
+  dcs:
+    # the primary's leader lock lives `ttl` seconds: a primary that stops renewing it (crashed,
+    # cut off) loses the lock, and the healthiest replica takes it and is promoted
+    ttl: 20
+    loop_wait: 5
+    retry_timeout: 5
+    # a replica more than 1 MB of WAL behind the primary is never promoted
+    maximum_lag_on_failover: 1048576
+    # if etcd itself is down, a primary that still reaches all its replicas keeps serving writes
+    failsafe_mode: true
+    postgresql:
+      # an old primary that comes back is rewound to the new timeline and rejoins as a replica
+      use_pg_rewind: true
+      use_slots: true
+      parameters:
+        max_connections: 100
+        shared_buffers: 16MB
+        work_mem: 2MB
+        maintenance_work_mem: 16MB
+        wal_level: replica
+        hot_standby: "on"
+        wal_log_hints: "on"
+        max_wal_senders: 5
+        max_replication_slots: 5
+        wal_keep_size: 64MB
+        password_encryption: scram-sha-256
+  initdb:
+    - encoding: UTF8
+    - data-checksums
+  # creates the service's database and loads db/<service>/init.sql, once, on the first primary
+  post_init: /usr/local/bin/post_init.sh
+
+postgresql:
+  listen: 0.0.0.0:5432
+  data_dir: /var/lib/postgresql/data/pgdata
+  pgpass: /tmp/pgpass
+  # a new replica copies the primary at once instead of waiting minutes for a spread checkpoint
+  basebackup:
+    - checkpoint: fast
+  authentication:
+    superuser:
+      username: postgres
+    replication:
+      username: replicator
+  pg_hba:
+    - local all all trust
+    - host replication replicator all scram-sha-256
+    - host all all all scram-sha-256
+
+watchdog:
+  mode: off
