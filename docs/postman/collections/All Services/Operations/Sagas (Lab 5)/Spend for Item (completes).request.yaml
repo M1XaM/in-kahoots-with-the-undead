@@ -1,0 +1,25 @@
+name: Spend for Item (completes)
+$kind: http-request
+description: |-
+  Reserve, deliver, commit. Player 1 needs 2 wood (seeded) and a Player account. Sent again, the same Idempotency-Key answers the same saga.
+method: POST
+url: "{{baseUrl}}/sagas/spend-for-item?wait=10"
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+  - key: Idempotency-Key
+    value: "5a6a0000-0000-4000-8000-000000000001"
+body:
+  type: json
+  content: |-
+    {
+      "playerId": 1,
+      "resources": {
+        "wood": 2
+      },
+      "itemId": "barricade_kit",
+      "quantity": 1
+    }
+order: 1000

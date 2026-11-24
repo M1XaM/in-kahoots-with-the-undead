@@ -1,0 +1,10 @@
+name: Retry a Stuck Saga
+$kind: http-request
+description: |-
+  Only for a stuck saga (409 SAGA_NOT_STUCK otherwise). With ?done=true the step it is stuck on is taken as applied.
+method: POST
+url: "{{baseUrl}}/sagas/5a6a0000-0000-4000-8000-000000000001/retry"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+order: 8000

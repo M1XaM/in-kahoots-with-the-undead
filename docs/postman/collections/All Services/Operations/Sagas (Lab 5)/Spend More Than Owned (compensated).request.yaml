@@ -1,0 +1,25 @@
+name: Spend More Than Owned (compensated)
+$kind: http-request
+description: |-
+  The first step is refused, so there is nothing to undo. Answers 409.
+method: POST
+url: "{{baseUrl}}/sagas/spend-for-item?wait=10"
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+  - key: Idempotency-Key
+    value: "{{$guid}}"
+body:
+  type: json
+  content: |-
+    {
+      "playerId": 1,
+      "resources": {
+        "wood": 99999
+      },
+      "itemId": "barricade_kit",
+      "quantity": 1
+    }
+order: 4000

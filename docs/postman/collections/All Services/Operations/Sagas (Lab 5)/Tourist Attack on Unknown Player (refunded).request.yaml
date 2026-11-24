@@ -1,0 +1,26 @@
+name: Tourist Attack on Unknown Player (refunded)
+$kind: http-request
+description: |-
+  Player 3 is seeded in Resource. Without a Player account the XP step is refused and the theft refunded.
+method: POST
+url: "{{baseUrl}}/sagas/tourist-attack?wait=10"
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+  - key: Idempotency-Key
+    value: "{{$guid}}"
+body:
+  type: json
+  content: |-
+    {
+      "playerId": 3,
+      "zombieId": 9,
+      "encounterId": "postman-encounter",
+      "xp": 10,
+      "resources": {
+        "food": 3
+      }
+    }
+order: 6000

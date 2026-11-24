@@ -1,0 +1,25 @@
+name: Spend for Unknown Item (compensated)
+$kind: http-request
+description: |-
+  Player refuses the item, so the reservation is released. Answers 409.
+method: POST
+url: "{{baseUrl}}/sagas/spend-for-item?wait=10"
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+  - key: Idempotency-Key
+    value: "{{$guid}}"
+body:
+  type: json
+  content: |-
+    {
+      "playerId": 1,
+      "resources": {
+        "wood": 2
+      },
+      "itemId": "no_such_item",
+      "quantity": 1
+    }
+order: 3000

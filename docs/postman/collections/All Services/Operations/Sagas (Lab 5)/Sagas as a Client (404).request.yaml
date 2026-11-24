@@ -1,0 +1,7 @@
+name: Sagas as a Client (404)
+$kind: http-request
+description: |-
+  Not part of the public API.
+method: GET
+url: "{{baseUrl}}/sagas"
+order: 9000

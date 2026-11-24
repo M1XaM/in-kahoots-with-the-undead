@@ -1,0 +1,18 @@
+name: Refund a Theft
+$kind: http-request
+description: |-
+  Compensation of Steal Resources; repeating it changes nothing.
+method: POST
+url: "{{baseUrl}}/resources/players/42/steal/refund"
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+body:
+  type: json
+  content: |-
+    {
+      "encounterId": "postman-encounter"
+    }
+order: 7500

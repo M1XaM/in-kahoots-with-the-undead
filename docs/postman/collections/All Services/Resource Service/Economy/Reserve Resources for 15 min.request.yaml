@@ -1,0 +1,23 @@
+name: Reserve Resources for 15 min
+$kind: http-request
+description: |-
+  holdSeconds (1-3600, default 60), as a saga does.
+method: POST
+url: "{{baseUrl}}/resources/players/42/reservations"
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+  - key: Idempotency-Key
+    value: "{{$guid}}"
+body:
+  type: json
+  content: |-
+    {
+      "resources": {
+        "wood": 1
+      },
+      "holdSeconds": 900
+    }
+order: 7600

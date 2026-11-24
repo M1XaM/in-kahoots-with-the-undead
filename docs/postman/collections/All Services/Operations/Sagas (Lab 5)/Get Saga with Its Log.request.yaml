@@ -1,0 +1,10 @@
+name: Get Saga with Its Log
+$kind: http-request
+description: |-
+  Every try of every step of the saga above.
+method: GET
+url: "{{baseUrl}}/sagas/5a6a0000-0000-4000-8000-000000000001"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+order: 2000
