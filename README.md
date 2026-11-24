@@ -550,7 +550,7 @@ docker compose exec base-db-0 patronictl switchover --force   # hand the primary
 A clean stop gives a new primary in about 8 s, and a `docker compose kill` in about 20 s (the lock
 `ttl`). Requests through the gateway may fail for a little longer: until the broker's circuit
 breakers for the service close again. Each node takes about 50–70 MB (Postgres with
-`shared_buffers=16MB`, plus Patroni), about 1.2 GB for the 24 nodes.
+`shared_buffers=16MB`, plus Patroni), about 1.4 GB for the 27 nodes.
 
 The clusters start empty. Patroni's `post_init` creates the service database and runs
 `db/<service>/init.sql` once, on the first primary; the replicas copy it. The volumes are
@@ -587,10 +587,10 @@ docker compose exec warehouse-db psql -U postgres -d warehouse -c 'select * from
 
 `docker-compose.dev.yml` publishes the warehouse on `WAREHOUSE_PORT` (5440) for a SQL client.
 
-### Auth cache (Redis, consistent hashing)
+### Cache (Redis, consistent hashing)
 
 `redis-0`, `redis-1` and `redis-2` are Valkey shards (the same protocol as Redis). Each runs
-in-memory only, capped at 32 MB. The gateway shards keys across them with **consistent hashing**:
+in-memory only, capped at 32 MB. Their clients, the gateway, Resource and Zombie, shard keys across them with **consistent hashing**:
 
 - Every shard owns `CACHE_VNODES` (160) points on a ring of 2^64 positions.
 - A key belongs to the first point clockwise from its hash.
@@ -603,6 +603,31 @@ and the logged-out token is refused from then on until it expires.
 A shard that stops answering is skipped, and its keys go to the next shard clockwise. With no shard
 up, every token is verified as before. See the gateway README for details, and
 `curl -H 'X-Internal-Key: changeme' localhost:8080/internal/cache` for how the ring splits keys.
+
+**GET answers** are cached too, by their owners, so calls between services benefit as well: Zombie's
+definitions (300 s, dropped on any write) and Resource's balances and newest ledger page (30 s, dropped when a
+write to the player's rows commits, never past the expiry of a hold). Each answer says `X-Cache: hit` or
+`miss` and names its `X-Cache-Shard`. The algorithm, what it guarantees and how it
+differs from Redis Cluster's hash slots: [consistent-hashing.md](docs/consistent-hashing.md).
+
+### Sagas
+
+Changes that span several databases are long-running sagas, coordinated by the gateway, instead of
+two-phase commits. Their state is in `gateway-db` (a Patroni cluster like the others), so a gateway
+that dies mid-saga loses nothing. Endpoints, DTOs and the rules for participants are in the
+[contract](docs/communication.md#sagas).
+
+```
+KEY=$(uuidgen)
+curl -X POST localhost:8080/sagas/spend-for-item -H 'X-Internal-Key: changeme' -H "Idempotency-Key: $KEY" \
+  -H 'Content-Type: application/json' -d '{"playerId":1,"resources":{"wood":2},"itemId":"barricade_kit","quantity":1}'
+curl -H 'X-Internal-Key: changeme' localhost:8080/sagas/$KEY      # every step it tried
+```
+
+- **Compensation:** an unknown `itemId` makes Player refuse, and the reservation is released (`409`, `compensated`).
+- **Retries:** `docker compose stop player`, start a `tourist-attack`, start Player again within its five tries
+  (about 15 s): the saga completes. Left stopped, what was stolen is refunded.
+- **Crash:** `docker compose kill gateway` mid-saga and start it: the saga goes on when its lease runs out (30 s).
 
 ## Monitoring
 
@@ -682,8 +707,9 @@ is in the [contract](docs/communication.md#log-collection-get-internallogs-and-g
 
 - [Technologies](docs/technologies.md): tech stack per service and the trade-offs behind each choice.
 - [Communication Contract](docs/communication.md): data ownership, endpoints and event payloads across services.
+- [Consistent hashing](docs/consistent-hashing.md): the cache's sharding, and how Redis Cluster does it.
 - [Postman collection](docs/postman/collections/All%20Services): every request of the system in one collection
   (**All Services**), one folder per service plus Broker, Service Discovery and Operations (logs, metrics,
-  the Lab 5 auth cache). It is stored in Postman's file format: open `docs/` in Postman (Local View; the
+  the Lab 5 auth cache and sagas). It is stored in Postman's file format: open `docs/` in Postman (Local View; the
   workspace is `docs/.postman`) or import the `docs/postman` folder. Run a folder's **Auth (run first)**
   once: the token is shared by every folder.
