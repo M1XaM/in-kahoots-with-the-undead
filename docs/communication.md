@@ -7,7 +7,7 @@
 
 | Service | Port | Path prefix |
 |---|---|---|
-| **Gateway** | 8080 | all of the below, plus `/ws/game`, `/logs`, `/health`, `/status`, `/metrics` |
+| **Gateway** | 8080 | all of the below, plus `/sagas` (internal), `/ws/game`, `/logs`, `/health`, `/status`, `/metrics` |
 | Message Broker | 8091 HTTP, 8092 gRPC | `/call/{service}/…`, `/topics`, `/dead-letters` (see [Message broker](#message-broker)) |
 | Service Discovery | 8089 | `/services` (see [Scaling](#scaling)) |
 | Player | 8081 | `/auth`, `/players`, `/trades` |
@@ -167,6 +167,107 @@ Before the broker every producer served its events on a `GET /events` WebSocket 
 `GET /ws/{producer}`. Services that have not moved yet still use it, with the gateway's
 `LEGACY_SERVICE_ROUTES=true`. New code publishes to and consumes from broker topics.
 
+## Sagas
+
+A change that spans several services' databases is a **saga** coordinated by the gateway: local
+transactions, one per service, each with a compensation that undoes it. No two-phase commit: a
+participant is never left holding locks until a coordinator decides. The coordinator stores every state change in
+`gateway-db` before the next step and calls the steps through the broker.
+
+| Saga | Steps (✗ = compensation, **pivot** = nothing is undone after it) | For |
+|---|---|---|
+| `spend-for-item` | Resource reserve, 900 s (✗ release) → **Player add item** → Resource commit | Crafting's craft, Base's Kiki reward |
+| `tourist-attack` | Zombie read → Resource steal (✗ refund) → **Player take XP** | Game's tourist zombie hit |
+
+**What a participant owes the coordinator:** every step and compensation is idempotent under its
+`Idempotency-Key` (or naturally), answers `4xx` only when it changed nothing, and a compensation with nothing to undo succeeds.
+
+> Player's `POST /players/{id}/inventory` (what it serves instead of the contract's
+> `.../inventory/items`) does not honour the key yet. The coordinator therefore never repeats it: a saga
+> that cannot tell whether it was applied becomes `stuck`.
+
+All routes need `X-Internal-Key`; anyone else gets `404`. Services reach them through the broker as
+`/call/gateway/sagas/...`.
+
+<details>
+<summary><b>POST</b> <code>/sagas/{name}</code> — Start a saga</summary>
+
+**Caller:** internal · **Auth:** `X-Internal-Key` · **Idempotent:** yes (the key is the saga's id)
+
+Waits up to `?wait=` seconds (default 5, 0-20) for the saga's end.
+
+```json
+// spend-for-item
+{ "playerId": 42, "resources": { "wood": 4 }, "itemId": "barricade_kit", "quantity": 1 }
+// tourist-attack; steps the zombie's abilities do not allow are skipped
+{ "playerId": 42, "zombieId": 9, "encounterId": "a5c2…", "xp": 25, "resources": { "food": 3 } }
+```
+
+| Code | When |
+|---|---|
+| `200` | Completed; body is the `Saga` |
+| `202` | Still `running` or `compensating`, or `stuck`; `Location: /sagas/{id}` |
+| `400 VALIDATION_ERROR` | Invalid body, or the `Idempotency-Key` is not a UUID |
+| `404 SAGA_NOT_FOUND` | No saga is called that |
+| `409` | Compensated: `{ "error": { the failed step's code and message }, "saga": Saga }` |
+| `409 IDEMPOTENCY_KEY_REUSED` | The key started another saga |
+| `503 SERVICE_UNAVAILABLE` | `gateway-db` does not answer |
+
+</details>
+
+<details>
+<summary><b>GET</b> <code>/sagas</code>, <code>/sagas/{id}</code> — Look at sagas</summary>
+
+**Caller:** internal · **Auth:** `X-Internal-Key` · **Idempotent:** —
+
+The list takes `?status=`, `?name=` and `?limit=` (50, max 200); one saga also has its `log`.
+`404 SAGA_NOT_FOUND`.
+
+</details>
+
+<details>
+<summary><b>POST</b> <code>/sagas/{id}/retry</code> — Continue a stuck saga</summary>
+
+**Caller:** internal (operator) · **Auth:** `X-Internal-Key` · **Idempotent:** no
+
+Calls the step it is stuck on again; with `?done=true`, after checking that the step was applied, skips it.
+
+| Code | When |
+|---|---|
+| `202` | It goes on; body is the `Saga` |
+| `404 SAGA_NOT_FOUND` | No such saga |
+| `409 SAGA_NOT_STUCK` | It is not stuck |
+
+</details>
+
+<details>
+<summary>Saga</summary>
+
+```
+Saga { sagaId: uuid, name: string, status: enum(running|compensating|completed|compensated|stuck),
+       step: string?, attempts: int, input: object, results: map<string, object>,
+       error: { step: string, code: string, message: string }?, createdAt: datetime, updatedAt: datetime,
+       log: [{ at: datetime, step: string, phase: string, outcome: string, by: string,
+               attempt: int?, code: string?, message: string? }]? }
+```
+
+</details>
+
+## Caching
+
+Three Valkey shards (`redis-0..2`) hold short-lived copies, placed by consistent hashing in the
+clients ([how and why](consistent-hashing.md)). A shard that fails is skipped, and with none up everything
+works from the databases.
+
+| Data | Owner | Kept for | Invalidated by |
+|---|---|---|---|
+| Verified token claims | Gateway | 300 s, at most the token's `exp` | `POST /auth/logout` (revocation on two shards) |
+| `GET /zombies`, `GET /zombies/{id}` | Zombie | 300 s | Any definition written |
+| `GET /resources/players/{id}`, its `/ledger` (newest page) | Resource | 30 s, at most the next reservation's expiry | The commit of any write to the player's rows |
+
+Cached answers carry `X-Cache: hit | miss | off` and `X-Cache-Shard`. Keys start with the service's name. Decisions
+(reserve, commit, steal) never read the cache.
+
 ## Authentication
 
 ### Player session
@@ -211,6 +312,7 @@ events.
 |---|---|
 | Player, Exam, World, Zombie, Base, Crafting, Resource | PostgreSQL, one database per service |
 | Game | Redis (live session and timer state), PostgreSQL (session history) |
+| Gateway | PostgreSQL (its sagas) |
 | Broker | `events.log` on the `broker-data` volume (queues, dead letters, subscriptions) |
 
 ---
@@ -1827,8 +1929,8 @@ Zombie     { zombieId: int, type: ZombieType, name: string, subject: string?, sp
 The resource economy: per-player balances, gathering, spending, a ledger of every change.
 
 Spending is two-phase so a caller that fails after spending can undo it:
-**reserve → do the work → commit** (or release). Reservations not committed within 60 s are
-released automatically.
+**reserve → do the work → commit** (or release). Reservations not committed within `holdSeconds`
+(60 by default) are released automatically.
 
 **Auth:** Resource reads the acting player from `X-Player-Id` set by the gateway; it does not read
 the cookie, and treats a request marked `X-Caller: client` as the player's. It calls World through
@@ -1902,6 +2004,7 @@ resources are reserved or none.
 | Field | Type | Rules |
 |---|---|---|
 | `resources` | map<string,int> | Non-empty, every amount ≥ 1 |
+| `holdSeconds` | int? | 1-3600, default 60; a saga holds longer |
 
 **Responses**
 
@@ -1932,7 +2035,7 @@ Deducts the reserved amounts permanently and writes `spent` ledger entries.
 | `200` | Committed (or already committed) |
 | `404 RESERVATION_NOT_FOUND` | No such reservation |
 | `409 RESERVATION_RELEASED` | Already released through `DELETE`; reserve again |
-| `410 RESERVATION_EXPIRED` | Auto-released after 60 s; reserve again |
+| `410 RESERVATION_EXPIRED` | Auto-released when its hold ran out; reserve again |
 
 ```json
 // 200
@@ -1987,6 +2090,32 @@ Takes `min(requested, free balance)` per resource; never fails for insufficient 
 ```json
 // 200
 { "taken": { "food": 4, "wood": 3 } }
+```
+
+</details>
+
+<details>
+<summary><b>POST</b> <code>/resources/players/{id}/steal/refund</code> — Give back what an encounter stole</summary>
+
+**Caller:** internal (Gateway, compensation of the `tourist-attack` saga) · **Auth:** `X-Internal-Key` · **Idempotent:** yes (naturally)
+
+Returns what the ledger says the encounter took and has not given back, and writes `refunded`
+entries. Repeating it, or refunding an encounter that took nothing, changes nothing.
+
+**Request body**
+
+```json
+{ "encounterId": "a5c2…" }
+```
+
+| Code | When |
+|---|---|
+| `200` | Applied, or nothing was owed |
+| `404 PLAYER_NOT_FOUND` | No balances for this player |
+
+```json
+// 200
+{ "refunded": { "food": 4, "wood": 3 } }
 ```
 
 </details>
@@ -2059,7 +2188,7 @@ event is a no-op. Publishes `resource.gathered` after crediting.
 <summary>LedgerEntry</summary>
 
 ```
-LedgerEntry { entryId: uuid, kind: enum(gathered|spent|stolen), resourceType: string, amount: int,
+LedgerEntry { entryId: uuid, kind: enum(gathered|spent|stolen|refunded), resourceType: string, amount: int,
               nodeId: int?, actionId: uuid?, reservationId: uuid?, encounterId: string?, at: datetime }
 ```
 
