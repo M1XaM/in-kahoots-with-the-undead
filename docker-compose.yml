@@ -6,7 +6,8 @@ x-jwt-private-key: &jwt-private-key ${JWT_PRIVATE_KEY:------BEGIN PRIVATE KEY---
 include:
   - docker-compose.db.yml
 
-# one shard of the gateway's auth cache: claims of verified player tokens and logout revocations.
+# one shard of the cache: the gateway's verified player tokens and logout revocations, and the GET
+# answers of Resource and Zombie.
 # Not persisted and capped: every key has a TTL, and the ones closest to expiring go first.
 x-cache-shard: &cache-shard
   image: valkey/valkey:8.1-alpine
@@ -253,6 +254,11 @@ services:
       DB_USERNAME: ${ZOMBIE_POSTGRES_USER:-postgres}
       DB_PASSWORD: ${ZOMBIE_POSTGRES_PASSWORD:-qwerty}
       DB_NAME: ${ZOMBIE_POSTGRES_DB:-zombie}
+      # GET answers are cached on these shards (consistent hashing); empty = no cache.
+      # Read from the Lab 5 image on.
+      REDIS_SHARDS: ${ZOMBIE_REDIS_SHARDS:-redis-0:6379,redis-1:6379,redis-2:6379}
+      CACHE_VNODES: ${ZOMBIE_CACHE_VNODES:-160}
+      CACHE_TTL_MS: ${ZOMBIE_CACHE_TTL_MS:-300000}
       # Zombie calls no service; the broker calls it on its gRPC port (broker.v1.Endpoint)
       GRPC_PORT: 9085
       # registers with its grpc_url (and no topics) on startup, heartbeats, deregisters on shutdown
@@ -278,6 +284,11 @@ services:
       DB_USERNAME: ${RESOURCE_POSTGRES_USER:-postgres}
       DB_PASSWORD: ${RESOURCE_POSTGRES_PASSWORD:-qwerty}
       DB_NAME: ${RESOURCE_POSTGRES_DB:-resource}
+      # GET answers are cached on these shards (consistent hashing); empty = no cache.
+      # Read from the Lab 5 image on.
+      REDIS_SHARDS: ${RESOURCE_REDIS_SHARDS:-redis-0:6379,redis-1:6379,redis-2:6379}
+      CACHE_VNODES: ${RESOURCE_CACHE_VNODES:-160}
+      CACHE_TTL_MS: ${RESOURCE_CACHE_TTL_MS:-30000}
       # calls to World go through the broker over gRPC (Broker.Call) and the outbox is relayed
       # with Broker.Publish; the broker calls Resource back on its gRPC port and delivers the
       # `player.registered` and `game.action_completed` topics
@@ -293,7 +304,7 @@ services:
       broker:
         condition: service_started
 
-  # the auth cache, sharded by the gateway with consistent hashing (each key on the first shard
+  # the cache, sharded by its clients (gateway, Resource, Zombie) with consistent hashing (each key on the first shard
   # clockwise from its hash on a ring of CACHE_VNODES points per shard); GET /internal/cache on
   # the gateway shows the split. A shard that stops answering hands its keys to the next one.
   redis-0:
@@ -339,6 +350,10 @@ services:
       CACHE_VNODES: ${GATEWAY_CACHE_VNODES:-160}
       AUTH_CACHE_TTL_S: ${GATEWAY_AUTH_CACHE_TTL_S:-300}
       REVOCATION_COPIES: ${GATEWAY_REVOCATION_COPIES:-2}
+      # the saga coordinator (POST /sagas/{name}) keeps its sagas here, so any gateway can continue
+      # them; empty = no sagas. Read from the Lab 5 gateway on.
+      SAGA_DATABASE_URL: ${GATEWAY_SAGA_DATABASE_URL-postgres://${GATEWAY_POSTGRES_USER:-postgres}:${GATEWAY_POSTGRES_PASSWORD:-qwerty}@gateway-db:5432/${GATEWAY_POSTGRES_DB:-gateway}?sslmode=disable}
+      SAGA_MAX_ATTEMPTS: ${GATEWAY_SAGA_MAX_ATTEMPTS:-5}
       # routes to the healthy instances Discovery lists, round-robin; the *_SERVICE_URL above
       # are only used for services Discovery has not listed (they do not register yet)
       DISCOVERY_URL: http://discovery:8089
@@ -350,6 +365,7 @@ services:
       - redis-0
       - redis-1
       - redis-2
+      - gateway-db
       - player
       - game
       - exam

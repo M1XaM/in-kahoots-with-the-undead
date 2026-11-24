@@ -323,6 +323,41 @@ services:
       - zombie-db-1
       - zombie-db-2
 
+  # --- gateway-db: the gateway's sagas ---
+  gateway-db-0:
+    <<: *pg-node
+    environment: &gateway-db-env
+      <<: *pg-env
+      PATRONI_SCOPE: gateway
+      NODE: gateway-db-0
+      APP_DB: ${GATEWAY_POSTGRES_DB:-gateway}
+      PATRONI_SUPERUSER_USERNAME: ${GATEWAY_POSTGRES_USER:-postgres}
+      PATRONI_SUPERUSER_PASSWORD: ${GATEWAY_POSTGRES_PASSWORD:-qwerty}
+    volumes:
+      - gateway-db-0-data:/var/lib/postgresql/data
+  gateway-db-1:
+    <<: *pg-node
+    environment:
+      <<: *gateway-db-env
+      NODE: gateway-db-1
+    volumes:
+      - gateway-db-1-data:/var/lib/postgresql/data
+  gateway-db-2:
+    <<: *pg-node
+    environment:
+      <<: *gateway-db-env
+      NODE: gateway-db-2
+    volumes:
+      - gateway-db-2-data:/var/lib/postgresql/data
+  gateway-db:
+    <<: *pg-router
+    environment:
+      CLUSTER: gateway-db
+    depends_on:
+      - gateway-db-0
+      - gateway-db-1
+      - gateway-db-2
+
   # --- resource-db: Resource Service's database ---
   resource-db-0:
     <<: *pg-node
@@ -430,6 +465,9 @@ volumes:
   zombie-db-0-data:
   zombie-db-1-data:
   zombie-db-2-data:
+  gateway-db-0-data:
+  gateway-db-1-data:
+  gateway-db-2-data:
   resource-db-0-data:
   resource-db-1-data:
   resource-db-2-data:
