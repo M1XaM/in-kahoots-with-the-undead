@@ -1,0 +1,8 @@
+name: List Compensated Sagas
+$kind: http-request
+method: GET
+url: "{{baseUrl}}/sagas?status=compensated&limit=20"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+order: 7000

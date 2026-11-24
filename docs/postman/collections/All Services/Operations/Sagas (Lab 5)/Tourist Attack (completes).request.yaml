@@ -1,0 +1,26 @@
+name: Tourist Attack (completes)
+$kind: http-request
+description: |-
+  Zombie read, steal, XP.
+method: POST
+url: "{{baseUrl}}/sagas/tourist-attack?wait=10"
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+  - key: Idempotency-Key
+    value: "{{$guid}}"
+body:
+  type: json
+  content: |-
+    {
+      "playerId": 1,
+      "zombieId": 9,
+      "encounterId": "postman-encounter",
+      "xp": 10,
+      "resources": {
+        "food": 3
+      }
+    }
+order: 5000
