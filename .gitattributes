@@ -1,0 +1,4 @@
+# run inside Linux containers: CRLF from a Windows checkout would break them
+*.sh text eol=lf
+*.cfg text eol=lf
+*.sql text eol=lf
