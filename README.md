@@ -53,8 +53,7 @@ registration. Only Game's Socket.IO connection still goes directly from the brow
 Game orchestrates a session by calling World, Zombie and Exam; Resource, Base and Crafting react to
 what Game reports via topics, and publish their own events (level-ups, exam results, wing unlocks)
 for services that depend on them. The diagram's source is [`docs/architecture.drawio`](docs/architecture.drawio).
-See the [Communication Contract](docs/communication.md) for the full endpoint and event contract
-(not yet rewritten for the broker; tracked by the Lab 4 contract tasks).
+See the [Communication Contract](docs/communication.md) for the full endpoint and event contract.
 
 ## Running
 
@@ -118,8 +117,7 @@ browser sockets all land on `game`; the others serve REST and the `/events` stre
 - **Repository:** [`services/gateway`](https://github.com/TimurCravtov/KahootWithUndeadGateway),
   Python / FastAPI (the lab's "banned" language).
 - **Image:** [`timurcravtov/gateway`](https://hub.docker.com/r/timurcravtov/gateway), version set
-  by `GATEWAY_SERVICE_TAG` (currently `3`; the Lab 4 behaviour below needs the image released from
-  the gateway's Lab 4 branch).
+  by `GATEWAY_SERVICE_TAG` (currently `5`, the lab number; the auth cache and sagas below need it).
 - **Routes** by the first path segment to the owning service (prefixes in the
   [Communication Contract](docs/communication.md#conventions)) **through the message broker**:
   `Broker.Call` over gRPC (`GATEWAY_BROKER_TRANSPORT=grpc`, or `http` for `/call/{service}/...`).
@@ -339,7 +337,7 @@ Defaults are the design's proposals, not confirmed.
 ### Player Service
 
 - **Image:** [`timurcravtov/player-service`](https://hub.docker.com/r/timurcravtov/player-service),
-  version set by `PLAYER_SERVICE_TAG` (default `4`).
+  version set by `PLAYER_SERVICE_TAG` (default `5`).
 - **Needs:** its own Postgres (`player-db`, started by compose); password defaults to `qwerty`, override with `PLAYER_POSTGRES_PASSWORD`.
 - **Talks to:** Game, over its event stream: it asks the gateway for the stream URL (`GATEWAY_URL`) and
   keeps `online` in step with `game.presence_changed`. It issues the login cookie, publishes the JWKS
@@ -350,7 +348,7 @@ Defaults are the design's proposals, not confirmed.
 ### Game Service
 
 - **Image:** [`timurcravtov/game-service`](https://hub.docker.com/r/timurcravtov/game-service),
-  version set by `GAME_SERVICE_TAG` (default `4`), `game` plus `GAME_EXTRA_REPLICAS` (1) `game-replica` replicas.
+  version set by `GAME_SERVICE_TAG` (default `5`), `game` plus `GAME_EXTRA_REPLICAS` (1) `game-replica` replicas.
 - **Needs:** its own Postgres (`game-db`, started by compose); password defaults to `qwerty`, override with `GAME_POSTGRES_PASSWORD`.
 - **Scaling:** instance-agnostic: lobbies, the event outbox and which sockets are joined (so
   `game.presence_changed` fires when a player's first socket anywhere joins and their last one
