@@ -421,7 +421,7 @@ Defaults are the design's proposals, not confirmed.
 ### Zombie Service
 
 - **Image:** [`nevaletik/kahoot-zombie-service`](https://hub.docker.com/r/nevaletik/kahoot-zombie-service),
-  version set by `ZOMBIE_SERVICE_TAG` (currently `3`, the lab number; each release is also tagged
+  version set by `ZOMBIE_SERVICE_TAG` (currently `5`, the lab number; each release is also tagged
   `<lab>.<minor>.<patch>` and `latest`), `ZOMBIE_REPLICAS` (2) replicas.
 - **Needs:** its own Postgres (`zombie-db`, started by compose and seeded from
   [`db/zombie-service/init.sql`](db/zombie-service/init.sql) with ten definitions: ids `5`/`6`/`7`
@@ -442,7 +442,7 @@ Defaults are the design's proposals, not confirmed.
 ### Resource Service
 
 - **Image:** [`nevaletik/kahoot-resource-service`](https://hub.docker.com/r/nevaletik/kahoot-resource-service),
-  version set by `RESOURCE_SERVICE_TAG` (currently `3`, the lab number; each release is also tagged
+  version set by `RESOURCE_SERVICE_TAG` (currently `5`, the lab number; each release is also tagged
   `<lab>.<minor>.<patch>` and `latest`), `RESOURCE_REPLICAS` (2) replicas.
 - **Needs:** its own Postgres (`resource-db`, started by compose and seeded from
   [`db/resource-service/init.sql`](db/resource-service/init.sql) with balances and ledger history
