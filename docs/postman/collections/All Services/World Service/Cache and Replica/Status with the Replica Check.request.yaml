@@ -1,0 +1,18 @@
+name: Status with the Replica Check
+$kind: http-request
+description: |-
+  checks.db is the primary (503 when it is down); checks.db_replica is up, primary, down or off.
+method: GET
+url: "{{brokerUrl}}/call/world/status"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      const checks = pm.response.json().checks;
+      console.log(checks);
+      pm.test('primary up', () => pm.expect(checks.db).to.eql('up'));
+      pm.test('replica answers', () => pm.expect(['up', 'primary']).to.include(checks.db_replica));
+order: 8000

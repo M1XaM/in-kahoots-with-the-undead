@@ -1,0 +1,18 @@
+name: Get Questions Again (hit)
+$kind: http-request
+description: |-
+  Send it again: any Exam replica answers from the same shard.
+method: GET
+url: "{{brokerUrl}}/call/exam/exams/questions?subject=math"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      const cache = pm.response.headers.get('X-Cache');
+      console.log('X-Cache', cache, 'X-Cache-Shard', pm.response.headers.get('X-Cache-Shard'));
+      pm.test('hit', () => pm.expect(cache).to.eql('hit'));
+      pm.test('same shard', () => pm.expect(pm.response.headers.get('X-Cache-Shard')).to.eql(pm.collectionVariables.get('examCacheShard')));
+order: 2000

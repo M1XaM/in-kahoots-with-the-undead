@@ -1,0 +1,17 @@
+name: Get Unlocked Rooms (player via gateway, cached)
+$kind: http-request
+description: |-
+  Each query is its own entry in world:map. Run Auth (run first) before.
+method: GET
+url: "{{baseUrl}}/world/rooms?unlocked=true"
+headers:
+  - key: Authorization
+    value: "Bearer {{accessToken}}"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      const cache = pm.response.headers.get('X-Cache');
+      console.log('X-Cache', cache, 'X-Cache-Shard', pm.response.headers.get('X-Cache-Shard'));
+      pm.test('cached answer', () => pm.expect(['hit', 'miss']).to.include(cache));
+order: 5000

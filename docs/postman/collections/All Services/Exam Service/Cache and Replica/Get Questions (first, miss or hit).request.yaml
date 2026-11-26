@@ -1,0 +1,19 @@
+name: Get Questions (first, miss or hit)
+$kind: http-request
+description: |-
+  The question bank is cached in the scope exam:questions (300 s) on the Valkey shard that owns it.
+  The first read after a change is a miss (from a replica of exam-db), later ones a hit.
+method: GET
+url: "{{brokerUrl}}/call/exam/exams/questions?subject=math"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      const cache = pm.response.headers.get('X-Cache');
+      console.log('X-Cache', cache, 'X-Cache-Shard', pm.response.headers.get('X-Cache-Shard'));
+      pm.test('cached answer', () => pm.expect(['hit', 'miss']).to.include(cache));
+      pm.collectionVariables.set('examCacheShard', pm.response.headers.get('X-Cache-Shard'));
+order: 1000

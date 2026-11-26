@@ -1,0 +1,19 @@
+name: Get Questions After a Change (miss)
+$kind: http-request
+description: |-
+  Misses and has the new question (read from the primary right after the change, so a lagging replica is never cached).
+method: GET
+url: "{{brokerUrl}}/call/exam/exams/questions?subject=math"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      const cache = pm.response.headers.get('X-Cache');
+      console.log('X-Cache', cache, 'X-Cache-Shard', pm.response.headers.get('X-Cache-Shard'));
+      pm.test('miss', () => pm.expect(cache).to.eql('miss'));
+      const id = Number(pm.collectionVariables.get('cacheQuestionId'));
+      pm.test('has the new question', () => pm.expect(pm.response.json().map((q) => q.questionId)).to.include(id));
+order: 4000

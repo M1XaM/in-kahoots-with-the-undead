@@ -1,0 +1,15 @@
+name: Delete the Created Question
+$kind: http-request
+description: |-
+  Cleans up (and drops the cache again).
+method: DELETE
+url: "{{brokerUrl}}/call/exam/exams/questions/{{cacheQuestionId}}"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('deleted', () => pm.response.to.have.status(204));
+order: 5000

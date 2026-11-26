@@ -1,0 +1,27 @@
+name: Create Question (drops the cache)
+$kind: http-request
+description: |-
+  A change to the bank deletes the scope's generation token on every shard, so every cached bank answer misses at once.
+method: POST
+url: "{{brokerUrl}}/call/exam/exams/questions"
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+body:
+  type: json
+  content: |-
+    {
+      "subject": "math",
+      "text": "Cache check: 7 x 6 = ?",
+      "options": ["42", "36", "48"],
+      "correctOption": 0
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('created', () => pm.response.to.have.status(201));
+      pm.collectionVariables.set('cacheQuestionId', pm.response.json().questionId);
+order: 3000

@@ -1,0 +1,18 @@
+name: Where a Key Lands (world ring)
+$kind: http-request
+description: |-
+  The shards, their share of the ring and where world:map lands.
+method: GET
+url: "{{brokerUrl}}/call/world/internal/cache?key=world:map"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      const key = pm.response.json().keys['world:map'];
+      console.log(key);
+      pm.collectionVariables.set('worldRingOwner', key.owner);
+      pm.test('three shards', () => pm.expect(pm.response.json().shards.length).to.eql(3));
+order: 6000

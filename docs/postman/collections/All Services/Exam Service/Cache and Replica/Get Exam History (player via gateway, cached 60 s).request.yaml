@@ -1,0 +1,17 @@
+name: Get Exam History (player via gateway, cached 60 s)
+$kind: http-request
+description: |-
+  Cached per player in exam:player:<id> for 60 s, dropped when one of the player's exams is graded. Run Auth (run first) before.
+method: GET
+url: "{{baseUrl}}/exams/players/{{playerId}}"
+headers:
+  - key: Authorization
+    value: "Bearer {{accessToken}}"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      const cache = pm.response.headers.get('X-Cache');
+      console.log('X-Cache', cache, 'X-Cache-Shard', pm.response.headers.get('X-Cache-Shard'));
+      pm.test('cached answer', () => pm.expect(['hit', 'miss']).to.include(cache));
+order: 6000

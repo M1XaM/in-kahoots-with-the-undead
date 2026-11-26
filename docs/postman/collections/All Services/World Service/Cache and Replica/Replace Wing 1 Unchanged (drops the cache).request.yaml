@@ -1,0 +1,24 @@
+name: Replace Wing 1 Unchanged (drops the cache)
+$kind: http-request
+description: |-
+  Any change to the map (here wing 1 written with its own values) drops every cached map answer once it commits. A wing unlocked by exam.completed does the same.
+method: PUT
+url: "{{brokerUrl}}/call/world/world/wings/1"
+headers:
+  - key: Content-Type
+    value: "application/json"
+  - key: X-Internal-Key
+    value: "changeme"
+body:
+  type: json
+  content: |-
+    {
+      "name": "Main Building",
+      "unlocked": true
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('replaced', () => pm.response.to.have.status(200));
+order: 3000
