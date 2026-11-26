@@ -32,11 +32,19 @@ x-game-service: &game-service
     MAX_CONCURRENT_TASKS: ${GAME_MAX_CONCURRENT_TASKS:-100}
     # signing keys for the Socket.IO handshake and service-to-service REST go through the gateway
     GATEWAY_URL: http://gateway:8080
+    # events (outbox) and the tourist-attack saga go through the broker over gRPC; the broker
+    # calls Game back on its gRPC port
+    BROKER_TRANSPORT: ${GAME_BROKER_TRANSPORT:-grpc}
+    BROKER_GRPC_URL: broker:${BROKER_GRPC_PORT:-8092}
+    BROKER_URL: http://broker:${BROKER_PORT:-8091}
+    GRPC_PORT: 9082
     # registers on startup, heartbeats, deregisters on shutdown
     DISCOVERY_URL: http://discovery:8089
   depends_on:
     game-db:
       condition: service_healthy
+    broker:
+      condition: service_started
 
 services:
   discovery:
@@ -102,13 +110,20 @@ services:
       KAFKA_BROKERS: ${KAFKA_BROKERS:-localhost:9092}
       TASK_TIMEOUT_MS: ${PLAYER_TASK_TIMEOUT_MS:-10000}
       MAX_CONCURRENT_TASKS: ${PLAYER_MAX_CONCURRENT_TASKS:-100}
-      # events and service-to-service REST go through the gateway
       GATEWAY_URL: http://gateway:8080
+      # events (player.registered, player.leveled_up) go out through the broker over gRPC; the
+      # broker calls Player back on its gRPC port
+      BROKER_TRANSPORT: ${PLAYER_BROKER_TRANSPORT:-grpc}
+      BROKER_GRPC_URL: broker:${BROKER_GRPC_PORT:-8092}
+      BROKER_URL: http://broker:${BROKER_PORT:-8091}
+      GRPC_PORT: 9081
       # registers on startup, heartbeats, deregisters on shutdown
       DISCOVERY_URL: http://discovery:8089
     depends_on:
       player-db:
         condition: service_healthy
+      broker:
+        condition: service_started
 
   # Socket.IO clients connect here directly (GET /ws/game); REST goes through the gateway. Replicas
   # started together race for a host port range, so only this one publishes a port and the extra
