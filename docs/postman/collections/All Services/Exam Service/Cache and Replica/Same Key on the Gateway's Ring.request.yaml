@@ -1,0 +1,15 @@
+name: Same Key on the Gateway's Ring
+$kind: http-request
+description: |-
+  The gateway places the same text on the same shard: every client of the cache uses one ring (md5, 160 points per shard).
+method: GET
+url: "{{baseUrl}}/internal/cache?key=exam:questions"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('same owner as Exam', () => pm.expect(pm.response.json().keys['exam:questions'].owner).to.eql(pm.collectionVariables.get('examRingOwner')));
+order: 8000

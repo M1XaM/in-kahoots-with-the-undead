@@ -1,0 +1,17 @@
+name: Get All Wings After a Change (miss)
+$kind: http-request
+description: |-
+  Misses, then the next read is a hit again.
+method: GET
+url: "{{brokerUrl}}/call/world/world/wings"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      const cache = pm.response.headers.get('X-Cache');
+      console.log('X-Cache', cache, 'X-Cache-Shard', pm.response.headers.get('X-Cache-Shard'));
+      pm.test('miss', () => pm.expect(cache).to.eql('miss'));
+order: 4000

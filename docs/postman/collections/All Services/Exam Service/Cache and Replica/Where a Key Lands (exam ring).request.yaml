@@ -1,0 +1,18 @@
+name: Where a Key Lands (exam ring)
+$kind: http-request
+description: |-
+  The shards, their share of the ring and where exam:questions lands: its owner, the fallback order and the shard serving it now.
+method: GET
+url: "{{brokerUrl}}/call/exam/internal/cache?key=exam:questions"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      const key = pm.response.json().keys['exam:questions'];
+      console.log(key);
+      pm.collectionVariables.set('examRingOwner', key.owner);
+      pm.test('three shards', () => pm.expect(pm.response.json().shards.length).to.eql(3));
+order: 7000

@@ -1,0 +1,15 @@
+name: Same Key on the Gateway's Ring
+$kind: http-request
+description: |-
+  The gateway places the same text on the same shard.
+method: GET
+url: "{{baseUrl}}/internal/cache?key=world:map"
+headers:
+  - key: X-Internal-Key
+    value: "changeme"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('same owner as World', () => pm.expect(pm.response.json().keys['world:map'].owner).to.eql(pm.collectionVariables.get('worldRingOwner')));
+order: 7000
