@@ -39,8 +39,8 @@ wings of the university to explore, tying academic progress directly to survival
   `<service>-db` hostname
 - **Data warehouse**: `warehouse-db` with a star schema, filled every minute by `warehouse-etl` from every
   database's replicas
-- **Auth cache**: three Valkey shards the Gateway splits keys across with consistent hashing (cached
-  token claims, logout revocations)
+- **Cache**: three Valkey shards split with consistent hashing: the Gateway's auth data (cached
+  token claims, logout revocations) and the GET answers of Zombie, Resource, Exam and World
 
 Clients reach the REST APIs through the Gateway, which verifies the login and forwards each
 request to the broker as `/call/{service}/...`; services call each other the same way, with
@@ -148,7 +148,9 @@ browser sockets all land on `game`; the others serve REST and the `/events` stre
 - **Repository:** [`services/service-discovery`](https://github.com/inercaso/KahootWithUndeadDiscovery),
   Python / FastAPI (the lab's "banned" language).
 - **Image:** [`inercaso/service-discovery`](https://hub.docker.com/r/inercaso/service-discovery),
-  version set by `DISCOVERY_SERVICE_TAG` (currently `3`).
+  version set by `DISCOVERY_SERVICE_TAG` (currently `4`: it keeps each instance's `topics` and
+  `grpc_url`, which the broker needs to deliver events and to call over gRPC, and serves
+  `GET /internal/logs` and `GET /metrics`).
 - **Registry:** every instance registers itself on startup (`POST /services/register` with its own
   container address), sends a heartbeat every few seconds and deregisters on shutdown; every service
   gets `DISCOVERY_URL: http://discovery:8089`. The gateway fetches `GET /services` every 2 s and
@@ -365,7 +367,7 @@ Defaults are the design's proposals, not confirmed.
 ### Exam Service
 
 - **Image:** [`inercaso/exam-service`](https://hub.docker.com/r/inercaso/exam-service),
-  version set by `EXAM_SERVICE_TAG` (currently `4`, the lab number; `latest` points at the newest),
+  version set by `EXAM_SERVICE_TAG` (currently `5`, the lab number; `latest` points at the newest),
   `EXAM_REPLICAS` (2) replicas.
 - **Needs:** its own Postgres (`exam-db`, started by compose and seeded with the question bank and
   achievements from [`db/exam-service/init.sql`](db/exam-service/init.sql)); password defaults to
@@ -382,8 +384,12 @@ Defaults are the design's proposals, not confirmed.
   load. The outbox, idempotency keys and encounter ids live in Postgres: one replica relays the
   outbox at a time, and an `Idempotency-Key` is claimed before `POST /exams` runs, so the same
   request on another replica answers `409 IDEMPOTENCY_KEY_IN_USE` while the first runs.
-- **Operations:** `GET /internal/logs` (collected by the gateway's `GET /logs`) and `GET /metrics`
-  (Prometheus job `exam`).
+- **Cache and replica:** the question bank (300 s, `EXAM_CACHE_TTL_S`) and each player's history
+  and achievements (60 s) are cached on the Valkey shards (`EXAM_REDIS_SHARDS`), dropped when a
+  question changes or the player's exam is graded. Plain GETs read a replica of `exam-db` (port
+  5433), writes and grading go to the primary; a primary failover is retried, then answered `503`.
+- **Operations:** `GET /internal/logs` (collected by the gateway's `GET /logs`), `GET /metrics`
+  (Prometheus job `exam`) and `GET /internal/cache?key=` (the ring, like the gateway's).
 - **Limits:** a request past `EXAM_TASK_TIMEOUT_MS` (default 10 s) answers `408 REQUEST_TIMEOUT`;
   beyond `EXAM_MAX_CONCURRENT_TASKS` (default 100) in flight, `429 TOO_MANY_REQUESTS` with
   `Retry-After`.
@@ -395,7 +401,7 @@ Defaults are the design's proposals, not confirmed.
 ### World Service
 
 - **Image:** [`inercaso/world-service`](https://hub.docker.com/r/inercaso/world-service),
-  version set by `WORLD_SERVICE_TAG` (currently `4`, the lab number; `latest` points at the newest),
+  version set by `WORLD_SERVICE_TAG` (currently `5`, the lab number; `latest` points at the newest),
   `WORLD_REPLICAS` (2) replicas.
 - **Needs:** its own Postgres (`world-db`, started by compose and seeded with the campus map from
   [`db/world-service/init.sql`](db/world-service/init.sql)); password defaults to `qwerty`,
@@ -409,8 +415,12 @@ Defaults are the design's proposals, not confirmed.
   load. The broker delivers each event to one replica; a repeat is a `duplicate`
   (`processed_events`, written in the same transaction as the wing update), and one replica relays
   the outbox at a time, so a wing is unlocked and announced once.
-- **Operations:** `GET /internal/logs` (collected by the gateway's `GET /logs`) and `GET /metrics`
-  (Prometheus job `world`).
+- **Cache and replica:** every map GET (rooms, wings, spawn points) is cached on the Valkey shards
+  (300 s, `WORLD_CACHE_TTL_S`, `WORLD_REDIS_SHARDS`) and dropped once any change to the map commits,
+  including a wing unlocked by `exam.completed`, so the unlock shows on the next read. Map GETs read a
+  replica of `world-db` (port 5433), writes and events go to the primary.
+- **Operations:** `GET /internal/logs` (collected by the gateway's `GET /logs`), `GET /metrics`
+  (Prometheus job `world`) and `GET /internal/cache?key=`.
 - **Limits:** `WORLD_TASK_TIMEOUT_MS` (default 10 s, then `408 REQUEST_TIMEOUT`) and
   `WORLD_MAX_CONCURRENT_TASKS` (default 100, then `429 TOO_MANY_REQUESTS` with `Retry-After`).
 - **Try it:** the [`World Service`](docs/postman/collections/All%20Services/World%20Service) folder of the Postman collection: players go through the
@@ -536,6 +546,10 @@ slot). The nodes are `<service>-db-0`, `-1` and `-2`; `etcd` stores each cluster
   node that is no longer primary are cut, so the services' pools reconnect to the new one.
   `:5433` reaches a replica (read-only), or the primary when no replica is up. HAProxy only reports
   healthy once its cluster has a primary, and the services wait for that.
+- **Reads from the replicas:** Exam and World send their plain GETs to `:5433`
+  (`DATABASE_REPLICA_URL`) and their writes to `:5432`. A broken replica connection falls back to the
+  primary, and operations that hit the failover are retried, then answered `503 DATABASE_UNAVAILABLE`
+  with `Retry-After`. The warehouse ETL also reads the replicas.
 
 ```
 docker compose exec base-db-0 patronictl list                 # roles, timeline, replication lag
@@ -588,7 +602,7 @@ docker compose exec warehouse-db psql -U postgres -d warehouse -c 'select * from
 ### Cache (Redis, consistent hashing)
 
 `redis-0`, `redis-1` and `redis-2` are Valkey shards (the same protocol as Redis). Each runs
-in-memory only, capped at 32 MB. Their clients, the gateway, Resource and Zombie, shard keys across them with **consistent hashing**:
+in-memory only, capped at 32 MB. Their clients, the gateway, Resource, Zombie, Exam and World, shard keys across them with **consistent hashing**:
 
 - Every shard owns `CACHE_VNODES` (160) points on a ring of 2^64 positions.
 - A key belongs to the first point clockwise from its hash.
@@ -603,8 +617,10 @@ up, every token is verified as before. See the gateway README for details, and
 `curl -H 'X-Internal-Key: changeme' localhost:8080/internal/cache` for how the ring splits keys.
 
 **GET answers** are cached too, by their owners, so calls between services benefit as well: Zombie's
-definitions (300 s, dropped on any write) and Resource's balances and newest ledger page (30 s, dropped when a
-write to the player's rows commits, never past the expiry of a hold). Each answer says `X-Cache: hit` or
+definitions (300 s, dropped on any write), Resource's balances and newest ledger page (30 s, dropped when a
+write to the player's rows commits, never past the expiry of a hold), Exam's question bank (300 s) and
+player history and achievements (60 s, dropped when the player's exam is graded), and World's whole map
+(300 s, dropped on any change to it, including a wing unlocked by `exam.completed`). Each answer says `X-Cache: hit` or
 `miss` and names its `X-Cache-Shard`. The algorithm, what it guarantees and how it
 differs from Redis Cluster's hash slots: [consistent-hashing.md](docs/consistent-hashing.md).
 
