@@ -238,7 +238,7 @@ services:
         condition: service_started
 
   zombie:
-    image: ${ZOMBIE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-zombie-service:${ZOMBIE_SERVICE_TAG:-4}
+    image: ${ZOMBIE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-zombie-service:${ZOMBIE_SERVICE_TAG:-5}
     restart: unless-stopped
     # every replica shares zombie-db; `docker compose up -d --scale zombie=3`
     deploy:
@@ -268,7 +268,7 @@ services:
         condition: service_healthy
 
   resource:
-    image: ${RESOURCE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-resource-service:${RESOURCE_SERVICE_TAG:-4}
+    image: ${RESOURCE_DOCKERHUB_USERNAME:-nevaletik}/kahoot-resource-service:${RESOURCE_SERVICE_TAG:-5}
     restart: unless-stopped
     # every replica shares resource-db; `docker compose up -d --scale resource=3`
     deploy:
