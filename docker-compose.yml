@@ -7,7 +7,7 @@ include:
   - docker-compose.db.yml
 
 # one shard of the cache: the gateway's verified player tokens and logout revocations, and the GET
-# answers of Resource and Zombie.
+# answers of Resource, Zombie, Exam and World.
 # Not persisted and capped: every key has a TTL, and the ones closest to expiring go first.
 x-cache-shard: &cache-shard
   image: valkey/valkey:8.1-alpine
@@ -40,7 +40,7 @@ x-game-service: &game-service
 
 services:
   discovery:
-    image: ${DISCOVERY_DOCKERHUB_USERNAME:-inercaso}/service-discovery:${DISCOVERY_SERVICE_TAG:-3}
+    image: ${DISCOVERY_DOCKERHUB_USERNAME:-inercaso}/service-discovery:${DISCOVERY_SERVICE_TAG:-4}
     restart: unless-stopped
     environment:
       PORT: 8089
@@ -181,7 +181,7 @@ services:
         condition: service_started
 
   exam:
-    image: ${EXAM_DOCKERHUB_USERNAME:-inercaso}/exam-service:${EXAM_SERVICE_TAG:-4}
+    image: ${EXAM_DOCKERHUB_USERNAME:-inercaso}/exam-service:${EXAM_SERVICE_TAG:-5}
     restart: unless-stopped
     # every replica shares exam-db; `docker compose up -d --scale exam=3`
     deploy:
@@ -189,6 +189,13 @@ services:
     environment:
       PORT: ${EXAM_PORT:-8083}
       DATABASE_URL: postgres://${EXAM_POSTGRES_USER:-postgres}:${EXAM_POSTGRES_PASSWORD:-qwerty}@exam-db:5432/${EXAM_POSTGRES_DB:-exam}?sslmode=disable
+      # plain GETs read a replica of the cluster (HAProxy port 5433); empty = every read on the primary
+      DATABASE_REPLICA_URL: postgres://${EXAM_POSTGRES_USER:-postgres}:${EXAM_POSTGRES_PASSWORD:-qwerty}@exam-db:5433/${EXAM_POSTGRES_DB:-exam}?sslmode=disable
+      # the question bank (CACHE_TTL_S) and player history / achievements (60 s) are cached on these
+      # shards (consistent hashing); empty = no cache. Read from the Lab 5 image on.
+      REDIS_SHARDS: ${EXAM_REDIS_SHARDS:-redis-0:6379,redis-1:6379,redis-2:6379}
+      CACHE_VNODES: ${EXAM_CACHE_VNODES:-160}
+      CACHE_TTL_S: ${EXAM_CACHE_TTL_S:-300}
       INTERNAL_KEY: ${INTERNAL_KEY:-changeme}
       TASK_TIMEOUT_MS: ${EXAM_TASK_TIMEOUT_MS:-10000}
       MAX_CONCURRENT_TASKS: ${EXAM_MAX_CONCURRENT_TASKS:-100}
@@ -209,9 +216,15 @@ services:
         condition: service_healthy
       broker:
         condition: service_started
+      redis-0:
+        condition: service_started
+      redis-1:
+        condition: service_started
+      redis-2:
+        condition: service_started
 
   world:
-    image: ${WORLD_DOCKERHUB_USERNAME:-inercaso}/world-service:${WORLD_SERVICE_TAG:-4}
+    image: ${WORLD_DOCKERHUB_USERNAME:-inercaso}/world-service:${WORLD_SERVICE_TAG:-5}
     restart: unless-stopped
     # every replica shares world-db; `docker compose up -d --scale world=3`
     deploy:
@@ -219,6 +232,13 @@ services:
     environment:
       PORT: ${WORLD_PORT:-8084}
       DATABASE_URL: postgres://${WORLD_POSTGRES_USER:-postgres}:${WORLD_POSTGRES_PASSWORD:-qwerty}@world-db:5432/${WORLD_POSTGRES_DB:-world}?sslmode=disable
+      # map GETs read a replica of the cluster (HAProxy port 5433); empty = every read on the primary
+      DATABASE_REPLICA_URL: postgres://${WORLD_POSTGRES_USER:-postgres}:${WORLD_POSTGRES_PASSWORD:-qwerty}@world-db:5433/${WORLD_POSTGRES_DB:-world}?sslmode=disable
+      # every map GET is cached on these shards (consistent hashing), dropped on any change to the
+      # map; empty = no cache. Read from the Lab 5 image on.
+      REDIS_SHARDS: ${WORLD_REDIS_SHARDS:-redis-0:6379,redis-1:6379,redis-2:6379}
+      CACHE_VNODES: ${WORLD_CACHE_VNODES:-160}
+      CACHE_TTL_S: ${WORLD_CACHE_TTL_S:-300}
       INTERNAL_KEY: ${INTERNAL_KEY:-changeme}
       TASK_TIMEOUT_MS: ${WORLD_TASK_TIMEOUT_MS:-10000}
       MAX_CONCURRENT_TASKS: ${WORLD_MAX_CONCURRENT_TASKS:-100}
@@ -235,6 +255,12 @@ services:
       world-db:
         condition: service_healthy
       broker:
+        condition: service_started
+      redis-0:
+        condition: service_started
+      redis-1:
+        condition: service_started
+      redis-2:
         condition: service_started
 
   zombie:
@@ -304,7 +330,7 @@ services:
       broker:
         condition: service_started
 
-  # the cache, sharded by its clients (gateway, Resource, Zombie) with consistent hashing (each key on the first shard
+  # the cache, sharded by its clients (gateway, Resource, Zombie, Exam, World) with consistent hashing (each key on the first shard
   # clockwise from its hash on a ring of CACHE_VNODES points per shard); GET /internal/cache on
   # the gateway shows the split. A shard that stops answering hands its keys to the next one.
   redis-0:
