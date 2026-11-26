@@ -264,9 +264,19 @@ works from the databases.
 | Verified token claims | Gateway | 300 s, at most the token's `exp` | `POST /auth/logout` (revocation on two shards) |
 | `GET /zombies`, `GET /zombies/{id}` | Zombie | 300 s | Any definition written |
 | `GET /resources/players/{id}`, its `/ledger` (newest page) | Resource | 30 s, at most the next reservation's expiry | The commit of any write to the player's rows |
+| `GET /exams/questions` (per `subject`), `GET /exams/questions/{id}` | Exam | 300 s | Any question created, replaced or deleted |
+| `GET /exams/players/{id}`, its `/achievements` | Exam | 60 s | One of the player's exams graded |
+| `GET /world/rooms` (per query), `/world/rooms/{id}`, `/world/wings`, `/world/wings/{id}`, `/world/spawn-points` (per query), `/world/spawn-points/{id}` | World | 300 s | Any map change committed: an admin write, or a wing unlocked by `exam.completed` |
 
 Cached answers carry `X-Cache: hit | miss | off` and `X-Cache-Shard`. Keys start with the service's name. Decisions
-(reserve, commit, steal) never read the cache.
+(reserve, commit, steal, drawing an exam's questions) never read the cache. A `404` is never cached.
+
+Exam and World also read their plain GETs from a replica of their database (the cluster's HAProxy
+port 5433) and write on the primary (5432). An item a replica does not have yet is read from the
+primary, so a read right after a create never answers `404`. While the cluster elects a new primary,
+their requests are retried, then answered `503 DATABASE_UNAVAILABLE` with `Retry-After`. Their
+`GET /status` adds `checks.db_replica` (`up`, `primary` when HAProxy serves 5433 from the primary,
+`down`, `off`); only a primary that is down makes it `503`.
 
 ## Authentication
 
